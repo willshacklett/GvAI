@@ -18,6 +18,8 @@ def main():
     print(f"Volatility: {summary['volatility']}")
     print(f"Recoverability: {summary['recoverability']}")
     print(f"Risk: {summary['risk']}")
+    print(f"Recovery State: {summary['recovery_state']}")
+    print(f"Recovery Strength: {summary['recovery_strength']}")
     print(f"Timestamp: {summary['timestamp']}")
     print(f"Label: {summary['label']}")
 

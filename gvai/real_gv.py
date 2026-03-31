@@ -104,6 +104,8 @@ def summarize_window(window_rows: List[Dict[str, object]]) -> Dict[str, object]:
             "risk": None,
             "timestamp": None,
             "label": None,
+            "recovery_state": "NO_DATA",
+            "recovery_strength": None,
         }
 
     scores = [r["gv_score"] for r in window_rows if r["gv_score"] is not None]
@@ -124,16 +126,34 @@ def summarize_window(window_rows: List[Dict[str, object]]) -> Dict[str, object]:
     else:
         trend = "STABLE"
 
+    latest_gv = latest["gv_score"]
+    latest_recovery = latest["recoverability"]
+    latest_risk = latest["risk"]
+
+    recovery_strength = None
+    if latest_gv is not None and latest_recovery is not None and latest_risk is not None:
+        recovery_strength = latest_recovery - latest_risk + 0.5 * latest_gv
+
+    recovery_state = "NONE"
+    if trend == "IMPROVING":
+        if latest_gv is not None and latest_recovery is not None and latest_risk is not None:
+            if latest_gv >= 0.75 and latest_recovery >= 0.70 and latest_risk <= 0.35:
+                recovery_state = "STABLE_RECOVERY"
+            else:
+                recovery_state = "FRAGILE_RECOVERY"
+
     return {
-        "gv_score": round(latest["gv_score"], 3),
+        "gv_score": round(latest_gv, 3),
         "avg_gv": round(sum(scores) / len(scores), 3),
         "delta_gv": round(delta_gv, 3),
         "trend": trend,
         "volatility": round(avg_abs_diff, 3),
-        "recoverability": latest["recoverability"],
-        "risk": latest["risk"],
+        "recoverability": latest_recovery,
+        "risk": latest_risk,
         "timestamp": latest["timestamp"],
         "label": latest["label"],
+        "recovery_state": recovery_state,
+        "recovery_strength": round(recovery_strength, 3) if recovery_strength is not None else None,
     }
 
 
@@ -141,6 +161,8 @@ def decision_from_summary(summary: Dict[str, object]) -> str:
     gv = summary["gv_score"]
     trend = summary["trend"]
     volatility = summary["volatility"]
+    recovery_state = summary.get("recovery_state", "NONE")
+    risk = summary.get("risk")
 
     if gv is None:
         return "NO_DATA"
@@ -148,9 +170,18 @@ def decision_from_summary(summary: Dict[str, object]) -> str:
     if gv < 0.55:
         return "REFUSE"
 
+    if recovery_state == "FRAGILE_RECOVERY":
+        return "QUALIFY"
+
+    if recovery_state == "STABLE_RECOVERY":
+        return "PASS"
+
     if trend == "DEGRADING" and volatility is not None and volatility >= 0.12:
         if gv < 0.68:
             return "SIMULATE"
+        return "QUALIFY"
+
+    if risk is not None and risk >= 0.50:
         return "QUALIFY"
 
     if gv < 0.72:
@@ -165,8 +196,21 @@ def response_from_summary(summary: Dict[str, object], decision: str) -> str:
     volatility = summary["volatility"]
     timestamp = summary["timestamp"]
     label = summary["label"]
+    recovery_state = summary.get("recovery_state", "NONE")
 
     header = f"Latest system snapshot: label={label}, timestamp={timestamp}, gv={gv}, trend={trend}, volatility={volatility}."
+
+    if recovery_state == "FRAGILE_RECOVERY":
+        return (
+            f"{header} The system is recovering, but the recovery is still fragile. "
+            f"Recommended next step: continue cautiously, keep safeguards in place, and confirm the rebound persists."
+        )
+
+    if recovery_state == "STABLE_RECOVERY":
+        return (
+            f"{header} The system is recovering with improving stability and preserved recovery paths. "
+            f"Recommended next step: continue normal operation with monitoring until the recovery is sustained."
+        )
 
     if decision == "PASS":
         return (
