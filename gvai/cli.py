@@ -3,7 +3,7 @@ from gvai.core import GvCore
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python -m gvai.cli "your text here"")
+        print("Usage: python -m gvai.cli \"your text here\"")
         return
 
     text = sys.argv[1]
@@ -11,8 +11,7 @@ def main():
     gv = GvCore()
     result = gv.evaluate(text)
 
-    print("
-=== GvAI Evaluation ===")
+    print("\n=== GvAI Evaluation ===")
     print(f"Input: {result['input']}")
     print(f"Gv Score: {result['metrics']['gv_score']}")
     print(f"Drift Risk: {result['metrics']['drift_risk']}")
@@ -20,8 +19,7 @@ def main():
     print(f"Confidence Stability: {result['metrics']['confidence_stability']}")
     print(f"Decision: {result['decision']}")
 
-    print("
-Would I stand by this in 10 steps?")
+    print("\nWould I stand by this in 10 steps?")
     if result["metrics"]["gv_score"] < 0.75:
         print("→ Not confidently. Requires qualification or simulation.")
     else:
