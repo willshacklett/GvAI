@@ -1,8 +1,6 @@
 async function loadData() {
   const res = await fetch("gvai_state.json?_=" + Date.now());
-  if (!res.ok) {
-    throw new Error("Could not load gvai_state.json");
-  }
+  if (!res.ok) throw new Error("Could not load gvai_state.json");
   return res.json();
 }
 
@@ -33,6 +31,24 @@ function renderHistory(rows) {
   });
 }
 
+function renderAlerts(alerts) {
+  const tbody = document.querySelector("#alertsTable tbody");
+  tbody.innerHTML = "";
+  alerts.forEach(alert => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${alert.logged_at ?? "—"}</td>
+      <td><span class="${severityClass(alert.severity)}">${alert.severity ?? "—"}</span></td>
+      <td>${alert.decision ?? "—"}</td>
+      <td>${(alert.reasons || []).join(", ")}</td>
+      <td>${alert.summary?.gv_score ?? "—"}</td>
+      <td>${alert.summary?.trend ?? "—"}</td>
+      <td>${alert.summary?.label ?? "—"}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
 function render(data) {
   const s = data.summary;
 
@@ -58,6 +74,7 @@ function render(data) {
   sev.innerHTML = `<span class="${severityClass(data.severity)}">${data.severity}</span>`;
 
   renderHistory(data.history || []);
+  renderAlerts(data.alerts || []);
 }
 
 async function refresh() {
@@ -66,7 +83,6 @@ async function refresh() {
     render(data);
   } catch (err) {
     console.error(err);
-    alert("Failed to load dashboard data.");
   }
 }
 

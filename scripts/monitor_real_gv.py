@@ -1,8 +1,14 @@
+import json
 import os
 import time
+from datetime import datetime, timezone
+
 from gvai.real_gv import evaluate_real_gv
 from gvai.agent import generate_action, generate_question
 from scripts.export_dashboard_state import export_state
+
+
+ALERT_LOG_PATH = "logs/alerts.jsonl"
 
 
 def severity(decision):
@@ -82,6 +88,24 @@ def should_alert(current, previous):
     return (len(meaningful) > 0), reasons
 
 
+def write_alert(current, reasons):
+    os.makedirs("logs", exist_ok=True)
+    summary = current["summary"]
+    decision = current["decision"]
+    payload = {
+        "logged_at": datetime.now(timezone.utc).isoformat(),
+        "severity": severity(decision),
+        "decision": decision,
+        "reasons": reasons,
+        "response": current["response"],
+        "action": generate_action(summary, decision),
+        "question": generate_question(summary, decision),
+        "summary": summary,
+    }
+    with open(ALERT_LOG_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(payload) + "\n")
+
+
 def print_alert(current, reasons):
     summary = current["summary"]
     decision = current["decision"]
@@ -157,6 +181,7 @@ def main():
                 fire, reasons = should_alert(current, previous)
                 if fire:
                     print_alert(current, reasons)
+                    write_alert(current, reasons)
                     export_state()
 
             previous = current

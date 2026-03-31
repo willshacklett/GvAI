@@ -4,6 +4,9 @@ from gvai.real_gv import evaluate_real_gv, find_csv_path, read_rows, latest_wind
 from gvai.agent import generate_action, generate_question
 
 
+ALERT_LOG_PATH = "logs/alerts.jsonl"
+
+
 def severity(decision):
     if decision == "REFUSE":
         return "CRITICAL"
@@ -14,6 +17,24 @@ def severity(decision):
     if decision == "PASS":
         return "INFO"
     return "UNKNOWN"
+
+
+def read_alerts(limit=20):
+    if not os.path.exists(ALERT_LOG_PATH):
+        return []
+
+    alerts = []
+    with open(ALERT_LOG_PATH, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                alerts.append(json.loads(line))
+            except Exception:
+                continue
+
+    return alerts[-limit:][::-1]
 
 
 def build_payload():
@@ -48,6 +69,7 @@ def build_payload():
         "question": question,
         "summary": summary,
         "history": history,
+        "alerts": read_alerts(),
     }
 
 
