@@ -106,6 +106,7 @@ def summarize_window(window_rows: List[Dict[str, object]]) -> Dict[str, object]:
             "label": None,
             "recovery_state": "NO_DATA",
             "recovery_strength": None,
+            "recovery_confidence": None,
         }
 
     scores = [r["gv_score"] for r in window_rows if r["gv_score"] is not None]
@@ -131,16 +132,23 @@ def summarize_window(window_rows: List[Dict[str, object]]) -> Dict[str, object]:
     latest_risk = latest["risk"]
 
     recovery_strength = None
+    recovery_confidence = None
     if latest_gv is not None and latest_recovery is not None and latest_risk is not None:
         recovery_strength = latest_recovery - latest_risk + 0.5 * latest_gv
+        recovery_confidence = (latest_recovery - latest_risk) * latest_gv
 
     recovery_state = "NONE"
-    if trend == "IMPROVING":
-        if latest_gv is not None and latest_recovery is not None and latest_risk is not None:
+    if latest_gv is not None and latest_recovery is not None and latest_risk is not None:
+        if trend == "IMPROVING":
             if latest_gv >= 0.75 and latest_recovery >= 0.70 and latest_risk <= 0.35:
                 recovery_state = "STABLE_RECOVERY"
             else:
                 recovery_state = "FRAGILE_RECOVERY"
+        elif trend == "STABLE":
+            if latest_gv >= 0.78 and latest_recovery >= 0.72 and latest_risk <= 0.30:
+                recovery_state = "STABLE_RECOVERY"
+            elif latest_gv >= 0.65 and latest_recovery >= 0.60 and latest_risk <= 0.35:
+                recovery_state = "STABILIZING"
 
     return {
         "gv_score": round(latest_gv, 3),
@@ -154,6 +162,7 @@ def summarize_window(window_rows: List[Dict[str, object]]) -> Dict[str, object]:
         "label": latest["label"],
         "recovery_state": recovery_state,
         "recovery_strength": round(recovery_strength, 3) if recovery_strength is not None else None,
+        "recovery_confidence": round(recovery_confidence, 3) if recovery_confidence is not None else None,
     }
 
 
@@ -171,6 +180,9 @@ def decision_from_summary(summary: Dict[str, object]) -> str:
         return "REFUSE"
 
     if recovery_state == "FRAGILE_RECOVERY":
+        return "QUALIFY"
+
+    if recovery_state == "STABILIZING":
         return "QUALIFY"
 
     if recovery_state == "STABLE_RECOVERY":
@@ -204,6 +216,12 @@ def response_from_summary(summary: Dict[str, object], decision: str) -> str:
         return (
             f"{header} The system is recovering, but the recovery is still fragile. "
             f"Recommended next step: continue cautiously, keep safeguards in place, and confirm the rebound persists."
+        )
+
+    if recovery_state == "STABILIZING":
+        return (
+            f"{header} The system is no longer degrading, but recovery is not yet strong enough to trust fully. "
+            f"Recommended next step: maintain protections, avoid aggressive changes, and verify that stability persists."
         )
 
     if recovery_state == "STABLE_RECOVERY":

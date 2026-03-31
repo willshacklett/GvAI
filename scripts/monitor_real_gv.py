@@ -49,7 +49,7 @@ def alert_reasons(current, previous):
     if c_trend == "IMPROVING" and p_trend != "IMPROVING":
         reasons.append("trend_became_improving")
 
-    if c_recovery_state != p_recovery_state and c_recovery_state in ("FRAGILE_RECOVERY", "STABLE_RECOVERY"):
+    if c_recovery_state != p_recovery_state and c_recovery_state in ("FRAGILE_RECOVERY", "STABILIZING", "STABLE_RECOVERY"):
         reasons.append(f"recovery_state:{p_recovery_state}->{c_recovery_state}")
 
     if c_gv is not None and p_gv is not None:
@@ -94,6 +94,7 @@ def print_alert(current, reasons):
     print(f"  Risk: {summary['risk']}")
     print(f"  Recovery State: {summary['recovery_state']}")
     print(f"  Recovery Strength: {summary['recovery_strength']}")
+    print(f"  Recovery Confidence: {summary['recovery_confidence']}")
     print(f"  Timestamp: {summary['timestamp']}")
     print(f"  Label: {summary['label']}")
     print()
@@ -111,6 +112,7 @@ def print_baseline(current):
     print(f"  Risk: {summary['risk']}")
     print(f"  Recovery State: {summary['recovery_state']}")
     print(f"  Recovery Strength: {summary['recovery_strength']}")
+    print(f"  Recovery Confidence: {summary['recovery_confidence']}")
     print(f"  Timestamp: {summary['timestamp']}")
     print(f"  Label: {summary['label']}")
     print()

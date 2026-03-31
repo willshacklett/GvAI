@@ -20,6 +20,7 @@ def main():
     print(f"Risk: {summary['risk']}")
     print(f"Recovery State: {summary['recovery_state']}")
     print(f"Recovery Strength: {summary['recovery_strength']}")
+    print(f"Recovery Confidence: {summary['recovery_confidence']}")
     print(f"Timestamp: {summary['timestamp']}")
     print(f"Label: {summary['label']}")
 
