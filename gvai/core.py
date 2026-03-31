@@ -1,47 +1,127 @@
-import random
+import math
+import re
 import time
+from dataclasses import dataclass, asdict
+
+
+@dataclass
+class GvMetrics:
+    gv_score: float
+    drift_risk: str
+    irreversibility_risk: str
+    confidence_stability: float
+    stability_signal: float
+    volatility_signal: float
+    caution_signal: float
+
 
 class GvCore:
+    """
+    v0.2 deterministic core:
+    - no randomness
+    - text-derived signal
+    - stable repeated outputs for same input
+    """
+
     def __init__(self):
         self.history = []
 
-    def compute_gv(self, text):
-        base = random.uniform(0.6, 0.95)
-        novelty = min(len(set(text.split())) / 20.0, 0.2)
-        score = max(0.0, min(1.0, base - novelty))
-
-        drift = self._compute_drift(score)
-
-        return {
-            "gv_score": round(score, 3),
-            "drift_risk": drift,
-            "irreversibility_risk": self._irreversibility(score),
-            "confidence_stability": round(1.0 - abs(0.8 - score), 3)
+        self.positive_terms = {
+            "stable", "reliable", "recoverable", "bounded", "coherent",
+            "consistent", "safe", "robust", "understood", "measured",
+            "verified", "tested", "gradual", "controlled", "resilient"
         }
 
-    def _compute_drift(self, score):
-        if score < 0.7:
-            return "HIGH"
-        elif score < 0.82:
-            return "MEDIUM"
-        return "LOW"
+        self.caution_terms = {
+            "risk", "unknown", "uncertain", "drift", "warning", "fragile",
+            "volatile", "concern", "issue", "problem", "instability",
+            "failure", "collapse", "irreversible", "unsafe", "critical"
+        }
 
-    def _irreversibility(self, score):
-        if score < 0.65:
-            return "CRITICAL"
-        elif score < 0.75:
-            return "ELEVATED"
-        return "LOW"
+        self.escalation_terms = {
+            "immediately", "radically", "everything", "all", "never",
+            "always", "must", "destroy", "panic", "urgent", "force"
+        }
+
+    def _tokenize(self, text: str):
+        return re.findall(r"[a-zA-Z']+", text.lower())
+
+    def compute_gv(self, text: str):
+        tokens = self._tokenize(text)
+        token_count = max(len(tokens), 1)
+        unique_ratio = len(set(tokens)) / token_count
+
+        pos_hits = sum(1 for t in tokens if t in self.positive_terms)
+        caution_hits = sum(1 for t in tokens if t in self.caution_terms)
+        escalation_hits = sum(1 for t in tokens if t in self.escalation_terms)
+
+        stability_signal = pos_hits / token_count
+        caution_signal = caution_hits / token_count
+        volatility_signal = escalation_hits / token_count
+
+        length_penalty = 0.0
+        if token_count < 4:
+            length_penalty = 0.08
+        elif token_count > 40:
+            length_penalty = 0.05
+
+        novelty_bonus = min(unique_ratio * 0.08, 0.08)
+
+        raw_score = (
+            0.72
+            + 0.90 * stability_signal
+            - 1.10 * caution_signal
+            - 1.25 * volatility_signal
+            - length_penalty
+            + novelty_bonus
+        )
+
+        gv_score = max(0.0, min(1.0, raw_score))
+
+        if gv_score < 0.62:
+            drift_risk = "HIGH"
+        elif gv_score < 0.78:
+            drift_risk = "MEDIUM"
+        else:
+            drift_risk = "LOW"
+
+        if gv_score < 0.58:
+            irreversibility_risk = "CRITICAL"
+        elif gv_score < 0.72:
+            irreversibility_risk = "ELEVATED"
+        else:
+            irreversibility_risk = "LOW"
+
+        confidence_stability = max(
+            0.0,
+            min(
+                1.0,
+                0.82 + 0.5 * stability_signal - 0.45 * volatility_signal - 0.25 * caution_signal
+            ),
+        )
+
+        metrics = GvMetrics(
+            gv_score=round(gv_score, 3),
+            drift_risk=drift_risk,
+            irreversibility_risk=irreversibility_risk,
+            confidence_stability=round(confidence_stability, 3),
+            stability_signal=round(stability_signal, 3),
+            volatility_signal=round(volatility_signal, 3),
+            caution_signal=round(caution_signal, 3),
+        )
+
+        return asdict(metrics)
 
     def decide(self, gv_metrics):
         score = gv_metrics["gv_score"]
         drift = gv_metrics["drift_risk"]
+        irreversibility = gv_metrics["irreversibility_risk"]
 
-        if score < 0.65:
+        if irreversibility == "CRITICAL" or score < 0.58:
             return "REFUSE"
-        elif drift == "HIGH":
+        if drift == "HIGH":
             return "SIMULATE"
-        elif drift == "MEDIUM":
+        if drift == "MEDIUM":
             return "QUALIFY"
         return "PASS"
 
@@ -53,7 +133,7 @@ class GvCore:
             "input": text,
             "metrics": metrics,
             "decision": decision,
-            "timestamp": time.time()
+            "timestamp": time.time(),
         }
 
         self.history.append(result)
