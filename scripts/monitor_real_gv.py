@@ -1,6 +1,7 @@
 import json
 import os
 import time
+import urllib.request
 from datetime import datetime, timezone
 
 from gvai.real_gv import evaluate_real_gv
@@ -21,6 +22,40 @@ def severity(decision):
     if decision == "PASS":
         return "INFO"
     return "UNKNOWN"
+
+
+def send_webhook_alert(payload):
+    webhook_url = os.getenv("GVAI_WEBHOOK_URL")
+    if not webhook_url:
+        return False, "GVAI_WEBHOOK_URL not set"
+
+    try:
+        body = {
+            "text": (
+                f"GvAI Alert\n"
+                f"Severity: {payload['severity']}\n"
+                f"Decision: {payload['decision']}\n"
+                f"Reasons: {', '.join(payload['reasons'])}\n"
+                f"GV: {payload['summary'].get('gv_score')}\n"
+                f"Trend: {payload['summary'].get('trend')}\n"
+                f"Label: {payload['summary'].get('label')}\n"
+                f"Response: {payload['response']}\n"
+                f"Action: {payload['action']}\n"
+                f"Question: {payload['question']}"
+            )
+        }
+
+        req = urllib.request.Request(
+            webhook_url,
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return True, f"Webhook sent ({resp.status})"
+    except Exception as e:
+        return False, str(e)
 
 
 def alert_reasons(current, previous):
@@ -88,11 +123,16 @@ def should_alert(current, previous):
     return (len(meaningful) > 0), reasons
 
 
-def write_alert(current, reasons):
+def write_alert(payload):
     os.makedirs("logs", exist_ok=True)
+    with open(ALERT_LOG_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(payload) + "\n")
+
+
+def build_alert_payload(current, reasons):
     summary = current["summary"]
     decision = current["decision"]
-    payload = {
+    return {
         "logged_at": datetime.now(timezone.utc).isoformat(),
         "severity": severity(decision),
         "decision": decision,
@@ -102,24 +142,18 @@ def write_alert(current, reasons):
         "question": generate_question(summary, decision),
         "summary": summary,
     }
-    with open(ALERT_LOG_PATH, "a", encoding="utf-8") as f:
-        f.write(json.dumps(payload) + "\n")
 
 
-def print_alert(current, reasons):
-    summary = current["summary"]
-    decision = current["decision"]
-    sev = severity(decision)
-    action = generate_action(summary, decision)
-    question = generate_question(summary, decision)
+def print_alert(payload):
+    summary = payload["summary"]
 
     print("=== GvAI ALERT ===")
-    print(f"Severity: {sev}")
-    print(f"Decision: {decision}")
-    print(f"Reasons: {', '.join(reasons)}")
-    print(f"Response: {current['response']}")
-    print(f"Action: {action}")
-    print(f"{question}")
+    print(f"Severity: {payload['severity']}")
+    print(f"Decision: {payload['decision']}")
+    print(f"Reasons: {', '.join(payload['reasons'])}")
+    print(f"Response: {payload['response']}")
+    print(f"Action: {payload['action']}")
+    print(f"{payload['question']}")
     print("Summary:")
     print(f"  Latest GV: {summary['gv_score']}")
     print(f"  Avg GV: {summary['avg_gv']}")
@@ -180,8 +214,14 @@ def main():
             else:
                 fire, reasons = should_alert(current, previous)
                 if fire:
-                    print_alert(current, reasons)
-                    write_alert(current, reasons)
+                    payload = build_alert_payload(current, reasons)
+                    print_alert(payload)
+                    write_alert(payload)
+
+                    if payload["severity"] in ("HIGH", "CRITICAL"):
+                        ok, msg = send_webhook_alert(payload)
+                        print(f"Webhook: {'sent' if ok else 'skipped/failed'} | {msg}")
+
                     export_state()
 
             previous = current
