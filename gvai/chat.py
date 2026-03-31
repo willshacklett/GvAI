@@ -1,6 +1,7 @@
 from gvai.core import GvCore
 from gvai.memory import GvMemory
 from gvai.brain import generate_brain_response
+from gvai.challenge import generate_challenge
 
 
 def escalate_decision(base_decision, trend, volatility, metrics):
@@ -51,10 +52,15 @@ def main():
         decision = escalate_decision(result["decision"], trend, volatility, m)
 
         response = generate_brain_response(user_input, decision, m, trend, volatility)
+        challenge = generate_challenge(user_input, decision, m, trend, volatility)
 
         print("\nGvAI:")
         print(f"[{decision}] {response}")
-        print(f"(Trend: {trend}, Volatility: {volatility})\n")
+
+        if challenge:
+            print(f"\n{challenge}")
+
+        print(f"\n(Trend: {trend}, Volatility: {volatility})\n")
 
 
 if __name__ == "__main__":
