@@ -30,7 +30,13 @@ def main():
     print("GvAI Chat (type 'exit' to quit)\n")
 
     while True:
-        user_input = input("You: ")
+        try:
+            user_input = input("You: ").strip()
+        except EOFError:
+            break
+
+        if not user_input:
+            continue
 
         if user_input.lower() in ["exit", "quit"]:
             break
