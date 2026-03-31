@@ -1,3 +1,5 @@
+let lastAlertKey = null;
+
 async function loadData() {
   const res = await fetch("gvai_state.json?_=" + Date.now());
   if (!res.ok) throw new Error("Could not load gvai_state.json");
@@ -13,6 +15,72 @@ function severityClass(sev) {
 
 function setText(id, value) {
   document.getElementById(id).textContent = value ?? "—";
+}
+
+function ensureBanner() {
+  let banner = document.getElementById("alertBanner");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "alertBanner";
+    banner.style.position = "sticky";
+    banner.style.top = "0";
+    banner.style.zIndex = "9999";
+    banner.style.padding = "14px 18px";
+    banner.style.fontWeight = "700";
+    banner.style.textAlign = "center";
+    banner.style.display = "none";
+    banner.style.borderBottom = "1px solid rgba(255,255,255,0.15)";
+    document.body.prepend(banner);
+  }
+  return banner;
+}
+
+function beep(severity) {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = severity === "CRITICAL" ? "sawtooth" : "square";
+  osc.frequency.value = severity === "CRITICAL" ? 880 : 660;
+  gain.gain.value = 0.03;
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start();
+  setTimeout(() => osc.stop(), severity === "CRITICAL" ? 250 : 140);
+}
+
+function updateBanner(data) {
+  const banner = ensureBanner();
+  const sev = data.severity;
+  const summary = data.summary || {};
+  const decision = data.decision || "—";
+
+  const show = sev === "CRITICAL" || sev === "HIGH";
+  if (!show) {
+    banner.style.display = "none";
+    return;
+  }
+
+  banner.style.display = "block";
+  banner.style.background = sev === "CRITICAL" ? "#7f1d1d" : "#92400e";
+  banner.style.color = "white";
+  banner.textContent = `⚠ ${sev} ALERT — ${decision} | GV ${summary.gv_score ?? "—"} | ${summary.trend ?? "—"} | ${summary.label ?? "—"}`;
+
+  const alertKey = [
+    sev,
+    decision,
+    summary.timestamp,
+    summary.gv_score,
+    summary.trend,
+    summary.label
+  ].join("|");
+
+  if (alertKey !== lastAlertKey) {
+    lastAlertKey = alertKey;
+    beep(sev);
+  }
 }
 
 function renderHistory(rows) {
@@ -33,6 +101,7 @@ function renderHistory(rows) {
 
 function renderAlerts(alerts) {
   const tbody = document.querySelector("#alertsTable tbody");
+  if (!tbody) return;
   tbody.innerHTML = "";
   alerts.forEach(alert => {
     const tr = document.createElement("tr");
@@ -75,6 +144,7 @@ function render(data) {
 
   renderHistory(data.history || []);
   renderAlerts(data.alerts || []);
+  updateBanner(data);
 }
 
 async function refresh() {
@@ -88,4 +158,4 @@ async function refresh() {
 
 document.getElementById("refreshBtn").addEventListener("click", refresh);
 refresh();
-setInterval(refresh, 5000);
+setInterval(refresh, 3000);
