@@ -1,15 +1,22 @@
 from gvai.real_gv import evaluate_real_gv
+from gvai.agent import generate_action, generate_question
 
 
 def main():
     result = evaluate_real_gv()
+    summary = result["summary"]
+    decision = result["decision"]
+
+    action = generate_action(summary, decision)
+    question = generate_question(summary, decision)
 
     print("\n=== GvAI Real GV ===")
     print(f"CSV Path: {result['path']}")
-    print(f"Decision: {result['decision']}")
+    print(f"Decision: {decision}")
     print(f"Response: {result['response']}")
+    print(f"Action: {action}")
+    print(f"{question}")
 
-    summary = result["summary"]
     print("\nSummary:")
     print(f"Latest GV: {summary['gv_score']}")
     print(f"Average GV (window): {summary['avg_gv']}")

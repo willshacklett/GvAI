@@ -1,6 +1,7 @@
 import os
 import time
 from gvai.real_gv import evaluate_real_gv
+from gvai.agent import generate_action, generate_question
 
 
 def severity(decision):
@@ -77,13 +78,18 @@ def should_alert(current, previous):
 
 def print_alert(current, reasons):
     summary = current["summary"]
-    sev = severity(current["decision"])
+    decision = current["decision"]
+    sev = severity(decision)
+    action = generate_action(summary, decision)
+    question = generate_question(summary, decision)
 
     print("=== GvAI ALERT ===")
     print(f"Severity: {sev}")
-    print(f"Decision: {current['decision']}")
+    print(f"Decision: {decision}")
     print(f"Reasons: {', '.join(reasons)}")
     print(f"Response: {current['response']}")
+    print(f"Action: {action}")
+    print(f"{question}")
     print("Summary:")
     print(f"  Latest GV: {summary['gv_score']}")
     print(f"  Avg GV: {summary['avg_gv']}")
@@ -102,9 +108,15 @@ def print_alert(current, reasons):
 
 def print_baseline(current):
     summary = current["summary"]
+    decision = current["decision"]
+    action = generate_action(summary, decision)
+    question = generate_question(summary, decision)
+
     print("=== GvAI Monitor Baseline ===")
-    print(f"Decision: {current['decision']}")
+    print(f"Decision: {decision}")
     print(f"Response: {current['response']}")
+    print(f"Action: {action}")
+    print(f"{question}")
     print("Summary:")
     print(f"  Latest GV: {summary['gv_score']}")
     print(f"  Trend: {summary['trend']}")
