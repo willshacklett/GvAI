@@ -1,7 +1,7 @@
 import sys
 from gvai.core import GvCore
 from gvai.memory import GvMemory
-from gvai.agent import generate_response
+from gvai.brain import generate_brain_response
 
 
 def escalate_decision(base_decision, trend, volatility, metrics):
@@ -42,8 +42,7 @@ def main():
         trend = memory.trend()
         volatility = memory.volatility()
         decision = escalate_decision(result["decision"], trend, volatility, m)
-
-        response = generate_response(text, decision, m)
+        response = generate_brain_response(text, decision, m, trend, volatility)
 
         print("\n=== GvAI ===")
         print(f"Input: {text}")
@@ -56,7 +55,12 @@ def main():
 
         print("\nMetrics:")
         print(f"Gv Score: {m['gv_score']}")
+        print(f"Drift Risk: {m['drift_risk']}")
+        print(f"Irreversibility Risk: {m['irreversibility_risk']}")
         print(f"Confidence Stability: {m['confidence_stability']}")
+        print(f"Stability Signal: {m.get('stability_signal', 0.0)}")
+        print(f"Volatility Signal: {m.get('volatility_signal', 0.0)}")
+        print(f"Caution Signal: {m.get('caution_signal', 0.0)}")
 
 
 if __name__ == "__main__":
