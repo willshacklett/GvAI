@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GvAI Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <h1>GvAI Dashboard</h1>
+      <p>Survivability-aware system monitoring</p>
+      <button id="refreshBtn">Refresh</button>
+    </header>
+
+    <section class="grid">
+      <div class="card">
+        <div class="label">Decision</div>
+        <div id="decision" class="value">—</div>
+      </div>
+      <div class="card">
+        <div class="label">Latest GV</div>
+        <div id="gvScore" class="value">—</div>
+      </div>
+      <div class="card">
+        <div class="label">Trend</div>
+        <div id="trend" class="value">—</div>
+      </div>
+      <div class="card">
+        <div class="label">Recovery State</div>
+        <div id="recoveryState" class="value">—</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Guidance</h2>
+      <div class="block">
+        <div class="label">Response</div>
+        <p id="response">—</p>
+      </div>
+      <div class="block">
+        <div class="label">Action</div>
+        <p id="action">—</p>
+      </div>
+      <div class="block">
+        <div class="label">Question</div>
+        <p id="question">—</p>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <div class="label">Average GV</div>
+        <div id="avgGv" class="value">—</div>
+      </div>
+      <div class="card">
+        <div class="label">Delta GV</div>
+        <div id="deltaGv" class="value">—</div>
+      </div>
+      <div class="card">
+        <div class="label">Volatility</div>
+        <div id="volatility" class="value">—</div>
+      </div>
+      <div class="card">
+        <div class="label">Risk</div>
+        <div id="risk" class="value">—</div>
+      </div>
+      <div class="card">
+        <div class="label">Recoverability</div>
+        <div id="recoverability" class="value">—</div>
+      </div>
+      <div class="card">
+        <div class="label">Recovery Confidence</div>
+        <div id="recoveryConfidence" class="value">—</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Latest Snapshot</h2>
+      <table>
+        <tbody>
+          <tr><th>Timestamp</th><td id="timestamp">—</td></tr>
+          <tr><th>Label</th><td id="label">—</td></tr>
+          <tr><th>Severity</th><td id="severity">—</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Recent Rows</h2>
+      <table id="historyTable">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Label</th>
+            <th>GV</th>
+            <th>Recoverability</th>
+            <th>Risk</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <p class="footnote">Data source: <code>data/longitudinal/summary_history.csv</code> or the best available GV summary file.</p>
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
