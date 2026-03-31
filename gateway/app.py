@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-
 from gvai.real_gv import evaluate_real_gv
 
 app = FastAPI()
@@ -10,7 +9,8 @@ def root():
     return {
         "name": "GvAI Gateway",
         "status": "live",
-        "endpoints": ["/health", "/gv/state", "/chat"]
+        "gv_endpoint": "/gv/state",
+        "chat_endpoint": "/chat"
     }
 
 @app.get("/health")
