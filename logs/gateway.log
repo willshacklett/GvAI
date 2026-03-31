@@ -1,0 +1,8 @@
+INFO:     Started server process [13454]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8010 (Press CTRL+C to quit)
+INFO:     71.228.172.181:0 - "GET / HTTP/1.1" 404 Not Found
+INFO:     71.228.172.181:0 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:45504 - "POST /chat HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:48592 - "POST /chat HTTP/1.1" 400 Bad Request
