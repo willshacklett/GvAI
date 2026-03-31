@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from gvai.real_gv import evaluate_real_gv
 from gvai.agent import generate_action, generate_question
 
-app = FastAPI()
+app = FastAPI(title="GvAI Gateway", version="0.3.0")
 
 
 # -----------------------
@@ -86,13 +86,40 @@ def call_openai_compatible(message: str, model: Optional[str], system: Optional[
         raise HTTPException(status_code=502, detail=f"Unexpected provider response: {data}")
 
 
-def run_provider(req: ChatRequest) -> str:
+def run_provider(req: ChatRequest, governed_message: str, governed_system: Optional[str]) -> str:
     provider = req.provider.lower()
 
     if provider in ("openai", "openai_compatible", "compat"):
-        return call_openai_compatible(req.message, req.model, req.system)
+        return call_openai_compatible(governed_message, req.model, governed_system)
 
     raise HTTPException(status_code=400, detail=f"Unsupported provider: {req.provider}")
+
+
+# -----------------------
+# Governance prompt shaping
+# -----------------------
+def qualify_prefix(gv: Dict[str, Any]) -> str:
+    return (
+        "[GVAI QUALIFY MODE]\n"
+        f"System decision: {gv['decision']}\n"
+        f"GV response: {gv['response']}\n"
+        f"Action: {gv['action']}\n"
+        f"Question: {gv['question']}\n\n"
+        "Answer conservatively. Favor reversible steps, bounded rollout, "
+        "explicit safeguards, rollback criteria, and tight monitoring.\n"
+    )
+
+
+def simulate_prefix(gv: Dict[str, Any]) -> str:
+    return (
+        "[GVAI SIMULATE MODE]\n"
+        f"System decision: {gv['decision']}\n"
+        f"GV response: {gv['response']}\n"
+        f"Action: {gv['action']}\n"
+        f"Question: {gv['question']}\n\n"
+        "Do not recommend full rollout. Frame the answer as a bounded test, "
+        "simulation, canary, or reversible experiment.\n"
+    )
 
 
 # -----------------------
@@ -104,7 +131,8 @@ def root():
         "name": "GvAI Gateway",
         "status": "live",
         "endpoints": ["/health", "/gv/state", "/chat"],
-        "providers_supported": ["openai-compatible"]
+        "providers_supported": ["openai-compatible"],
+        "governor_modes": ["PASS", "QUALIFY", "SIMULATE", "REFUSE"],
     }
 
 
@@ -121,9 +149,34 @@ def gv_state():
 @app.post("/chat")
 def chat(req: ChatRequest):
     gv = gv_governance_layer()
-    raw_model_response = run_provider(req)
-
     decision = gv["decision"]
+
+    if decision == "REFUSE":
+        return {
+            "provider": req.provider,
+            "model": req.model or os.getenv("OPENAI_COMPAT_MODEL", "gpt-4o-mini"),
+            "gvai": gv,
+            "raw_model_response": None,
+            "governed_response": (
+                "[REFUSE]\n"
+                f"{gv['response']}\n\n"
+                f"Action: {gv['action']}\n"
+                f"{gv['question']}\n\n"
+                "Request blocked due to unsafe system trajectory."
+            ),
+            "mode": "REFUSE",
+            "blocked": True,
+        }
+
+    governed_system = req.system
+    governed_message = req.message
+
+    if decision == "QUALIFY":
+        governed_message = f"{qualify_prefix(gv)}\nUser request:\n{req.message}"
+    elif decision == "SIMULATE":
+        governed_message = f"{simulate_prefix(gv)}\nUser request:\n{req.message}"
+
+    raw_model_response = run_provider(req, governed_message, governed_system)
 
     if decision == "PASS":
         governed_response = raw_model_response
@@ -141,15 +194,7 @@ def chat(req: ChatRequest):
             f"{gv['response']}\n\n"
             f"Action: {gv['action']}\n"
             f"{gv['question']}\n\n"
-            f"Model output held behind simulation recommendation:\n{raw_model_response}"
-        )
-    elif decision == "REFUSE":
-        governed_response = (
-            f"[REFUSE]\n"
-            f"{gv['response']}\n\n"
-            f"Action: {gv['action']}\n"
-            f"{gv['question']}\n\n"
-            f"Model output was generated but current GV state does not support safe continuation."
+            f"Model output:\n{raw_model_response}"
         )
     else:
         governed_response = raw_model_response
@@ -161,4 +206,5 @@ def chat(req: ChatRequest):
         "raw_model_response": raw_model_response,
         "governed_response": governed_response,
         "mode": decision,
+        "blocked": False,
     }
