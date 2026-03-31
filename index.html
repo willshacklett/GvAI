@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GvAI</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #0b1220;
+      color: #e5e7eb;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .wrap {
+      width: 100%;
+      max-width: 900px;
+      padding: 32px;
+    }
+    .card {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 20px;
+      padding: 32px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 48px;
+    }
+    .sub {
+      color: #94a3b8;
+      font-size: 18px;
+      margin-bottom: 28px;
+    }
+    .status {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin: 28px 0;
+    }
+    .tile {
+      background: #0f172a;
+      border: 1px solid #1f2937;
+      border-radius: 16px;
+      padding: 16px;
+    }
+    .label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+    .value {
+      font-size: 34px;
+      font-weight: bold;
+    }
+    .actions {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-top: 24px;
+    }
+    .btn {
+      display: inline-block;
+      text-decoration: none;
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-weight: bold;
+    }
+    .btn-primary {
+      background: #2563eb;
+      color: white;
+    }
+    .btn-secondary {
+      background: #1f2937;
+      color: white;
+    }
+    .foot {
+      margin-top: 24px;
+      color: #94a3b8;
+      font-size: 14px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    .critical { background: #7f1d1d; color: white; }
+    .high { background: #92400e; color: white; }
+    .medium { background: #b45309; color: white; }
+    .info { background: #1d4ed8; color: white; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>GvAI</h1>
+      <div class="sub">Survivability-first monitoring, guidance, and alerting</div>
+
+      <div class="status">
+        <div class="tile">
+          <div class="label">Decision</div>
+          <div id="decision" class="value">—</div>
+        </div>
+        <div class="tile">
+          <div class="label">Latest GV</div>
+          <div id="gv" class="value">—</div>
+        </div>
+        <div class="tile">
+          <div class="label">Trend</div>
+          <div id="trend" class="value">—</div>
+        </div>
+        <div class="tile">
+          <div class="label">Severity</div>
+          <div id="severity">—</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <a class="btn btn-primary" href="/dashboard/">Open Dashboard</a>
+        <a class="btn btn-secondary" href="/dashboard/gvai_state.json" target="_blank">Open State JSON</a>
+      </div>
+
+      <div class="foot" id="response">Loading current system state...</div>
+    </div>
+  </div>
+
+  <script>
+    function sevClass(sev) {
+      if (sev === "CRITICAL") return "badge critical";
+      if (sev === "HIGH") return "badge high";
+      if (sev === "MEDIUM") return "badge medium";
+      return "badge info";
+    }
+
+    async function load() {
+      try {
+        const res = await fetch("/dashboard/gvai_state.json?_=" + Date.now());
+        const data = await res.json();
+
+        document.getElementById("decision").textContent = data.decision ?? "—";
+        document.getElementById("gv").textContent = data.summary?.gv_score ?? "—";
+        document.getElementById("trend").textContent = data.summary?.trend ?? "—";
+        document.getElementById("severity").innerHTML =
+          `<span class="${sevClass(data.severity)}">${data.severity ?? "—"}</span>`;
+        document.getElementById("response").textContent = data.response ?? "No response available.";
+      } catch (e) {
+        document.getElementById("response").textContent = "Could not load GvAI state yet.";
+      }
+    }
+
+    load();
+    setInterval(load, 5000);
+  </script>
+</body>
+</html>
