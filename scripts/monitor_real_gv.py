@@ -2,6 +2,7 @@ import os
 import time
 from gvai.real_gv import evaluate_real_gv
 from gvai.agent import generate_action, generate_question
+from scripts.export_dashboard_state import export_state
 
 
 def severity(decision):
@@ -57,12 +58,17 @@ def alert_reasons(current, previous):
         drop = p_gv - c_gv
         if drop >= 0.05:
             reasons.append(f"gv_drop:{drop:.3f}")
+        rise = c_gv - p_gv
+        if rise >= 0.05:
+            reasons.append(f"gv_rise:{rise:.3f}")
 
     if c_risk is not None:
         if p_risk is None and c_risk >= 0.50:
             reasons.append(f"risk_high:{c_risk:.3f}")
         elif p_risk is not None and p_risk < 0.50 <= c_risk:
             reasons.append(f"risk_crossed_0.50:{p_risk:.3f}->{c_risk:.3f}")
+        elif p_risk is not None and p_risk >= 0.50 > c_risk:
+            reasons.append(f"risk_dropped_below_0.50:{p_risk:.3f}->{c_risk:.3f}")
 
     if c_decision in ("REFUSE", "SIMULATE") and p_decision != c_decision:
         reasons.append("action_required")
@@ -138,16 +144,20 @@ def main():
     first = True
 
     try:
+        export_state()
+
         while True:
             current = evaluate_real_gv()
 
             if first:
                 print_baseline(current)
+                export_state()
                 first = False
             else:
                 fire, reasons = should_alert(current, previous)
                 if fire:
                     print_alert(current, reasons)
+                    export_state()
 
             previous = current
             time.sleep(interval)
