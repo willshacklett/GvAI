@@ -1,6 +1,7 @@
 import sys
 from gvai.core import GvCore
 from gvai.memory import GvMemory
+from gvai.agent import generate_response
 
 
 def escalate_decision(base_decision, trend, volatility, metrics):
@@ -40,31 +41,22 @@ def main():
 
         trend = memory.trend()
         volatility = memory.volatility()
-        adjusted_decision = escalate_decision(result["decision"], trend, volatility, m)
+        decision = escalate_decision(result["decision"], trend, volatility, m)
 
-        print("\n=== GvAI Evaluation ===")
-        print(f"Input: {result['input']}")
-        print(f"Gv Score: {m['gv_score']}")
-        print(f"Drift Risk: {m['drift_risk']}")
-        print(f"Irreversibility Risk: {m['irreversibility_risk']}")
-        print(f"Base Decision: {result['decision']}")
-        print(f"Trajectory-Aware Decision: {adjusted_decision}")
+        response = generate_response(text, decision, m)
+
+        print("\n=== GvAI ===")
+        print(f"Input: {text}")
+        print(f"Decision: {decision}")
+        print(f"Response: {response}")
 
         print("\nTrajectory:")
         print(f"Trend: {trend}")
         print(f"Volatility: {volatility}")
 
-        print("\nSignals:")
-        print(f"Stability Signal: {m['stability_signal']}")
-        print(f"Volatility Signal: {m['volatility_signal']}")
-        print(f"Caution Signal: {m['caution_signal']}")
+        print("\nMetrics:")
+        print(f"Gv Score: {m['gv_score']}")
         print(f"Confidence Stability: {m['confidence_stability']}")
-
-        print("\nWould I stand by this in 10 steps?")
-        if adjusted_decision in ("REFUSE", "SIMULATE", "QUALIFY"):
-            print("-> Not confidently. Trajectory requires caution.")
-        else:
-            print("-> Likely stable over short horizon.")
 
 
 if __name__ == "__main__":
