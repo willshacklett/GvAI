@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="refresh" content="10" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GvAI Live Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --panel-2: #111827;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --allow: #22c55e;
+      --warn: #facc15;
+      --block: #ef4444;
+      --grid: #334155;
+      --line: #60a5fa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 24px;
+    }
+    h1 { margin: 0 0 20px; font-size: 32px; }
+    .sub { color: var(--muted); margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .card, .panel {
+      background: var(--panel);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+    .panel { margin-bottom: 20px; }
+    .label {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .value {
+      font-size: 28px;
+      font-weight: 700;
+    }
+    .allow { color: var(--allow); }
+    .warn  { color: var(--warn); }
+    .block { color: var(--block); }
+    canvas {
+      width: 100%;
+      height: 320px;
+      background: var(--panel-2);
+      border-radius: 10px;
+      display: block;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: var(--panel-2);
+      padding: 14px;
+      border-radius: 10px;
+      color: var(--text);
+      margin: 0;
+      overflow-x: auto;
+    }
+    .footer {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>GvAI Live Dashboard</h1>
+  <div class="sub">Trend-aware AI trust monitoring with memory, confidence, and live GV history.</div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="label">Latest Decision</div>
+      <div id="decision" class="value">Loading...</div>
+    </div>
+    <div class="card">
+      <div class="label">Current GV</div>
+      <div id="gv" class="value">--</div>
+    </div>
+    <div class="card">
+      <div class="label">Confidence</div>
+      <div id="confidence" class="value">--</div>
+    </div>
+    <div class="card">
+      <div class="label">Log Entries</div>
+      <div id="count" class="value">0</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>GV Trend</h2>
+    <canvas id="chart" width="1000" height="320"></canvas>
+    <div class="footer">Auto-refreshes every 10 seconds.</div>
+  </div>
+
+  <div class="panel">
+    <h2>Latest Record</h2>
+    <pre id="latestRecord">Loading...</pre>
+  </div>
+
+  <script>
+    async function fetchLogText() {
+      const paths = ["./logs/gv_log.jsonl", "../logs/gv_log.jsonl"];
+      for (const path of paths) {
+        try {
+          const res = await fetch(path + "?t=" + Date.now(), { cache: "no-store" });
+          if (res.ok) {
+            const text = await res.text();
+            if (text.trim()) return text;
+          }
+        } catch (e) {}
+      }
+      throw new Error("Could not load gv_log.jsonl");
+    }
+
+    function setDecisionStyle(el, decision) {
+      el.classList.remove("allow", "warn", "block");
+      if (decision === "allow") el.classList.add("allow");
+      else if (decision === "warn") el.classList.add("warn");
+      else if (decision === "block") el.classList.add("block");
+    }
+
+    function drawChart(records) {
+      const canvas = document.getElementById("chart");
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width;
+      const h = canvas.height;
+
+      ctx.clearRect(0, 0, w, h);
+
+      const padL = 56, padR = 24, padT = 20, padB = 40;
+      const plotW = w - padL - padR;
+      const plotH = h - padT - padB;
+
+      ctx.strokeStyle = "#334155";
+      ctx.lineWidth = 1;
+
+      for (let i = 0; i <= 4; i++) {
+        const y = padT + (plotH * i / 4);
+        ctx.beginPath();
+        ctx.moveTo(padL, y);
+        ctx.lineTo(w - padR, y);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = "12px Arial";
+      ctx.fillText("1.0", 18, padT + 4);
+      ctx.fillText("0.75", 10, padT + plotH * 0.25 + 4);
+      ctx.fillText("0.50", 10, padT + plotH * 0.50 + 4);
+      ctx.fillText("0.25", 10, padT + plotH * 0.75 + 4);
+      ctx.fillText("0.00", 10, padT + plotH + 4);
+
+      if (!records.length) return;
+
+      const values = records.map(r => Math.max(0, Math.min(1, typeof r.gv === "number" ? r.gv : 0)));
+
+      const xFor = (i) => values.length === 1 ? padL + plotW / 2 : padL + (plotW * i / (values.length - 1));
+      const yFor = (v) => padT + ((1 - v) * plotH);
+
+      ctx.strokeStyle = "#60a5fa";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      values.forEach((v, i) => {
+        const x = xFor(i), y = yFor(v);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      values.forEach((v, i) => {
+        const x = xFor(i), y = yFor(v);
+        const decision = (records[i].decision || "").toLowerCase();
+        let color = "#60a5fa";
+        if (decision === "allow") color = "#22c55e";
+        else if (decision === "warn") color = "#facc15";
+        else if (decision === "block") color = "#ef4444";
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = "12px Arial";
+      values.forEach((v, i) => {
+        const x = xFor(i);
+        if (i % Math.max(1, Math.ceil(values.length / 8)) === 0 || i === values.length - 1) {
+          ctx.fillText(String(i + 1), x - 4, h - 16);
+        }
+      });
+    }
+
+    async function main() {
+      try {
+        const text = await fetchLogText();
+        const lines = text.split("\n").map(s => s.trim()).filter(Boolean);
+        const records = lines.map(line => JSON.parse(line));
+        const last = records[records.length - 1];
+
+        const decisionEl = document.getElementById("decision");
+        const gvEl = document.getElementById("gv");
+        const confEl = document.getElementById("confidence");
+        const countEl = document.getElementById("count");
+        const latestRecordEl = document.getElementById("latestRecord");
+
+        const decision = (last.decision || "unknown").toLowerCase();
+        decisionEl.textContent = decision.toUpperCase();
+        gvEl.textContent = typeof last.gv === "number" ? last.gv.toFixed(2) : "--";
+        confEl.textContent = (last.confidence || "n/a").toUpperCase();
+        countEl.textContent = String(records.length);
+        latestRecordEl.textContent = JSON.stringify(last, null, 2);
+
+        setDecisionStyle(decisionEl, decision);
+        setDecisionStyle(gvEl, decision);
+
+        drawChart(records);
+      } catch (err) {
+        document.getElementById("decision").textContent = "NO DATA";
+        document.getElementById("gv").textContent = "--";
+        document.getElementById("confidence").textContent = "--";
+        document.getElementById("latestRecord").textContent = String(err);
+      }
+    }
+
+    main();
+  </script>
+</body>
+</html>
