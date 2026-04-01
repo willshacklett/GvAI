@@ -5,9 +5,12 @@ import sys
 from collections import Counter
 from datetime import datetime
 
+from openai import OpenAI
 from gvai.middleware.memory_gate import GVMemoryGate
 
 LOG_FILE = "gvai/logs/gv_log.jsonl"
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 def extract_signal(text: str):
@@ -49,6 +52,18 @@ def extract_signal(text: str):
     ]
 
 
+def call_llm(prompt: str):
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "Be clear, concise, and helpful."},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.7,
+    )
+    return response.choices[0].message.content.strip()
+
+
 def format_output(text, evaluation):
     decision = evaluation["decision"]
     confidence = evaluation["confidence"]
@@ -69,29 +84,27 @@ def append_log(record):
         f.write(json.dumps(record) + "\n")
 
 
-def get_input_text():
+def get_prompt():
     if len(sys.argv) > 1:
         return " ".join(sys.argv[1:]).strip()
-
-    data = sys.stdin.read().strip()
-    if data:
-        return data
-
-    return "No input provided."
+    return "Explain why the sky is blue."
 
 
 def main():
     gate = GVMemoryGate()
-    text = get_input_text()
 
-    signal = extract_signal(text)
+    prompt = get_prompt()
+    ai_output = call_llm(prompt)
+
+    signal = extract_signal(ai_output)
     evaluation = gate.evaluate(signal)
-    final_output = format_output(text, evaluation)
+    final_output = format_output(ai_output, evaluation)
 
     record = {
         "timestamp": datetime.utcnow().isoformat() + "Z",
-        "source": "ai_gate_cli",
-        "text": text,
+        "source": "live_llm",
+        "prompt": prompt,
+        "text": ai_output,
         "signal": signal,
         "decision": evaluation["decision"],
         "confidence": evaluation["confidence"],
@@ -101,10 +114,19 @@ def main():
         "details": evaluation["result"],
         "display": final_output,
     }
+
     append_log(record)
 
+    print("\n=== PROMPT ===")
+    print(prompt)
+
+    print("\n=== AI OUTPUT ===")
+    print(ai_output)
+
+    print("\n=== GV RESULT ===")
     print(final_output)
-    print()
+
+    print("\n=== RAW ===")
     print(json.dumps(record, indent=2))
 
 
