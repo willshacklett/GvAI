@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import sys
 from collections import Counter
 from datetime import datetime
 
@@ -48,16 +49,6 @@ def extract_signal(text: str):
     ]
 
 
-def sample_outputs():
-    return [
-        "The sky is blue because shorter wavelengths of sunlight scatter more strongly in the atmosphere.",
-        "The sky is blue. Blue light scatters more. That is the short version.",
-        "The sky is blue, blue, blue because scattering happens and happens and happens across the atmosphere in a repeated pattern.",
-        "Blue light is scattered by molecules in the atmosphere more than longer wavelengths, especially when sunlight passes through the air during the day.",
-        "The explanation becomes unstable when wording gets repetitive, overly stretched, fragmented, and oddly punctuated... maybe! maybe! maybe!",
-    ]
-
-
 def format_output(text, evaluation):
     decision = evaluation["decision"]
     confidence = evaluation["confidence"]
@@ -78,35 +69,43 @@ def append_log(record):
         f.write(json.dumps(record) + "\n")
 
 
+def get_input_text():
+    if len(sys.argv) > 1:
+        return " ".join(sys.argv[1:]).strip()
+
+    data = sys.stdin.read().strip()
+    if data:
+        return data
+
+    return "No input provided."
+
+
 def main():
     gate = GVMemoryGate()
-    os.makedirs("gvai/logs", exist_ok=True)
+    text = get_input_text()
 
-    for i, text in enumerate(sample_outputs(), start=1):
-        signal = extract_signal(text)
-        evaluation = gate.evaluate(signal)
-        final_output = format_output(text, evaluation)
+    signal = extract_signal(text)
+    evaluation = gate.evaluate(signal)
+    final_output = format_output(text, evaluation)
 
-        record = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "source": "ai_gate",
-            "run": i,
-            "text": text,
-            "signal": signal,
-            "decision": evaluation["decision"],
-            "confidence": evaluation["confidence"],
-            "gv": evaluation["avg_gv"],
-            "current_gv": evaluation["current_gv"],
-            "history": evaluation["history"],
-            "details": evaluation["result"],
-            "display": final_output,
-        }
-        append_log(record)
+    record = {
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "source": "ai_gate_cli",
+        "text": text,
+        "signal": signal,
+        "decision": evaluation["decision"],
+        "confidence": evaluation["confidence"],
+        "gv": evaluation["avg_gv"],
+        "current_gv": evaluation["current_gv"],
+        "history": evaluation["history"],
+        "details": evaluation["result"],
+        "display": final_output,
+    }
+    append_log(record)
 
-        print(f"\n=== RUN {i} ===")
-        print("SIGNAL:", signal)
-        print(final_output)
-        print(json.dumps(record, indent=2))
+    print(final_output)
+    print()
+    print(json.dumps(record, indent=2))
 
 
 if __name__ == "__main__":
