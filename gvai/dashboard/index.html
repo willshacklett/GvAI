@@ -113,6 +113,12 @@
     <pre id="latestRecord">Loading...</pre>
   </div>
 
+
+  <div class="panel">
+    <h2>Latest Output</h2>
+    <pre id="latestOutput">Loading...</pre>
+  </div>
+
   <script>
     async function fetchLogText() {
       const paths = ["./logs/gv_log.jsonl", "../logs/gv_log.jsonl"];
@@ -218,6 +224,7 @@
         const confEl = document.getElementById("confidence");
         const countEl = document.getElementById("count");
         const latestRecordEl = document.getElementById("latestRecord");
+        const latestOutputEl = document.getElementById("latestOutput");
 
         const decision = (last.decision || "unknown").toLowerCase();
         decisionEl.textContent = decision.toUpperCase();
@@ -225,6 +232,7 @@
         confEl.textContent = (last.confidence || "n/a").toUpperCase();
         countEl.textContent = String(records.length);
         latestRecordEl.textContent = JSON.stringify(last, null, 2);
+        latestOutputEl.textContent = last.display || last.text || "No output available";
 
         setDecisionStyle(decisionEl, decision);
         setDecisionStyle(gvEl, decision);
@@ -235,6 +243,8 @@
         document.getElementById("gv").textContent = "--";
         document.getElementById("confidence").textContent = "--";
         document.getElementById("latestRecord").textContent = String(err);
+        const out = document.getElementById("latestOutput");
+        if (out) out.textContent = "No output available";
       }
     }
 
