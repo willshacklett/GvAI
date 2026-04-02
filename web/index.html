@@ -19,6 +19,7 @@
     }
 
     * { box-sizing: border-box; }
+
     body {
       margin: 0;
       font-family: Inter, Arial, Helvetica, sans-serif;
@@ -32,9 +33,7 @@
       padding: 48px 20px 64px;
     }
 
-    .hero {
-      margin-bottom: 28px;
-    }
+    .hero { margin-bottom: 28px; }
 
     h1 {
       margin: 0 0 10px;
@@ -214,7 +213,11 @@
       font-size: 14px;
     }
 
-    .sig-name { color: var(--muted); text-transform: lowercase; }
+    .sig-name {
+      color: var(--muted);
+      text-transform: lowercase;
+    }
+
     .sig-track {
       height: 10px;
       background: rgba(255,255,255,0.05);
@@ -222,12 +225,14 @@
       border-radius: 999px;
       overflow: hidden;
     }
+
     .sig-fill {
       height: 100%;
       width: 0%;
       background: var(--accent);
       transition: width 240ms ease;
     }
+
     .sig-val {
       text-align: right;
       color: var(--text);
@@ -258,12 +263,8 @@
     }
 
     @media (max-width: 860px) {
-      .grid {
-        grid-template-columns: 1fr;
-      }
-      h1 {
-        font-size: 40px;
-      }
+      .grid { grid-template-columns: 1fr; }
+      h1 { font-size: 40px; }
     }
   </style>
 </head>
@@ -283,7 +284,7 @@
         <textarea id="inputText" placeholder="Paste text here...">Civilizations don’t collapse in noise, but in silence.</textarea>
 
         <div class="row">
-          <button id="scoreBtn">Score text</button>
+          <button id="scoreBtn" type="button">Score text</button>
           <button id="clearBtn" class="secondary" type="button">Clear</button>
         </div>
 
@@ -334,8 +335,9 @@
     }
 
     function setDecision(decision) {
+      const cls = decision || "";
       decisionPillEl.textContent = decision || "waiting";
-      decisionPillEl.className = "pill " + (decision || "");
+      decisionPillEl.className = "pill" + (cls ? " " + cls : "");
     }
 
     function renderSignals(signal) {
@@ -378,18 +380,22 @@
         });
 
         if (!res.ok) {
-          throw new Error("Request failed: " + res.status);
+          const body = await res.text();
+          throw new Error("Request failed: " + res.status + " " + body);
         }
 
         const data = await res.json();
         const gv = Number(data.gv ?? 0);
+
         gvValueEl.textContent = gv.toFixed(3);
         gvFillEl.style.width = Math.max(0, Math.min(100, gv * 100)) + "%";
         setDecision(data.decision || "");
         renderSignals(data.signal || {});
         setStatus("Live score returned from api.gvai.io");
       } catch (err) {
+        console.error(err);
         setStatus("Error: " + err.message);
+        gvValueEl.textContent = "ERR";
         setDecision("");
       } finally {
         scoreBtn.disabled = false;
