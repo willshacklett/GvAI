@@ -1,1 +1,3 @@
-# minimal
+fastapi
+uvicorn
+pydantic

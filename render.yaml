@@ -1,15 +1,7 @@
 services:
   - type: web
-    name: gvai-gateway
+    name: gvai-api
     env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: ./start.sh
     plan: free
-    buildCommand: pip install -r gateway/requirements.txt
-    startCommand: uvicorn gateway.app:app --host 0.0.0.0 --port $PORT
-    autoDeploy: true
-    envVars:
-      - key: OPENAI_COMPAT_BASE_URL
-        sync: false
-      - key: OPENAI_COMPAT_API_KEY
-        sync: false
-      - key: OPENAI_COMPAT_MODEL
-        value: gpt-4o-mini
