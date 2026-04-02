@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>GvAI</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121933;
+      --panel-2: #0f1530;
+      --text: #eef2ff;
+      --muted: #a7b0d6;
+      --line: #24305f;
+      --accent: #6ea8fe;
+      --good: #22c55e;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, Arial, Helvetica, sans-serif;
+      background: linear-gradient(180deg, #0b1020 0%, #0a0f1d 100%);
+      color: var(--text);
+    }
+
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 48px 20px 64px;
+    }
+
+    .hero {
+      margin-bottom: 28px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 52px;
+      line-height: 1;
+      letter-spacing: -0.03em;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: 18px;
+      max-width: 760px;
+      line-height: 1.5;
+      margin-bottom: 18px;
+    }
+
+    .api {
+      display: inline-block;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 14px;
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.25fr 0.9fr;
+      gap: 20px;
+      margin-top: 26px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.22);
+    }
+
+    .label {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 280px;
+      resize: vertical;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.03);
+      color: var(--text);
+      padding: 16px;
+      font: inherit;
+      line-height: 1.5;
+      outline: none;
+    }
+
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px rgba(110,168,254,0.12);
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      background: var(--accent);
+      color: #07111f;
+      font-weight: 700;
+      padding: 12px 18px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    button.secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+
+    button:disabled {
+      opacity: 0.65;
+      cursor: wait;
+    }
+
+    .status {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 14px;
+      min-height: 20px;
+    }
+
+    .score {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .score .num {
+      font-size: 56px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      border: 1px solid transparent;
+    }
+
+    .pill.allow {
+      color: #b8ffcf;
+      background: rgba(34,197,94,0.12);
+      border-color: rgba(34,197,94,0.25);
+    }
+
+    .pill.warn {
+      color: #ffe0a3;
+      background: rgba(245,158,11,0.12);
+      border-color: rgba(245,158,11,0.25);
+    }
+
+    .pill.block {
+      color: #ffc3c3;
+      background: rgba(239,68,68,0.12);
+      border-color: rgba(239,68,68,0.25);
+    }
+
+    .bar-wrap {
+      margin: 18px 0 16px;
+    }
+
+    .bar {
+      width: 100%;
+      height: 14px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .fill {
+      height: 100%;
+      width: 0%;
+      transition: width 240ms ease;
+      background: linear-gradient(90deg, var(--good) 0%, var(--warn) 60%, var(--bad) 100%);
+    }
+
+    .signals {
+      margin-top: 16px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .sig {
+      display: grid;
+      grid-template-columns: 140px 1fr 54px;
+      gap: 10px;
+      align-items: center;
+      font-size: 14px;
+    }
+
+    .sig-name { color: var(--muted); text-transform: lowercase; }
+    .sig-track {
+      height: 10px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .sig-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width 240ms ease;
+    }
+    .sig-val {
+      text-align: right;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .examples {
+      margin-top: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.02);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .footer {
+      margin-top: 24px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 860px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      h1 {
+        font-size: 40px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <h1>GvAI</h1>
+      <div class="sub">
+        Survivability-first AI scoring. Paste text, score it live, and inspect the signal behind the result.
+      </div>
+      <a class="api" href="https://api.gvai.io" target="_blank" rel="noreferrer">API: https://api.gvai.io</a>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <label class="label" for="inputText">Input text</label>
+        <textarea id="inputText" placeholder="Paste text here...">Civilizations don’t collapse in noise, but in silence.</textarea>
+
+        <div class="row">
+          <button id="scoreBtn">Score text</button>
+          <button id="clearBtn" class="secondary" type="button">Clear</button>
+        </div>
+
+        <div class="examples">
+          <button class="chip" type="button" data-text="Gravity pulls objects toward each other.">Short clean answer</button>
+          <button class="chip" type="button" data-text="Plants use sunlight to make energy from water and carbon dioxide, and they release oxygen.">Simple explanation</button>
+          <button class="chip" type="button" data-text="The sun dipped below the horizon, and the ruined city seemed to exhale its last memory as towers fell into shadow and silence.">Dramatic prose</button>
+        </div>
+
+        <div id="status" class="status"></div>
+      </div>
+
+      <div class="card">
+        <div class="score">
+          <div id="gvValue" class="num">--</div>
+          <div id="decisionPill" class="pill">waiting</div>
+        </div>
+
+        <div class="bar-wrap">
+          <div class="bar">
+            <div id="gvFill" class="fill"></div>
+          </div>
+        </div>
+
+        <div class="signals" id="signals"></div>
+
+        <div class="footer">
+          Live endpoint: <strong>api.gvai.io/score</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = "https://api.gvai.io/score";
+
+    const input = document.getElementById("inputText");
+    const scoreBtn = document.getElementById("scoreBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const statusEl = document.getElementById("status");
+    const gvValueEl = document.getElementById("gvValue");
+    const gvFillEl = document.getElementById("gvFill");
+    const decisionPillEl = document.getElementById("decisionPill");
+    const signalsEl = document.getElementById("signals");
+
+    function setStatus(msg) {
+      statusEl.textContent = msg || "";
+    }
+
+    function setDecision(decision) {
+      decisionPillEl.textContent = decision || "waiting";
+      decisionPillEl.className = "pill " + (decision || "");
+    }
+
+    function renderSignals(signal) {
+      signalsEl.innerHTML = "";
+      const keys = Object.keys(signal || {});
+      if (!keys.length) return;
+
+      keys.forEach((key) => {
+        const value = Number(signal[key] ?? 0);
+        const row = document.createElement("div");
+        row.className = "sig";
+        row.innerHTML = `
+          <div class="sig-name">${key}</div>
+          <div class="sig-track"><div class="sig-fill" style="width:${Math.max(0, Math.min(100, value * 100))}%"></div></div>
+          <div class="sig-val">${value.toFixed(3)}</div>
+        `;
+        signalsEl.appendChild(row);
+      });
+    }
+
+    async function scoreText() {
+      const text = input.value.trim();
+      if (!text) {
+        setStatus("Paste some text first.");
+        return;
+      }
+
+      scoreBtn.disabled = true;
+      setStatus("Scoring...");
+      gvValueEl.textContent = "--";
+      gvFillEl.style.width = "0%";
+      setDecision("");
+      signalsEl.innerHTML = "";
+
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+
+        if (!res.ok) {
+          throw new Error("Request failed: " + res.status);
+        }
+
+        const data = await res.json();
+        const gv = Number(data.gv ?? 0);
+        gvValueEl.textContent = gv.toFixed(3);
+        gvFillEl.style.width = Math.max(0, Math.min(100, gv * 100)) + "%";
+        setDecision(data.decision || "");
+        renderSignals(data.signal || {});
+        setStatus("Live score returned from api.gvai.io");
+      } catch (err) {
+        setStatus("Error: " + err.message);
+        setDecision("");
+      } finally {
+        scoreBtn.disabled = false;
+      }
+    }
+
+    scoreBtn.addEventListener("click", scoreText);
+
+    clearBtn.addEventListener("click", () => {
+      input.value = "";
+      gvValueEl.textContent = "--";
+      gvFillEl.style.width = "0%";
+      setDecision("");
+      signalsEl.innerHTML = "";
+      setStatus("");
+      input.focus();
+    });
+
+    document.querySelectorAll(".chip").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        input.value = btn.dataset.text || "";
+        scoreText();
+      });
+    });
+
+    setDecision("");
+    renderSignals({});
+  </script>
+</body>
+</html>
