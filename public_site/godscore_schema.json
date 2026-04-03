@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GodScore CI Result",
+  "type": "object",
+  "required": ["godscore","status","passed","fired","reasons"],
+  "properties": {
+    "godscore": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "status": { "type": "string", "enum": ["stable","warning","critical","collapse"] },
+    "passed": { "type": "boolean" },
+    "fired": { "type": "boolean" },
+    "mean_step": { "type": ["integer","null"] },
+    "drift_step": { "type": ["integer","null"] },
+    "breach_step": { "type": ["integer","null"] },
+    "collapse_step": { "type": ["integer","null"] },
+    "lead_time": { "type": ["integer","null"] },
+    "reasons": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}
