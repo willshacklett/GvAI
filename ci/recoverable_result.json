@@ -1,0 +1,11 @@
+{
+  "godscore": 100,
+  "status": "stable",
+  "passed": true,
+  "fired": false,
+  "breach_step": null,
+  "drift_step": null,
+  "collapse_step": null,
+  "lead_time": null,
+  "reasons": []
+}

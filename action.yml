@@ -1,0 +1,51 @@
+name: "GodScore CI"
+description: "Recoverability-aware CI scoring and optional enforcement before collapse."
+author: "William Shacklett"
+branding:
+  icon: "shield"
+  color: "blue"
+
+inputs:
+  scenario:
+    description: "Demo scenario to simulate: stable, recoverable, or collapse"
+    required: false
+    default: "collapse"
+  enforce:
+    description: "Fail the job on critical/collapse"
+    required: false
+    default: "false"
+  fail_on_warning:
+    description: "Also fail the job on warning"
+    required: false
+    default: "false"
+
+outputs:
+  godscore:
+    description: "Recoverability-aware score from 0 to 100"
+  status:
+    description: "Final sentinel status: stable, warning, critical, collapse"
+  passed:
+    description: "Whether the evaluated system passed policy"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install numpy pandas matplotlib
+
+    - name: Run GodScore CI
+      shell: bash
+      env:
+        GODSCORE_SCENARIO: ${{ inputs.scenario }}
+        GODSCORE_ENFORCE: ${{ inputs.enforce }}
+        GODSCORE_FAIL_ON_WARNING: ${{ inputs.fail_on_warning }}
+      run: |
+        PYTHONPATH=. python scripts/run_godscore_action.py

@@ -3,127 +3,81 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GvAI Dashboard</title>
-  <link rel="stylesheet" href="style.css" />
+  <title>GvAI Sentinel Dashboard</title>
+  <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
   <div class="wrap">
-    <header class="hero">
-      <h1>GvAI Dashboard</h1>
-      <p>Survivability-aware system monitoring</p>
-      <button id="refreshBtn">Refresh</button>
-    </header>
+    <h1>GvAI Recoverability Sentinel</h1>
+    <p class="sub">State machine dashboard for drift → variance → collapse timing</p>
 
-    <section class="grid">
+    <div class="grid">
       <div class="card">
-        <div class="label">Decision</div>
-        <div id="decision" class="value">—</div>
+        <div class="label">Scenario</div>
+        <div class="value" id="scenario">-</div>
       </div>
       <div class="card">
-        <div class="label">Latest GV</div>
-        <div id="gvScore" class="value">—</div>
+        <div class="label">Final Status</div>
+        <div class="value" id="status">-</div>
       </div>
       <div class="card">
-        <div class="label">Trend</div>
-        <div id="trend" class="value">—</div>
+        <div class="label">Lead Time</div>
+        <div class="value" id="leadTime">-</div>
       </div>
       <div class="card">
-        <div class="label">Recovery State</div>
-        <div id="recoveryState" class="value">—</div>
+        <div class="label">Sentinel Fired</div>
+        <div class="value" id="fired">-</div>
       </div>
-    </section>
+    </div>
 
-    <section class="panel">
-      <h2>Guidance</h2>
-      <div class="block">
-        <div class="label">Response</div>
-        <p id="response">—</p>
+    <div class="grid">
+      <div class="card">
+        <div class="label">Drift Step</div>
+        <div class="value" id="driftStep">-</div>
       </div>
-      <div class="block">
-        <div class="label">Action</div>
-        <p id="action">—</p>
+      <div class="card">
+        <div class="label">Breach Step</div>
+        <div class="value" id="breachStep">-</div>
       </div>
-      <div class="block">
-        <div class="label">Question</div>
-        <p id="question">—</p>
+      <div class="card">
+        <div class="label">Collapse Step</div>
+        <div class="value" id="collapseStep">-</div>
       </div>
-    </section>
+      <div class="card">
+        <div class="label">Reasons</div>
+        <div class="small" id="reasons">-</div>
+      </div>
+    </div>
 
-    <section class="grid">
-      <div class="card">
-        <div class="label">Average GV</div>
-        <div id="avgGv" class="value">—</div>
+    <div class="card">
+      <div class="label">Timeline</div>
+      <div id="timeline" class="timeline"></div>
+      <div class="legend">
+        <span class="pill stable">stable</span>
+        <span class="pill warning">warning</span>
+        <span class="pill critical">critical</span>
+        <span class="pill collapse">collapse</span>
       </div>
-      <div class="card">
-        <div class="label">Delta GV</div>
-        <div id="deltaGv" class="value">—</div>
-      </div>
-      <div class="card">
-        <div class="label">Volatility</div>
-        <div id="volatility" class="value">—</div>
-      </div>
-      <div class="card">
-        <div class="label">Risk</div>
-        <div id="risk" class="value">—</div>
-      </div>
-      <div class="card">
-        <div class="label">Recoverability</div>
-        <div id="recoverability" class="value">—</div>
-      </div>
-      <div class="card">
-        <div class="label">Recovery Confidence</div>
-        <div id="recoveryConfidence" class="value">—</div>
-      </div>
-    </section>
+    </div>
 
-    <section class="panel">
-      <h2>Latest Snapshot</h2>
+    <div class="card">
+      <div class="label">Event Summary</div>
       <table>
+        <thead>
+          <tr>
+            <th>Event</th>
+            <th>Step</th>
+          </tr>
+        </thead>
         <tbody>
-          <tr><th>Timestamp</th><td id="timestamp">—</td></tr>
-          <tr><th>Label</th><td id="label">—</td></tr>
-          <tr><th>Severity</th><td id="severity">—</td></tr>
+          <tr><td>First warning</td><td id="firstWarning">-</td></tr>
+          <tr><td>First critical</td><td id="firstCritical">-</td></tr>
+          <tr><td>First collapse</td><td id="firstCollapse">-</td></tr>
         </tbody>
       </table>
-    </section>
-
-    <section class="panel">
-      <h2>Recent Rows</h2>
-      <table id="historyTable">
-        <thead>
-          <tr>
-            <th>Timestamp</th>
-            <th>Label</th>
-            <th>GV</th>
-            <th>Recoverability</th>
-            <th>Risk</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </section>
-
-    <section class="panel">
-      <h2>Recent Alerts</h2>
-      <table id="alertsTable">
-        <thead>
-          <tr>
-            <th>Logged At</th>
-            <th>Severity</th>
-            <th>Decision</th>
-            <th>Reasons</th>
-            <th>GV</th>
-            <th>Trend</th>
-            <th>Label</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </section>
-
-    <p class="footnote">Data source: <code>data/longitudinal/summary_history.csv</code> or the best available GV summary file.</p>
+    </div>
   </div>
 
-  <script src="dashboard.js"></script>
+  <script src="./dashboard.js"></script>
 </body>
 </html>
