@@ -1,0 +1,9 @@
+{
+  "name": "GodScore CI Public API",
+  "endpoints": {
+    "latest": "/latest.json",
+    "schema": "/schema.json",
+    "example": "/example.json"
+  },
+  "description": "Recoverability-aware system signal"
+}
