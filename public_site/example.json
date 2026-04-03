@@ -3,12 +3,13 @@
   "status": "collapse",
   "passed": false,
   "fired": true,
-  "breach_step": 82,
-  "drift_step": 65,
-  "collapse_step": 115,
-  "lead_time": 33,
+  "mean_step": 20,
+  "drift_step": 4,
+  "breach_step": null,
+  "collapse_step": 31,
+  "lead_time": 11,
   "reasons": [
-    "variance persistence detected",
+    "mean slope trigger detected",
     "drift confirmed",
     "gated sentinel fired",
     "collapse threshold crossed"

@@ -2,6 +2,8 @@
   "name": "GodScore API",
   "endpoints": {
     "latest": "/latest.json",
+    "history": "/history.json",
     "schema": "/schema.json"
-  }
+  },
+  "description": "Recoverability-aware system signal with latest snapshot and historical trail"
 }

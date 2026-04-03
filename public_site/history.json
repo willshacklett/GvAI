@@ -1,0 +1,20 @@
+[
+  {
+    "seq": 1,
+    "godscore": 5,
+    "status": "collapse",
+    "passed": false,
+    "fired": true,
+    "mean_step": null,
+    "drift_step": 65,
+    "breach_step": 82,
+    "collapse_step": 115,
+    "lead_time": 33,
+    "reasons": [
+      "variance persistence detected",
+      "drift confirmed",
+      "gated sentinel fired",
+      "collapse threshold crossed"
+    ]
+  }
+]
