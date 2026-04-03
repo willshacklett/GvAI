@@ -1,5 +1,17 @@
 __pycache__/
 *.pyc
-.gvai_run/
-logs/
-dashboard/gvai_state.json
+venv/
+gvai-fpr/venv/
+.env
+
+# build artifacts
+gvai-build/
+gvai-fpr/
+
+# data + outputs
+data/
+dashboard/data/
+
+# misc
+*.log
+*.png
