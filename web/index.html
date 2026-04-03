@@ -1129,33 +1129,58 @@
 
       const reasons = normalizeReasons(signal.reasons);
       const score = show(signal.godscore);
+      const rawGv = signal.raw_gv !== null && signal.raw_gv !== undefined ? Number(signal.raw_gv).toFixed(2) : null;
       const status = show(signal.status);
       const tone = state.tone;
 
       if (tone === "dramatic") {
-        return `Here’s the read: this text lands at GodScore ${score} with a status of ${status}. The signal does not just care about what the message says in isolation — it cares about whether the structure feels stable, recoverable, and durable under strain.${reasons.length ? " The strongest reasons showing up are: " + reasons.join("; ") + "." : ""}`;
+        return `Here’s the read: this message lands at GodScore ${score}${rawGv ? ` (raw gv ${rawGv})` : ""} and the system calls it ${status}. That means the engine is seeing something more fragile or more constrained than a clean pass.${reasons.length ? " The strongest visible signal markers are: " + reasons.join("; ") + "." : ""}`;
       }
 
       if (tone === "simple") {
-        return `This came back with a GodScore of ${score} and a status of ${status}.${reasons.length ? " Main reasons: " + reasons.join("; ") + "." : ""} In plain English, GvAI is reading the message for stability, drift, and recoverability — not just surface tone.`;
+        return `This came back as ${status} with a GodScore of ${score}${rawGv ? ` and raw gv ${rawGv}` : ""}.${reasons.length ? " Main signal details: " + reasons.join("; ") + "." : ""} In plain English, the current API is returning a compact decision plus a small signal summary.`;
       }
 
-      return `GodScore ${score}. Status: ${status}.${reasons.length ? " Why: " + reasons.join("; ") + "." : ""}`;
+      return `GodScore ${score}${rawGv ? ` (raw gv ${rawGv})` : ""}. Status: ${status}.${reasons.length ? " Why: " + reasons.join("; ") + "." : ""}`;
     }
 
     function extractSignal(data) {
-      const src = data?.result && typeof data.result === "object" ? { ...data, ...data.result } : data || {};
+      const src = data?.result && typeof data.result === "object" ? { ...data, ...data.result } : (data || {});
+      const nestedSignal = src.signal && typeof src.signal === "object" ? src.signal : {};
+
+      let rawScore = pickNumber(src, ["godscore", "score", "gv_score", "trust_score", "gv"]);
+      let normalizedScore = rawScore;
+
+      if (normalizedScore !== null && normalizedScore !== undefined && !isNaN(Number(normalizedScore))) {
+        normalizedScore = Number(normalizedScore);
+        if (normalizedScore <= 1) normalizedScore = Math.round(normalizedScore * 100);
+        else normalizedScore = Math.round(normalizedScore);
+      }
+
+      const decision = pickString(src, ["decision"]);
+      const status =
+        pickString(src, ["status", "state", "classification", "label"])
+        || decision
+        || "unknown";
+
+      const reasons = [];
+      if (decision) reasons.push(`decision: ${decision}`);
+      if (nestedSignal.sentence_count !== undefined) reasons.push(`sentence count: ${nestedSignal.sentence_count}`);
+      if (nestedSignal.avg_len !== undefined) reasons.push(`average length: ${Number(nestedSignal.avg_len).toFixed(2)}`);
+
       return {
-        godscore: pickNumber(src, ["godscore", "score", "gv_score", "trust_score"]),
-        status: pickString(src, ["status", "state", "classification", "label"]) || "unknown",
-        passed: pickBoolean(src, ["passed", "pass"]),
-        fired: pickBoolean(src, ["fired", "triggered"]),
-        mean_step: pickNullable(src, ["mean_step", "meanStep"]),
-        drift_step: pickNullable(src, ["drift_step", "driftStep"]),
-        breach_step: pickNullable(src, ["breach_step", "breachStep"]),
-        collapse_step: pickNullable(src, ["collapse_step", "collapseStep"]),
-        lead_time: pickNullable(src, ["lead_time", "leadTime"]),
-        reasons: src.reasons ?? src.reason ?? src.explanations ?? src.flags ?? []
+        godscore: normalizedScore,
+        raw_gv: rawScore,
+        status,
+        passed: src.passed ?? (decision ? decision !== "block" : null),
+        fired: src.fired ?? (decision ? decision === "block" : null),
+        mean_step: src.mean_step ?? nestedSignal.mean_step ?? null,
+        drift_step: src.drift_step ?? nestedSignal.drift_step ?? null,
+        breach_step: src.breach_step ?? nestedSignal.breach_step ?? null,
+        collapse_step: src.collapse_step ?? nestedSignal.collapse_step ?? null,
+        lead_time: src.lead_time ?? nestedSignal.lead_time ?? null,
+        reasons: (src.reasons ?? src.reason ?? src.explanations ?? src.flags ?? reasons),
+        signal: nestedSignal
       };
     }
 
@@ -1236,7 +1261,9 @@
 
       scoreEl.textContent = show(score);
       stateEl.textContent = status;
-      subEl.textContent = `Live survivability signal for the latest assistant response.`;
+      subEl.textContent = signal.raw_gv !== null && signal.raw_gv !== undefined
+        ? `Live survivability signal for the latest assistant response. Raw gv: ${Number(signal.raw_gv).toFixed(2)}`
+        : `Live survivability signal for the latest assistant response.`;
       barEl.style.width = `${Math.max(0, Math.min(100, Number(score) || 0))}%`;
 
       document.getElementById("signalPassed").textContent = show(signal.passed);
