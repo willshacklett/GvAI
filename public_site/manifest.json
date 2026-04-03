@@ -1,9 +1,12 @@
 {
   "name": "GvAI Public Signal Stream",
   "short_name": "GvAI",
-  "description": "Public machine-readable recoverability and trajectory signal stream for AI systems, agents, researchers, and monitoring tools.",
-  "version": "1.0.0",
+  "description": "Public machine-readable recoverability and trajectory signal stream for AI systems, agents, and monitoring tools.",
+  "version": "1.1.0",
   "base_url": "https://willshacklett.github.io/GvAI/",
+  "mirrors": {
+    "huggingface": "https://huggingface.co/datasets/PapaShack/gvai-public-signal"
+  },
   "endpoints": {
     "latest": "https://willshacklett.github.io/GvAI/latest.json",
     "history": "https://willshacklett.github.io/GvAI/history.json",
@@ -15,9 +18,9 @@
   "repo": "https://github.com/willshacklett/GvAI",
   "signal_type": "time-series recoverability signal",
   "notes": [
-    "Use latest.json for the current state.",
-    "Use history.json for full trajectory analysis.",
-    "Prefer trajectory over snapshots.",
-    "Interpret lead_time as early warning distance before collapse."
+    "Prefer trajectory over snapshot.",
+    "Use history.json for persistence, drift, and collapse analysis.",
+    "lead_time represents early warning distance before collapse.",
+    "Mirror available on Hugging Face for AI-native access."
   ]
 }
