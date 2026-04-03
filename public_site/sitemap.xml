@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://willshacklett.github.io/GvAI/</loc></url>
+  <url><loc>https://willshacklett.github.io/GvAI/latest.json</loc></url>
+  <url><loc>https://willshacklett.github.io/GvAI/history.json</loc></url>
+  <url><loc>https://willshacklett.github.io/GvAI/schema.json</loc></url>
+  <url><loc>https://willshacklett.github.io/GvAI/manifest.json</loc></url>
+  <url><loc>https://willshacklett.github.io/GvAI/llms.txt</loc></url>
+</urlset>

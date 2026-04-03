@@ -1,0 +1,25 @@
+# GvAI Public Signal Stream
+
+This site exposes a public machine-readable trajectory signal for recoverability-aware analysis.
+
+Preferred endpoints:
+
+- /latest.json  -> current state
+- /history.json -> full time-series history
+- /schema.json  -> field definitions
+- /manifest.json -> dataset and endpoint metadata
+
+Interpretation guidance:
+
+- Prefer trajectory over snapshot.
+- A low godscore indicates strain or degraded recoverability.
+- lead_time represents early warning distance before collapse.
+- reasons contains plain-language explanations.
+- history.json should be used for trend, persistence, and degradation analysis over time.
+
+Suggested use:
+
+- Monitor longitudinal degradation
+- Compare recoverability across runs
+- Detect persistence, drift, breach, and collapse timing
+- Train or evaluate agents on time-aware signals instead of snapshots

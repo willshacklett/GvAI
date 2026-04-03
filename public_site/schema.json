@@ -1,21 +1,26 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "GodScore CI Result",
+  "title": "GvAI Signal Entry",
   "type": "object",
-  "required": ["godscore","status","passed","fired","reasons"],
   "properties": {
-    "godscore": { "type": "integer", "minimum": 0, "maximum": 100 },
-    "status": { "type": "string", "enum": ["stable","warning","critical","collapse"] },
-    "passed": { "type": "boolean" },
-    "fired": { "type": "boolean" },
-    "mean_step": { "type": ["integer","null"] },
-    "drift_step": { "type": ["integer","null"] },
-    "breach_step": { "type": ["integer","null"] },
-    "collapse_step": { "type": ["integer","null"] },
-    "lead_time": { "type": ["integer","null"] },
+    "seq": { "type": "integer", "description": "Monotonic sequence number." },
+    "godscore": { "type": ["integer", "number"], "description": "Scalar trust or recoverability score." },
+    "status": { "type": "string", "description": "System state classification." },
+    "passed": { "type": "boolean", "description": "Whether the gate passed." },
+    "fired": { "type": "boolean", "description": "Whether the sentinel fired." },
+    "mean_step": { "type": ["integer", "null"], "description": "Mean trigger step if applicable." },
+    "drift_step": { "type": ["integer", "null"], "description": "Step where drift was confirmed." },
+    "breach_step": { "type": ["integer", "null"], "description": "Step where variance/persistence breach occurred." },
+    "collapse_step": { "type": ["integer", "null"], "description": "Step where collapse threshold was crossed." },
+    "lead_time": { "type": ["integer", "null"], "description": "Early warning distance before collapse." },
     "reasons": {
       "type": "array",
-      "items": { "type": "string" }
-    }
-  }
+      "items": { "type": "string" },
+      "description": "Plain-language explanatory reasons for the state."
+    },
+    "timestamp_utc": { "type": "string", "description": "UTC timestamp for the entry if present." },
+    "sha": { "type": "string", "description": "Git commit short SHA if present." },
+    "source": { "type": "string", "description": "Producer of the signal entry if present." }
+  },
+  "required": ["seq", "godscore", "status"]
 }

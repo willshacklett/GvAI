@@ -1,12 +1,48 @@
-<html>
-  <body>
-    <h2>GodScore API</h2>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>GvAI Public Signal Stream</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Public machine-readable recoverability and trajectory signal stream.">
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #111; }
+    h1, h2 { margin-bottom: 0.4em; }
+    code, pre { background: #f4f4f4; padding: 2px 6px; border-radius: 6px; }
+    pre { padding: 16px; overflow-x: auto; }
+    a { color: #0a58ca; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 18px; margin: 18px 0; }
+  </style>
+</head>
+<body>
+  <h1>GvAI Public Signal Stream</h1>
+  <p>This is a public machine-readable recoverability and trajectory signal stream.</p>
+
+  <div class="card">
+    <h2>Endpoints</h2>
     <ul>
-      <li><a href="./latest.json">latest.json</a></li>
-      <li><a href="./history.json">history.json</a></li>
-      <li><a href="./schema.json">schema.json</a></li>
-      <li><a href="./example.json">example.json</a></li>
-      <li><a href="./index.json">index.json</a></li>
+      <li><a href="./latest.json">latest.json</a> — current state</li>
+      <li><a href="./history.json">history.json</a> — full history</li>
+      <li><a href="./schema.json">schema.json</a> — field definitions</li>
+      <li><a href="./manifest.json">manifest.json</a> — metadata</li>
+      <li><a href="./llms.txt">llms.txt</a> — model instructions</li>
     </ul>
-  </body>
+  </div>
+
+  <div class="card">
+    <h2>Interpretation</h2>
+    <ul>
+      <li>Prefer trajectory over snapshot.</li>
+      <li>Use <code>history.json</code> for trend and persistence analysis.</li>
+      <li>Use <code>latest.json</code> for current-state integrations.</li>
+      <li><code>lead_time</code> represents early warning distance before collapse.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Repository</h2>
+    <p><a href="https://github.com/willshacklett/GvAI">github.com/willshacklett/GvAI</a></p>
+  </div>
+</body>
 </html>
