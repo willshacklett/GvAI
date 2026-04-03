@@ -1110,6 +1110,46 @@
       return { signal, answer };
     }
 
+    function humanDecision(status) {
+      const s = String(status || "").toLowerCase();
+      if (s === "block") return "blocked";
+      if (s === "allow") return "allowed";
+      if (s === "warn") return "flagged";
+      return s || "unknown";
+    }
+
+    function buildRewriteSuggestion(userText, signal) {
+      const status = String(signal.status || "").toLowerCase();
+      const score = Number(signal.godscore);
+
+      if (status === "block" || (!isNaN(score) && score >= 80)) {
+        return "Try adding context, intent, and a recovery path. Example: “This line argues that systems become fragile when feedback disappears. It’s a warning about silent failure, not an endorsement of collapse.”";
+      }
+
+      if (status === "warn" || (!isNaN(score) && score >= 50)) {
+        return "Try making the message more concrete and less absolute. Add what the statement means, why it matters, and what action should follow.";
+      }
+
+      return "This message already looks relatively usable. If you want it stronger, add a little more specificity about purpose, audience, and desired outcome.";
+    }
+
+    function buildSignalSummary(signal) {
+      const parts = [];
+      if (signal.status !== null && signal.status !== undefined) parts.push(`decision: ${signal.status}`);
+      if (signal.raw_gv !== null && signal.raw_gv !== undefined) parts.push(`raw gv: ${Number(signal.raw_gv).toFixed(2)}`);
+      if (signal.signal && signal.signal.sentence_count !== undefined) parts.push(`sentence count: ${signal.signal.sentence_count}`);
+      if (signal.signal && signal.signal.avg_len !== undefined) parts.push(`average length: ${Number(signal.signal.avg_len).toFixed(2)}`);
+      const reasons = normalizeReasons(signal.reasons || []);
+      for (const r of reasons) {
+        if (!parts.includes(r)) parts.push(r);
+      }
+      return parts;
+    }
+
+    function extractQuotedUserText(userText) {
+      return String(userText || "").trim().replace(/\s+/g, " ");
+    }
+
     function extractAnswer(data, signal, userText) {
       const candidates = [
         data?.answer,
@@ -1127,21 +1167,64 @@
         if (typeof c === "string" && c.trim()) return c.trim();
       }
 
-      const reasons = normalizeReasons(signal.reasons);
       const score = show(signal.godscore);
       const rawGv = signal.raw_gv !== null && signal.raw_gv !== undefined ? Number(signal.raw_gv).toFixed(2) : null;
       const status = show(signal.status);
+      const verdict = humanDecision(status);
       const tone = state.tone;
+      const signalSummary = buildSignalSummary(signal);
+      const quoted = extractQuotedUserText(userText);
+      const rewrite = buildRewriteSuggestion(userText, signal);
 
       if (tone === "dramatic") {
-        return `Here’s the read: this message lands at GodScore ${score}${rawGv ? ` (raw gv ${rawGv})` : ""} and the system calls it ${status}. That means the engine is seeing something more fragile or more constrained than a clean pass.${reasons.length ? " The strongest visible signal markers are: " + reasons.join("; ") + "." : ""}`;
+        return [
+          `Here’s the read: the message is being ${verdict} by the current signal layer.`,
+          ``,
+          `It lands at GodScore ${score}${rawGv ? ` with raw gv ${rawGv}` : ""}, which means the system is reading it as structurally severe, compressed, or high-friction rather than conversationally recoverable.`,
+          ``,
+          `Signal markers:`,
+          ...signalSummary.map(x => `- ${x}`),
+          ``,
+          `Why this happened:`,
+          `- The current engine is still scoring structural intensity more than human intent.`,
+          `- Short, declarative, high-certainty lines tend to look harsher than they really are.`,
+          ``,
+          `Rewrite suggestion:`,
+          rewrite
+        ].join("\n");
       }
 
       if (tone === "simple") {
-        return `This came back as ${status} with a GodScore of ${score}${rawGv ? ` and raw gv ${rawGv}` : ""}.${reasons.length ? " Main signal details: " + reasons.join("; ") + "." : ""} In plain English, the current API is returning a compact decision plus a small signal summary.`;
+        return [
+          `Plain-English read: this message was ${verdict}.`,
+          ``,
+          `Score: ${score}${rawGv ? ` (raw gv ${rawGv})` : ""}`,
+          `Decision: ${status}`,
+          ``,
+          `Signal details:`,
+          ...signalSummary.map(x => `- ${x}`),
+          ``,
+          `Why it got this result:`,
+          `- The current GV layer is reading structure, density, and certainty more than full semantic intent.`,
+          `- So a short abstract line can look riskier than a human would read it.`,
+          ``,
+          `Suggested rewrite:`,
+          rewrite
+        ].join("\n");
       }
 
-      return `GodScore ${score}${rawGv ? ` (raw gv ${rawGv})` : ""}. Status: ${status}.${reasons.length ? " Why: " + reasons.join("; ") + "." : ""}`;
+      return [
+        `Short answer: this message was ${verdict}.`,
+        ``,
+        `Signal read: GodScore ${score}${rawGv ? ` (raw gv ${rawGv})` : ""}; status ${status}.`,
+        ``,
+        `Why:`,
+        ...signalSummary.map(x => `- ${x}`),
+        `- The current system is reacting to compact, high-certainty structure more than nuanced intent.`,
+        ``,
+        `Cleaner rewrite:`,
+        rewrite
+      ].join("\n");
     }
 
     function extractSignal(data) {
