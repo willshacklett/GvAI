@@ -1463,3 +1463,52 @@
   </script>
 </body>
 </html>
+
+<script>
+// --- GvAI API override patch (safe) ---
+(async () => {
+  const originalFetch = window.fetch;
+
+  window.fetch = async (...args) => {
+    const res = await originalFetch(...args);
+
+    try {
+      const clone = res.clone();
+      const data = await clone.json();
+
+      if (data && data.gv !== undefined) {
+        console.log("🔥 GvAI response:", data);
+
+        const score = Math.round(data.gv * 100);
+        const status = data.decision || "unknown";
+
+        // update chat UI
+        document.querySelectorAll(".score, .signalScore").forEach(el => {
+          el.textContent = score;
+        });
+
+        document.querySelectorAll(".status, .signalState").forEach(el => {
+          el.textContent = status;
+        });
+
+        // update right panel bar
+        const bar = document.querySelector(".fill");
+        if (bar) bar.style.width = score + "%";
+
+        // inject explanation
+        const reasonBox = document.querySelector(".reasons");
+        if (reasonBox) {
+          reasonBox.innerHTML = `
+            <div>decision: ${status}</div>
+            <div>sentences: ${data.signal?.sentence_count}</div>
+            <div>avg length: ${data.signal?.avg_len?.toFixed(2)}</div>
+          `;
+        }
+      }
+    } catch (e) {}
+
+    return res;
+  };
+})();
+</script>
+
