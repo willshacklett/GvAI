@@ -1,0 +1,57 @@
+name: Auto Append History
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  append-history:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Ensure public_site exists
+        run: mkdir -p public_site
+
+      - name: Ensure history file exists
+        run: |
+          if [ ! -f public_site/history.json ]; then
+            echo "[]" > public_site/history.json
+          fi
+
+      - name: Append history entry
+        env:
+          GODSCORE: 5
+          STATUS: collapse
+          MEAN_STEP: 20
+          COLLAPSE_STEP: 31
+          LEAD_TIME: 11
+        run: python scripts/append_history.py
+
+      - name: Commit updated history
+        run: |
+          if git diff --quiet -- public_site/history.json; then
+            echo "No history changes to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public_site/history.json
+          git commit -m "auto-append history [skip ci]"
+          git push
