@@ -1563,7 +1563,24 @@
         console.log("🔥 GvAI response:", data);
 
         const score = Math.round(data.gv * 100);
-        const status = data.decision || "unknown";
+        
+let status = data.decision || "unknown";
+
+// Override with smarter state logic
+if (data.gv !== undefined) {
+  const gv = Number(data.gv);
+
+  if (gv >= 0.95) {
+    status = "critical";
+  } else if (gv >= 0.85) {
+    status = "fragile";
+  } else if (gv >= 0.70) {
+    status = "watch";
+  } else {
+    status = "stable";
+  }
+}
+
 
         // update chat UI
         document.querySelectorAll(".score, .signalScore").forEach(el => {
