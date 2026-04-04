@@ -1062,7 +1062,23 @@
 
     function badgeText(signal) {
       const score = show(signal.godscore);
-      const status = show(signal.status);
+      
+let status = "unknown";
+
+if (data && data.gv !== undefined) {
+  const gv = Number(data.gv);
+
+  if (gv >= 0.95) {
+    status = "critical";
+  } else if (gv >= 0.85) {
+    status = "fragile";
+  } else if (gv >= 0.70) {
+    status = "watch";
+  } else {
+    status = "stable";
+  }
+}
+
       return `GodScore ${score} · ${status}`;
     }
 
@@ -1119,7 +1135,23 @@
     }
 
     function buildRewriteSuggestion(userText, signal) {
-      const status = String(signal.status || "").toLowerCase();
+      
+let status = "unknown";
+
+if (data && data.gv !== undefined) {
+  const gv = Number(data.gv);
+
+  if (gv >= 0.95) {
+    status = "critical";
+  } else if (gv >= 0.85) {
+    status = "fragile";
+  } else if (gv >= 0.70) {
+    status = "watch";
+  } else {
+    status = "stable";
+  }
+}
+
       const score = Number(signal.godscore);
 
       if (status === "block" || (!isNaN(score) && score >= 80)) {
@@ -1169,7 +1201,23 @@
 
       const score = show(signal.godscore);
       const rawGv = signal.raw_gv !== null && signal.raw_gv !== undefined ? Number(signal.raw_gv).toFixed(2) : null;
-      const status = show(signal.status);
+      
+let status = "unknown";
+
+if (data && data.gv !== undefined) {
+  const gv = Number(data.gv);
+
+  if (gv >= 0.95) {
+    status = "critical";
+  } else if (gv >= 0.85) {
+    status = "fragile";
+  } else if (gv >= 0.70) {
+    status = "watch";
+  } else {
+    status = "stable";
+  }
+}
+
       const verdict = humanDecision(status);
       const tone = state.tone;
       const signalSummary = buildSignalSummary(signal);
@@ -1336,7 +1384,23 @@
       state.lastSignal = signal;
 
       const score = signal.godscore;
-      const status = show(signal.status);
+      
+let status = "unknown";
+
+if (data && data.gv !== undefined) {
+  const gv = Number(data.gv);
+
+  if (gv >= 0.95) {
+    status = "critical";
+  } else if (gv >= 0.85) {
+    status = "fragile";
+  } else if (gv >= 0.70) {
+    status = "watch";
+  } else {
+    status = "stable";
+  }
+}
+
       const scoreEl = document.getElementById("signalScore");
       const stateEl = document.getElementById("signalState");
       const subEl = document.getElementById("signalSub");
