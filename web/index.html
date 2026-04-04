@@ -1356,17 +1356,10 @@ if (data && data.gv !== undefined) {
         style: state.tone
       };
 
-      const res = await 
-fetch("https://api.gvai.io/score", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    text: input
-  })
-})
-
+      const res = await fetch(API_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
       });
 
       if (!res.ok) {
