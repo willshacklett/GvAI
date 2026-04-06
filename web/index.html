@@ -748,7 +748,7 @@
 
         <div class="top-actions">
           <div class="pill"><span class="dot"></span> Signal on</div>
-          <div class="pill">API: <strong id="apiBaseLabel">api.gvai.io/score</strong></div>
+          <div class="pill">API: <strong id="apiBaseLabel">gvai-gateway.onrender.com/score</strong></div>
           <button class="ghost mobile-toggle" id="mobileSignalBtn">Signal</button>
         </div>
       </div>
@@ -850,14 +850,14 @@
         </div>
 
         <div class="api-note">
-          Endpoint: <strong id="endpointText">https://api.gvai.io/score</strong>
+          Endpoint: <strong id="endpointText">https://gvai-gateway.onrender.com/score</strong>
         </div>
       </div>
     </aside>
   </div>
 
   <script>
-    const API_ENDPOINT = "https://api.gvai.io/score";
+    const API_ENDPOINT = "https://gvai-gateway.onrender.com/score";
     const thread = document.getElementById("thread");
     const threadWrap = document.getElementById("threadWrap");
     const composerInput = document.getElementById("composerInput");
@@ -1664,8 +1664,8 @@ if (data.gv !== undefined) {
         if (reasonBox) {
           reasonBox.innerHTML = `
             <div>decision: ${status}</div>
-            <div>sentences: ${data.signal?.sentence_count}</div>
-            <div>avg length: ${data.signal?.avg_len?.toFixed(2)}</div>
+            <div>sentences: ${payload.signal?.sentence_count}</div>
+            <div>avg length: ${payload.signal?.avg_len?.toFixed(2)}</div>
           `;
         }
       }
