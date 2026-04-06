@@ -857,6 +857,11 @@
   </div>
 
   <script>
+
+function gvaiData() {
+  return window.__gvaiPayload || {};
+}
+
     const API_ENDPOINT = "https://gvai-api.onrender.com/score";
     const thread = document.getElementById("thread");
     const threadWrap = document.getElementById("threadWrap");
