@@ -2,6 +2,7 @@ import os
 from typing import Optional, Dict, Any
 
 import requests
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -9,6 +10,21 @@ from gvai.real_gv import evaluate_real_gv
 from gvai.agent import generate_action, generate_question
 
 app = FastAPI(title="GvAI Gateway", version="0.3.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://gvai.io",
+        "https://www.gvai.io",
+        "https://api.gvai.io",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 
 # -----------------------
