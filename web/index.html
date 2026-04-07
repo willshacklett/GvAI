@@ -777,7 +777,7 @@
 
         <div class="top-actions">
           <div class="pill"><span class="dot"></span> Signal on</div>
-          <div class="pill">API: <strong id="apiBaseLabel">gvai-api.onrender.com/score</strong></div>
+          <div class="pill">API: <strong id="apiBaseLabel">gvai-api.onrender.com/api/chat</strong></div>
           <button class="ghost mobile-toggle" id="mobileSignalBtn">Signal</button>
         </div>
       </div>
@@ -879,7 +879,7 @@
         </div>
 
         <div class="api-note">
-          Endpoint: <strong id="endpointText">https://gvai-api.onrender.com/score</strong>
+          Endpoint: <strong id="endpointText">https://gvai-api.onrender.com/api/chat</strong>
         </div>
       </div>
     </aside>
@@ -893,7 +893,7 @@ function gvaiData() {
   return window.__gvaiPayload || {};
 }
 
-    const API_ENDPOINT = "https://gvai-api.onrender.com/score";
+    const API_ENDPOINT = "https://gvai-api.onrender.com/api/chat";
     const thread = document.getElementById("thread");
     const threadWrap = document.getElementById("threadWrap");
     const composerInput = document.getElementById("composerInput");
