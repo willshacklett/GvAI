@@ -733,6 +733,34 @@
 }
 
 </style>
+
+<style>
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.chat-container {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 20px;
+}
+
+.input-container {
+  position: sticky;
+  bottom: 0;
+  background: #0b1220;
+  padding: 12px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+</style>
+
 </head>
 <body>
   <div class="app">
@@ -805,7 +833,7 @@
             <button class="chip tone-chip" data-tone="simple">Simple explanation</button>
             <button class="chip tone-chip" data-tone="dramatic">Dramatic prose</button>
           </div>
-          <div class="composer">
+          <div class="composer input-container">
             <textarea id="composerInput" placeholder="Message GvAI..."></textarea>
             <div class="composer-actions">
               <button class="ghost" id="clearBtn">Clear</button>
