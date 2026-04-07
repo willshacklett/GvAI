@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import os
+from typing import Any, Dict, List, Optional
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Any, Dict, List, Optional
-import os
 
-app = FastAPI(title="GvAI API", version="1.3.0")
+app = FastAPI(title="GvAI API", version="1.4.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,32 +26,65 @@ try:
     from gvai.llm import generate_llm_response, llm_available
 except Exception:
     generate_llm_response = None
+
     def llm_available() -> bool:
         return False
 
-def fallback_score(message: str) -> Dict[str, Any]:
-    words = len(message.split())
-    chars = len(message.strip())
+
+def compute_signal(message: str) -> Dict[str, Any]:
+    text = (message or "").strip()
+    words = text.split()
+    chars = len(text)
+
     base = 78
-    if chars > 0:
+    if chars >= 40:
         base += min(8, chars // 40)
-    if "?" in message:
+    if "?" in text:
         base += 2
-    if len(words := message.split()) >= 8:
+    if len(words) >= 8:
         base += 3
 
-    score = max(55, min(99, base))
-    status = "stable" if score >= 85 else "watch"
-    return {
-        "godscore": score,
-        "status": status,
-        "label": "unknown" if status != "stable" else "stable",
-        "metrics": {
-            "chars": chars,
-            "words": len(words),
-            "raw_gv": float(score),
-        },
+    godscore = max(55, min(99, base))
+    status = "stable" if godscore >= 85 else "watch"
+    label = "stable" if godscore >= 85 else "unknown"
+
+    reasons = [
+        "Signal computed from current message only",
+    ]
+    if len(words) < 8:
+        reasons.append("Compact prompt with limited context")
+    else:
+        reasons.append("Prompt includes enough structure for a richer answer")
+
+    metrics = {
+        "chars": chars,
+        "words": len(words),
+        "raw_gv": float(godscore),
     }
+
+    return {
+        "godscore": godscore,
+        "status": status,
+        "label": label,
+        "reasons": reasons,
+        "metrics": metrics,
+    }
+
+
+def build_overlay(signal: Dict[str, Any]) -> str:
+    decision = "stable" if signal["godscore"] >= 85 else "watch"
+    return (
+        f"\n\n---\n"
+        f"Signal: GodScore {signal['godscore']} "
+        f"(raw gv {signal['metrics']['raw_gv']:.2f})\n"
+        f"Status: {signal['label']} | Decision: {decision}"
+    )
+
+
+@app.get("/")
+def root():
+    return {"ok": True, "service": "gvai-api", "message": "GvAI API online"}
+
 
 @app.get("/health")
 def health():
@@ -62,6 +96,15 @@ def health():
         "openai_model": os.getenv("OPENAI_MODEL", "unset"),
     }
 
+
+@app.get("/api/chat")
+def api_chat_get():
+    return {
+        "ok": True,
+        "message": 'Use POST /api/chat with JSON like {"message":"...","history":[],"mode":"simple"}'
+    }
+
+
 @app.post("/api/chat")
 def api_chat(req: ChatRequest):
     user_message = (req.message or "").strip()
@@ -70,17 +113,25 @@ def api_chat(req: ChatRequest):
 
     if not user_message:
         return {
-            "reply": "No message received.",
+            "reply": "I did not receive a message.",
+            "godscore": 0,
+            "status": "empty",
+            "label": "unknown",
+            "reasons": ["No message supplied"],
+            "metrics": {},
             "engine": "none",
-            "debug": {"error": "empty_message"},
+            "debug": {
+                "llm_ready": bool(llm_available()),
+                "llm_error": "empty_message",
+            },
         }
 
-    score_payload = fallback_score(user_message)
+    signal = compute_signal(user_message)
 
     llm_text = None
     llm_error = None
 
-    if generate_llm_response is not None:
+    if generate_llm_response is not None and llm_available():
         try:
             llm_text = generate_llm_response(
                 user_message=user_message,
@@ -90,43 +141,43 @@ def api_chat(req: ChatRequest):
         except Exception as e:
             llm_error = f"{type(e).__name__}: {e}"
 
-    if llm_text and llm_text.strip():
-        decision = "stable" if score_payload["godscore"] >= 85 else "watch"
-        return {
-            "reply": (
-                f"{llm_text.strip()}\n\n"
-                f"---\n"
-                f"Signal: GodScore {score_payload['godscore']} "
-                f"(raw gv {score_payload['metrics']['raw_gv']:.2f})\n"
-                f"Status: {score_payload['label']} | Decision: {decision}"
-            ),
-            "godscore": score_payload["godscore"],
-            "status": score_payload["status"],
-            "label": score_payload["label"],
-            "metrics": score_payload["metrics"],
-            "engine": "llm",
-            "debug": {
-                "llm_ready": bool(llm_available()),
-                "openai_model": os.getenv("OPENAI_MODEL", "unset"),
-                "llm_error": None,
-            },
-        }
+    if llm_text and isinstance(llm_text, str) and llm_text.strip():
+        reply = llm_text.strip() + build_overlay(signal)
+        engine = "llm"
+    else:
+        engine = "fallback"
+        if llm_error is None and llm_available():
+            llm_error = "No text returned from model"
+        elif llm_error is None and not llm_available():
+            llm_error = "LLM not ready"
+
+        reply = (
+            "LLM call failed, so fallback mode engaged.\n\n"
+            f"Signal: GodScore {signal['godscore']} "
+            f"(raw gv {signal['metrics']['raw_gv']:.2f})\n"
+            f"Status: {signal['label']}"
+        )
 
     return {
-        "reply": (
-            "LLM call failed, so fallback mode engaged.\n\n"
-            f"Signal: GodScore {score_payload['godscore']} "
-            f"(raw gv {score_payload['metrics']['raw_gv']:.2f})\n"
-            f"Status: {score_payload['label']}"
-        ),
-        "godscore": score_payload["godscore"],
-        "status": score_payload["status"],
-        "label": score_payload["label"],
-        "metrics": score_payload["metrics"],
-        "engine": "fallback",
+        "reply": reply,
+        "godscore": signal["godscore"],
+        "status": signal["status"],
+        "label": signal["label"],
+        "reasons": signal["reasons"],
+        "metrics": signal["metrics"],
+        "engine": engine,
         "debug": {
             "llm_ready": bool(llm_available()),
             "openai_model": os.getenv("OPENAI_MODEL", "unset"),
-            "llm_error": llm_error or "No text returned from model",
+            "llm_error": llm_error,
         },
+    }
+
+
+@app.post("/score")
+def score(req: ChatRequest):
+    signal = compute_signal(req.message or "")
+    return {
+        "text": req.message,
+        **signal,
     }
