@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
-import os
+import traceback
 
-app = FastAPI(title="GvAI API", version="1.0.0")
+app = FastAPI(title="GvAI API", version="1.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,8 +25,7 @@ def safe_imports():
     core = None
     memory = None
     brain = None
-    chat_mod = None
-    sentinel = None
+    llm_fn = None
 
     try:
         from gvai.core import GvCore
@@ -45,20 +46,14 @@ def safe_imports():
         pass
 
     try:
-        import gvai.chat as chat_mod_import
-        chat_mod = chat_mod_import
+        from gvai.llm import generate_llm_response
+        llm_fn = generate_llm_response
     except Exception:
         pass
 
-    try:
-        from gvai.sentinel import RecoverabilitySentinel
-        sentinel = RecoverabilitySentinel
-    except Exception:
-        pass
+    return core, memory, brain, llm_fn
 
-    return core, memory, brain, chat_mod, sentinel
-
-GvCore, Memory, generate_brain_response, chat_mod, RecoverabilitySentinel = safe_imports()
+GvCore, Memory, generate_brain_response, generate_llm_response = safe_imports()
 
 memory_store = None
 if Memory is not None:
@@ -74,31 +69,48 @@ if GvCore is not None:
     except Exception:
         core_engine = None
 
+@app.get("/")
+def root():
+    return {"ok": True, "message": "GvAI API online"}
+
 @app.get("/health")
 def health():
+    llm_ready = False
+    try:
+        from gvai.llm import llm_available
+        llm_ready = bool(llm_available())
+    except Exception:
+        llm_ready = False
+
     return {
         "ok": True,
         "service": "gvai-api",
         "brain_loaded": generate_brain_response is not None,
         "core_loaded": core_engine is not None,
         "memory_loaded": memory_store is not None,
+        "llm_loaded": generate_llm_response is not None,
+        "llm_ready": llm_ready,
     }
-
-@app.get("/")
-def root():
-    return {"ok": True, "message": "GvAI API online"}
 
 def fallback_score(message: str) -> Dict[str, Any]:
     words = len(message.split())
     chars = len(message.strip())
-    base = 82
+    base = 78
+
     if chars > 0:
-        base += min(10, chars // 40)
+        base += min(8, chars // 40)
+    if "?" in message:
+        base += 2
+    if len(message.split()) >= 8:
+        base += 3
+
     score = max(55, min(99, base))
+    status = "stable" if score >= 85 else "watch"
+
     return {
         "godscore": score,
-        "status": "stable" if score >= 85 else "watch",
-        "label": "unknown",
+        "status": status,
+        "label": "unknown" if status != "stable" else "stable",
         "reasons": [
             "Signal computed from current message only",
             "Full recoverability pipeline fallback mode",
@@ -106,28 +118,73 @@ def fallback_score(message: str) -> Dict[str, Any]:
         "metrics": {
             "chars": chars,
             "words": words,
+            "raw_gv": float(score),
         },
     }
 
-def fallback_response(message: str, score_payload: Dict[str, Any]) -> str:
-    score = score_payload["godscore"]
-    status = score_payload["status"]
+def governed_response(
+    user_message: str,
+    llm_text: Optional[str],
+    score_payload: Dict[str, Any],
+    mode: str = "simple",
+) -> str:
+    if llm_text and generate_brain_response is not None:
+        try:
+            wrapped = {
+                "godscore": score_payload["godscore"],
+                "status": score_payload["status"],
+                "label": score_payload["label"],
+                "reasons": score_payload["reasons"],
+                "metrics": score_payload["metrics"],
+                "draft_response": llm_text,
+            }
+            out = generate_brain_response(user_message, wrapped)
+            if isinstance(out, str) and out.strip():
+                return out.strip()
+        except Exception:
+            pass
 
-    if status == "stable":
-        tone = "You look steady right now."
-    else:
-        tone = "There is some strain showing, but not a breakdown."
+    if llm_text:
+        return llm_text.strip()
 
+    decision = "stable" if score_payload["godscore"] >= 85 else "watch"
+    intro = {
+        "simple": f"Short answer: this message was {score_payload['label']}.",
+        "explain": f"Simple explanation: I read this as {score_payload['label']}.",
+        "dramatic": f"The signal reads {score_payload['label']}, not collapsed but not settled.",
+    }.get(mode or "simple", f"Short answer: this message was {score_payload['label']}.")
+
+    why = "\n".join(f"- {r}" for r in score_payload["reasons"])
     return (
-        f"{tone} "
-        f"I read your message as: \"{message}\". "
-        f"Current GodScore is {score}. "
-        f"This is a live fallback response from GvAI, which means the chat layer is responding instead of only echoing your input."
+        f"{intro}\n\n"
+        f"Signal read: GodScore {score_payload['godscore']} "
+        f"(raw gv {score_payload['metrics'].get('raw_gv', score_payload['godscore']):.2f}); "
+        f"status {score_payload['label']}.\n\n"
+        f"Why:\n"
+        f"- decision: {decision}\n"
+        f"- raw gv: {score_payload['metrics'].get('raw_gv', score_payload['godscore']):.2f}\n"
+        f"{why}"
     )
+
+def store_memory(user_message: str, assistant_message: str):
+    if memory_store is None:
+        return
+
+    for fn_name in ["add", "store", "remember", "append"]:
+        fn = getattr(memory_store, fn_name, None)
+        if callable(fn):
+            try:
+                fn({"role": "user", "content": user_message})
+                fn({"role": "assistant", "content": assistant_message})
+                return
+            except Exception:
+                pass
 
 @app.post("/api/chat")
 def api_chat(req: ChatRequest):
     user_message = (req.message or "").strip()
+    history = req.history or []
+    mode = (req.mode or "simple").strip()
 
     if not user_message:
         return {
@@ -137,56 +194,35 @@ def api_chat(req: ChatRequest):
             "label": "unknown",
             "reasons": ["No message supplied"],
             "metrics": {},
+            "engine": "none",
         }
 
     score_payload = fallback_score(user_message)
 
-    response_text = None
+    llm_text = None
+    engine = "fallback"
 
-    if generate_brain_response is not None:
+    if generate_llm_response is not None:
         try:
-            response_text = generate_brain_response(
-                user_message,
-                {
-                    "godscore": score_payload["godscore"],
-                    "status": score_payload["status"],
-                    "label": score_payload["label"],
-                    "reasons": score_payload["reasons"],
-                    "metrics": score_payload["metrics"],
-                },
+            llm_text = generate_llm_response(
+                user_message=user_message,
+                history=history,
+                mode=mode,
             )
-        except TypeError:
-            try:
-                response_text = generate_brain_response(user_message)
-            except Exception:
-                response_text = None
+            if llm_text:
+                engine = "llm"
         except Exception:
-            response_text = None
+            llm_text = None
+            engine = "fallback"
 
-    if not response_text and chat_mod is not None:
-        for fn_name in ["generate_reply", "chat_reply", "respond", "reply"]:
-            fn = getattr(chat_mod, fn_name, None)
-            if callable(fn):
-                try:
-                    response_text = fn(user_message)
-                    if response_text:
-                        break
-                except Exception:
-                    pass
+    response_text = governed_response(
+        user_message=user_message,
+        llm_text=llm_text,
+        score_payload=score_payload,
+        mode=mode,
+    )
 
-    if not response_text:
-        response_text = fallback_response(user_message, score_payload)
-
-    if memory_store is not None:
-        for fn_name in ["add", "store", "remember", "append"]:
-            fn = getattr(memory_store, fn_name, None)
-            if callable(fn):
-                try:
-                    fn({"role": "user", "content": user_message})
-                    fn({"role": "assistant", "content": response_text})
-                    break
-                except Exception:
-                    pass
+    store_memory(user_message, response_text)
 
     return {
         "reply": response_text,
@@ -195,7 +231,15 @@ def api_chat(req: ChatRequest):
         "label": score_payload["label"],
         "reasons": score_payload["reasons"],
         "metrics": score_payload["metrics"],
+        "engine": engine,
         "echo": False,
+    }
+
+@app.get("/api/chat")
+def api_chat_get():
+    return {
+        "ok": True,
+        "message": "Use POST /api/chat with JSON: {\"message\":\"...\",\"history\":[],\"mode\":\"simple\"}",
     }
 
 @app.post("/score")
