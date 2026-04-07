@@ -761,8 +761,44 @@ html, body {
 }
 </style>
 
+
+<style>
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.main-column {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.chat-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.input-bar {
+  flex-shrink: 0;
+  background: #0b1220;
+  padding: 12px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+</style>
+
 </head>
 <body>
+<div class="app-container">
   <div class="app">
     <aside class="sidebar">
       <button class="btn new-chat" id="newChatBtn">+ New chat</button>
@@ -792,7 +828,7 @@ html, body {
       </div>
     </aside>
 
-    <main class="main">
+    <main class="main main-column">
       <div class="topbar">
         <div class="brand">
           <button class="ghost mobile-toggle" id="mobileSidebarBtn">☰</button>
@@ -1671,6 +1707,7 @@ if (data && data.gv !== undefined) {
     bindHeroPrompts();
     autoGrow();
   </script>
+</div>
 </body>
 </html>
 
