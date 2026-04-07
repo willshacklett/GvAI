@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="GvAI API", version="1.4.0")
+app = FastAPI(title="GvAI API", version="1.5.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -22,13 +22,7 @@ class ChatRequest(BaseModel):
     history: Optional[List[Dict[str, Any]]] = None
     mode: Optional[str] = "simple"
 
-try:
-    from gvai.llm import generate_llm_response, llm_available
-except Exception:
-    generate_llm_response = None
-
-    def llm_available() -> bool:
-        return False
+from gvai.llm import generate_llm_response, llm_available
 
 
 def compute_signal(message: str) -> Dict[str, Any]:
@@ -48,9 +42,7 @@ def compute_signal(message: str) -> Dict[str, Any]:
     status = "stable" if godscore >= 85 else "watch"
     label = "stable" if godscore >= 85 else "unknown"
 
-    reasons = [
-        "Signal computed from current message only",
-    ]
+    reasons = ["Signal computed from current message only"]
     if len(words) < 8:
         reasons.append("Compact prompt with limited context")
     else:
@@ -91,9 +83,9 @@ def health():
     return {
         "ok": True,
         "service": "gvai-api",
-        "llm_loaded": generate_llm_response is not None,
+        "llm_loaded": True,
         "llm_ready": bool(llm_available()),
-        "openai_model": os.getenv("OPENAI_MODEL", "unset"),
+        "openai_model": os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
     }
 
 
@@ -128,50 +120,47 @@ def api_chat(req: ChatRequest):
 
     signal = compute_signal(user_message)
 
-    llm_text = None
-    llm_error = None
-
-    if generate_llm_response is not None and llm_available():
-        try:
-            llm_text = generate_llm_response(
-                user_message=user_message,
-                history=history,
-                mode=mode,
-            )
-        except Exception as e:
-            llm_error = f"{type(e).__name__}: {e}"
-
-    if llm_text and isinstance(llm_text, str) and llm_text.strip():
-        reply = llm_text.strip() + build_overlay(signal)
-        engine = "llm"
-    else:
-        engine = "fallback"
-        if llm_error is None and llm_available():
-            llm_error = "No text returned from model"
-        elif llm_error is None and not llm_available():
-            llm_error = "LLM not ready"
-
-        reply = (
-            "LLM call failed, so fallback mode engaged.\n\n"
-            f"Signal: GodScore {signal['godscore']} "
-            f"(raw gv {signal['metrics']['raw_gv']:.2f})\n"
-            f"Status: {signal['label']}"
+    try:
+        llm_text = generate_llm_response(
+            user_message=user_message,
+            history=history,
+            mode=mode,
         )
-
-    return {
-        "reply": reply,
-        "godscore": signal["godscore"],
-        "status": signal["status"],
-        "label": signal["label"],
-        "reasons": signal["reasons"],
-        "metrics": signal["metrics"],
-        "engine": engine,
-        "debug": {
-            "llm_ready": bool(llm_available()),
-            "openai_model": os.getenv("OPENAI_MODEL", "unset"),
-            "llm_error": llm_error,
-        },
-    }
+        return {
+            "reply": llm_text.strip() + build_overlay(signal),
+            "godscore": signal["godscore"],
+            "status": signal["status"],
+            "label": signal["label"],
+            "reasons": signal["reasons"],
+            "metrics": signal["metrics"],
+            "engine": "llm",
+            "debug": {
+                "llm_ready": bool(llm_available()),
+                "openai_model": os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
+                "llm_error": None,
+            },
+        }
+    except Exception as e:
+        return {
+            "reply": (
+                "LLM failed, so fallback mode engaged.\n\n"
+                f"Signal: GodScore {signal['godscore']} "
+                f"(raw gv {signal['metrics']['raw_gv']:.2f})\n"
+                f"Status: {signal['label']}\n\n"
+                f"LLM error: {type(e).__name__}: {e}"
+            ),
+            "godscore": signal["godscore"],
+            "status": signal["status"],
+            "label": signal["label"],
+            "reasons": signal["reasons"],
+            "metrics": signal["metrics"],
+            "engine": "fallback",
+            "debug": {
+                "llm_ready": bool(llm_available()),
+                "openai_model": os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
+                "llm_error": f"{type(e).__name__}: {e}",
+            },
+        }
 
 
 @app.post("/score")
