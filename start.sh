@@ -1,2 +1,4 @@
 #!/usr/bin/env bash
-uvicorn src.api.main:app --host 0.0.0.0 --port 10000
+set -e
+PORT="${PORT:-10000}"
+exec uvicorn server.main:app --host 0.0.0.0 --port "$PORT"
