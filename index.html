@@ -1,3 +1,31 @@
+
+function normalizeGvAiResponse(data, fallbackInput = "") {
+  return {
+    reply:
+      data?.reply ??
+      data?.response ??
+      data?.answer ??
+      data?.text ??
+      fallbackInput ??
+      "No response returned.",
+    godscore:
+      data?.godscore ??
+      data?.score ??
+      data?.GodScore ??
+      0,
+    status:
+      data?.status ??
+      data?.label ??
+      "unknown",
+    reasons:
+      data?.reasons ??
+      [],
+    metrics:
+      data?.metrics ??
+      {},
+  };
+}
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -748,7 +776,7 @@
 
         <div class="top-actions">
           <div class="pill"><span class="dot"></span> Signal on</div>
-          <div class="pill">API: <strong id="apiBaseLabel">/score</strong></div>
+          <div class="pill">API: <strong id="apiBaseLabel">/api/chat</strong></div>
           <button class="ghost mobile-toggle" id="mobileSignalBtn">Signal</button>
         </div>
       </div>
@@ -850,14 +878,14 @@
         </div>
 
         <div class="api-note">
-          Endpoint: <strong id="endpointText">/score</strong>
+          Endpoint: <strong id="endpointText">/api/chat</strong>
         </div>
       </div>
     </aside>
   </div>
 
   <script>
-    const API_ENDPOINT = "/score";
+    const API_ENDPOINT = "/api/chat";
     const thread = document.getElementById("thread");
     const threadWrap = document.getElementById("threadWrap");
     const composerInput = document.getElementById("composerInput");
