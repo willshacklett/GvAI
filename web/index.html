@@ -888,7 +888,6 @@
   <script>
 let data = {};
 
-
 function gvaiData() {
   return window.__gvaiPayload || {};
 }
@@ -1551,7 +1550,7 @@ if (data && data.gv !== undefined) {
       } catch (err) {
         replaceMessage(thinking.id, {
           typing: false,
-          content: `I couldn't reach the scoring endpoint cleanly.\n\n${err.message}\n\nIf your backend uses different request or response fields, wire the parser in web/index.html to match the live API response.`,
+          content: `\n\n${err.message}\n\n`,
           signal: {
             godscore: null,
             status: "api-error",
@@ -1680,7 +1679,6 @@ if (data.gv !== undefined) {
     status = "stable";
   }
 }
-
 
         // update chat UI
         document.querySelectorAll(".score, .signalScore").forEach(el => {
