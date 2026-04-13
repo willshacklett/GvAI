@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 app = FastAPI(title="GvAI API", version="1.4.0")
 
@@ -18,7 +18,7 @@ app.add_middleware(
 )
 
 class ChatRequest(BaseModel):
-    message: Optional[str] = ""
+    message: str = ""
     history: Optional[List[Dict[str, Any]]] = None
     messages: Optional[List[Dict[str, Any]]] = None
     mode: Optional[str] = "simple"
@@ -64,7 +64,7 @@ def coerce_request_context(req: ChatRequest) -> tuple[str, List[Dict[str, str]],
                 user_message = item["content"]
                 break
 
-    mode = (req.mode or req.tone or req.style or "simple").strip()
+    mode = (req.mode or req.tone or req.style or "simple").strip().lower()
 
     return user_message, history, mode
 
@@ -148,7 +148,7 @@ def health():
 def api_chat_get():
     return {
         "ok": True,
-        "message": 'Use POST /api/chat with JSON like {"message":"...","history":[],"messages":[],"mode":"simple"}'
+        "message": 'Use POST /api/chat with JSON like {"message":"...","history":[{"role":"user","content":"Hi"}],"mode":"simple"}'
     }
 
 
