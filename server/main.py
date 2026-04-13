@@ -157,6 +157,7 @@ def gv_behavior_prompt(signal: Dict[str, Any], mode: str) -> str:
     status = str(signal.get("status", "unknown"))
     reasons = signal.get("reasons", []) or []
     reasons_text = "; ".join(str(r) for r in reasons[:4]) if reasons else "No reasons provided"
+    guidance = recoverability_guidance(signal)
 
     base = theory_bridge_prompt() + f"""
 
@@ -167,9 +168,17 @@ Current signal context:
 - User-selected mode: {mode}
 - Signal reasons: {reasons_text}
 
+Recoverability action guidance:
+- Stance: {guidance["stance"]}
+- Action style: {guidance["action_style"]}
+- Preferred moves: {guidance["preferred_moves"]}
+- Avoid moves: {guidance["avoid_moves"]}
+- Decision frame: {guidance["decision_frame"]}
+
 Core runtime rule:
 Let the signal influence how you answer. Be natural, useful, and conversational.
 Do not force theory language unless it helps the user.
+When useful, do not stop at interpretation alone — recommend recoverable next steps.
 """
 
     if band == "high":
@@ -223,6 +232,38 @@ Mode instructions:
     }
 
     return base + behavior + mode_map.get(mode, mode_map["clean"])
+
+
+def recoverability_guidance(signal: Dict[str, Any]) -> Dict[str, str]:
+    score = int(signal.get("godscore", 0) or 0)
+    band = gv_band(signal)
+
+    if band == "high":
+        return {
+            "stance": "decisive",
+            "action_style": "Recommend clear next steps. Favor practical execution, but still avoid fabricated certainty.",
+            "preferred_moves": "direct action, concrete planning, implementation, prioritized execution",
+            "avoid_moves": "needless hesitation, over-hedging, vague abstraction",
+            "decision_frame": "Choose the strongest practical next step that preserves momentum without creating unnecessary fragility."
+        }
+
+    if band == "medium":
+        return {
+            "stance": "balanced",
+            "action_style": "Recommend useful steps that preserve flexibility. Prefer reversible moves when uncertainty is meaningful.",
+            "preferred_moves": "small bets, staged rollout, verification, comparison, reversible testing",
+            "avoid_moves": "sweeping irreversible conclusions, inflated certainty, false precision",
+            "decision_frame": "Prefer actions that reduce downside, preserve options, and improve clarity before commitment."
+        }
+
+    return {
+        "stance": "cautious",
+        "action_style": "Recommend low-risk, reversible actions. Slow down commitment and reduce exposure to brittle assumptions.",
+        "preferred_moves": "clarify, verify, pause, gather evidence, run a small test, choose reversible paths",
+        "avoid_moves": "irreversible commitments, aggressive conclusions, escalation under uncertainty, collapsing options",
+        "decision_frame": "Act to preserve maneuverability. Lower the cost of being wrong before increasing commitment."
+    }
+
 
 def build_overlay(signal: Dict[str, Any]) -> str:
     decision = "stable" if signal["godscore"] >= 85 else "watch"
@@ -323,6 +364,7 @@ def api_chat(req: ChatRequest):
         "reasons": signal["reasons"],
         "metrics": signal["metrics"],
         "engine": engine,
+        "action_guidance": recoverability_guidance(signal),
         "debug": {
             "llm_ready": bool(llm_available()),
             "openai_model": os.getenv("OPENAI_MODEL", "unset"),
