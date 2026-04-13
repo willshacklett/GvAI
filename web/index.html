@@ -1283,11 +1283,13 @@ if (data && data.gv !== undefined) {
 
     function extractAnswer(data, signal, userText) {
       const candidates = [
+        data?.reply,
         data?.answer,
         data?.response,
         data?.output,
         data?.message,
         data?.text,
+        data?.result?.reply,
         data?.result?.answer,
         data?.result?.response,
         data?.result?.message,
