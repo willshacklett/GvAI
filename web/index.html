@@ -1120,10 +1120,18 @@ function gvaiData() {
           <div class="details-grid">
             <div class="mini-card"><span class="k">GodScore</span><div class="v">${show(message.signal.godscore)}</div></div>
             <div class="mini-card"><span class="k">Status</span><div class="v">${show(message.signal.status)}</div></div>
+            <div class="mini-card"><span class="k">Trend</span><div class="v">${show(message.signal.trend)}</div></div>
+            <div class="mini-card"><span class="k">Trajectory</span><div class="v">${show(message.signal.trajectory_score)}</div></div>
             <div class="mini-card"><span class="k">Lead time</span><div class="v">${show(message.signal.lead_time)}</div></div>
             <div class="mini-card"><span class="k">Tone</span><div class="v">${show(message.tone || state.tone)}</div></div>
           </div>
-          ${renderReasonsHtml(message.signal.reasons)}
+          ${renderReasonsHtml([
+            ...(normalizeReasons(message.signal.reasons)),
+            ...(message.signal.recoverability_note ? [message.signal.recoverability_note] : []),
+            ...(Array.isArray(message.signal.recent_scores) && message.signal.recent_scores.length
+              ? [`Recent scores: ${message.signal.recent_scores.join(" → ")}`]
+              : [])
+          ])}
         `;
         bubble.appendChild(details);
       }
@@ -1529,8 +1537,18 @@ if (data && data.gv !== undefined) {
       document.getElementById("signalTone").textContent = state.tone;
 
       const reasons = normalizeReasons(signal.reasons);
-      document.getElementById("reasonBox").innerHTML = reasons.length
-        ? `<ul class="reason-list">${reasons.map(r => `<li>${escapeHtml(r)}</li>`).join("")}</ul>`
+      const extras = [];
+      if (signal.trend) extras.push(`Trend: ${signal.trend}`);
+      if (signal.trajectory_score !== null && signal.trajectory_score !== undefined && signal.trajectory_score !== "")
+        extras.push(`Trajectory score: ${signal.trajectory_score}`);
+      if (Array.isArray(signal.recent_scores) && signal.recent_scores.length)
+        extras.push(`Recent scores: ${signal.recent_scores.join(" → ")}`);
+      if (signal.recoverability_note) extras.push(signal.recoverability_note);
+
+      const allReasons = [...reasons, ...extras];
+
+      document.getElementById("reasonBox").innerHTML = allReasons.length
+        ? `<ul class="reason-list">${allReasons.map(r => `<li>${escapeHtml(r)}</li>`).join("")}</ul>`
         : `<div class="status-empty">No reason strings returned.</div>`;
 
       renderTimeline(signal);

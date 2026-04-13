@@ -265,6 +265,60 @@ def recoverability_guidance(signal: Dict[str, Any]) -> Dict[str, str]:
     }
 
 
+
+def extract_recent_scores(history: Optional[List[Dict[str, Any]]]) -> List[float]:
+    scores: List[float] = []
+    for item in history or []:
+        if not isinstance(item, dict):
+            continue
+        content = str(item.get("content", "") or "")
+        if "GodScore" not in content:
+            continue
+
+        import re
+        m = re.search(r"GodScore\s+(\d+(?:\.\d+)?)", content)
+        if m:
+            try:
+                scores.append(float(m.group(1)))
+            except Exception:
+                pass
+    return scores[-6:]
+
+
+def compute_trajectory(signal: Dict[str, Any], history: Optional[List[Dict[str, Any]]]) -> Dict[str, Any]:
+    current = float(signal.get("godscore", 0) or 0)
+    prior_scores = extract_recent_scores(history)
+    scores = prior_scores + [current]
+
+    if len(scores) <= 1:
+        return {
+            "trend": "insufficient_data",
+            "trajectory_score": current,
+            "recent_scores": scores,
+            "recoverability_note": "Not enough history to judge trajectory yet."
+        }
+
+    delta = current - scores[0]
+    avg = sum(scores) / len(scores)
+
+    if delta >= 4:
+        trend = "improving"
+        note = "Recent interaction trend looks more recoverable and better-structured."
+    elif delta <= -4:
+        trend = "drifting"
+        note = "Recent interaction trend is degrading or becoming less recoverable."
+    else:
+        trend = "stable"
+        note = "Recent interaction trend appears broadly stable."
+
+    return {
+        "trend": trend,
+        "trajectory_score": round(avg, 2),
+        "recent_scores": scores,
+        "recoverability_note": note
+    }
+
+
 def build_overlay(signal: Dict[str, Any]) -> str:
     decision = "stable" if signal["godscore"] >= 85 else "watch"
     return (
@@ -320,6 +374,7 @@ def api_chat(req: ChatRequest):
         }
 
     signal = compute_signal(user_message, history=history)
+    trajectory = compute_trajectory(signal, history)
 
     llm_text = None
     llm_error = None
@@ -365,6 +420,10 @@ def api_chat(req: ChatRequest):
         "metrics": signal["metrics"],
         "engine": engine,
         "action_guidance": recoverability_guidance(signal),
+        "trend": trajectory["trend"],
+        "trajectory_score": trajectory["trajectory_score"],
+        "recent_scores": trajectory["recent_scores"],
+        "recoverability_note": trajectory["recoverability_note"],
         "debug": {
             "llm_ready": bool(llm_available()),
             "openai_model": os.getenv("OPENAI_MODEL", "unset"),

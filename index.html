@@ -1114,10 +1114,18 @@ html, body {
           <div class="details-grid">
             <div class="mini-card"><span class="k">GodScore</span><div class="v">${show(message.signal.godscore)}</div></div>
             <div class="mini-card"><span class="k">Status</span><div class="v">${show(message.signal.status)}</div></div>
+            <div class="mini-card"><span class="k">Trend</span><div class="v">${show(message.signal.trend)}</div></div>
+            <div class="mini-card"><span class="k">Trajectory</span><div class="v">${show(message.signal.trajectory_score)}</div></div>
             <div class="mini-card"><span class="k">Lead time</span><div class="v">${show(message.signal.lead_time)}</div></div>
             <div class="mini-card"><span class="k">Tone</span><div class="v">${show(message.tone || state.tone)}</div></div>
           </div>
-          ${renderReasonsHtml(message.signal.reasons)}
+          ${renderReasonsHtml([
+            ...(normalizeReasons(message.signal.reasons)),
+            ...(message.signal.recoverability_note ? [message.signal.recoverability_note] : []),
+            ...(Array.isArray(message.signal.recent_scores) && message.signal.recent_scores.length
+              ? [`Recent scores: ${message.signal.recent_scores.join(" → ")}`]
+              : [])
+          ])}
         `;
         bubble.appendChild(details);
       }
@@ -1250,6 +1258,10 @@ html, body {
         breach_step: pickNullable(src, ["breach_step", "breachStep"]),
         collapse_step: pickNullable(src, ["collapse_step", "collapseStep"]),
         lead_time: pickNullable(src, ["lead_time", "leadTime"]),
+        trend: pickString(src, ["trend"]) || "unknown",
+        trajectory_score: pickNullable(src, ["trajectory_score", "trajectoryScore"]),
+        recent_scores: src.recent_scores ?? src.recentScores ?? [],
+        recoverability_note: pickString(src, ["recoverability_note", "recoverabilityNote"]),
         reasons: src.reasons ?? src.reason ?? src.explanations ?? src.flags ?? []
       };
     }
@@ -1336,7 +1348,9 @@ html, body {
 
       scoreEl.textContent = show(score);
       stateEl.textContent = status;
-      subEl.textContent = `Live survivability signal for the latest assistant response.`;
+      const trendLabel = signal.trend ? ` Trend: ${signal.trend}.` : "";
+      const recoverabilityLabel = signal.recoverability_note ? ` ${signal.recoverability_note}` : "";
+      subEl.textContent = `Live survivability signal for the latest assistant response.${trendLabel}${recoverabilityLabel}`;
       barEl.style.width = `${Math.max(0, Math.min(100, Number(score) || 0))}%`;
 
       document.getElementById("signalPassed").textContent = show(signal.passed);
@@ -1349,8 +1363,18 @@ html, body {
       document.getElementById("signalTone").textContent = state.tone;
 
       const reasons = normalizeReasons(signal.reasons);
-      document.getElementById("reasonBox").innerHTML = reasons.length
-        ? `<ul class="reason-list">${reasons.map(r => `<li>${escapeHtml(r)}</li>`).join("")}</ul>`
+      const extras = [];
+      if (signal.trend) extras.push(`Trend: ${signal.trend}`);
+      if (signal.trajectory_score !== null && signal.trajectory_score !== undefined && signal.trajectory_score !== "")
+        extras.push(`Trajectory score: ${signal.trajectory_score}`);
+      if (Array.isArray(signal.recent_scores) && signal.recent_scores.length)
+        extras.push(`Recent scores: ${signal.recent_scores.join(" → ")}`);
+      if (signal.recoverability_note) extras.push(signal.recoverability_note);
+
+      const allReasons = [...reasons, ...extras];
+
+      document.getElementById("reasonBox").innerHTML = allReasons.length
+        ? `<ul class="reason-list">${allReasons.map(r => `<li>${escapeHtml(r)}</li>`).join("")}</ul>`
         : `<div class="status-empty">No reason strings returned.</div>`;
 
       renderTimeline(signal);
