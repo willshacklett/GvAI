@@ -1459,13 +1459,7 @@ if (data && data.gv !== undefined) {
       const payload = {
         message: text,
         history: messages,
-        messages: messages,
-        input: text,
-        text,
-        prompt: text,
-        tone: state.tone,
-        mode: state.tone,
-        style: state.tone
+        mode: state.tone
       };
 
       const res = await fetch(API_ENDPOINT, {
