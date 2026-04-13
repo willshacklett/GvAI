@@ -1283,11 +1283,22 @@ html, body {
     }
 
     async function callApi(text) {
+      const chat = getActiveChat();
+
+      const messages = (chat?.messages || [])
+        .filter(m => !m.typing && typeof m.content === "string" && m.content.trim())
+        .map(m => ({
+          role: m.role === "assistant" ? "assistant" : "user",
+          content: m.content
+        }));
+
       const payload = {
+        message: text,
+        history: messages,
+        messages: messages,
         input: text,
         text,
         prompt: text,
-        message: text,
         tone: state.tone,
         mode: state.tone,
         style: state.tone
