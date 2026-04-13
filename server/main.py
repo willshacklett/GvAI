@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 app = FastAPI(title="GvAI API", version="1.4.0")
 
@@ -18,9 +18,12 @@ app.add_middleware(
 )
 
 class ChatRequest(BaseModel):
-    message: str
+    message: Optional[str] = ""
     history: Optional[List[Dict[str, Any]]] = None
+    messages: Optional[List[Dict[str, Any]]] = None
     mode: Optional[str] = "simple"
+    tone: Optional[str] = "simple"
+    style: Optional[str] = "simple"
 
 try:
     from gvai.llm import generate_llm_response, llm_available
@@ -31,8 +34,43 @@ except Exception:
         return False
 
 
-def compute_signal(message: str) -> Dict[str, Any]:
+
+def normalize_history_messages(items: Optional[List[Dict[str, Any]]]) -> List[Dict[str, str]]:
+    normalized: List[Dict[str, str]] = []
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role", "")).strip().lower()
+        content = str(item.get("content", "")).strip()
+        if role not in {"user", "assistant", "system"}:
+            continue
+        if not content:
+            continue
+        normalized.append({"role": role, "content": content})
+    return normalized
+
+
+def coerce_request_context(req: ChatRequest) -> tuple[str, List[Dict[str, str]], str]:
+    incoming_messages = normalize_history_messages(req.messages)
+    incoming_history = normalize_history_messages(req.history)
+
+    history = incoming_messages or incoming_history
+
+    user_message = (req.message or "").strip()
+
+    if not user_message and history:
+        for item in reversed(history):
+            if item["role"] == "user":
+                user_message = item["content"]
+                break
+
+    mode = (req.mode or req.tone or req.style or "simple").strip()
+
+    return user_message, history, mode
+
+def compute_signal(message: str, history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
     text = (message or "").strip()
+    history = normalize_history_messages(history)
     words = text.split()
     chars = len(text)
 
@@ -48,11 +86,19 @@ def compute_signal(message: str) -> Dict[str, Any]:
     status = "stable" if godscore >= 85 else "watch"
     label = "stable" if godscore >= 85 else "unknown"
 
-    reasons = [
-        "Signal computed from current message only",
-    ]
-    if len(words) < 8:
+    reasons = []
+
+    history_turns = len(history)
+
+    if history_turns:
+        reasons.append(f"Signal includes conversation context ({history_turns} turns)")
+    else:
+        reasons.append("Signal computed from current message only")
+
+    if len(words) < 8 and not history_turns:
         reasons.append("Compact prompt with limited context")
+    elif len(words) < 8 and history_turns:
+        reasons.append("Short latest prompt, but prior context is available")
     else:
         reasons.append("Prompt includes enough structure for a richer answer")
 
@@ -60,6 +106,7 @@ def compute_signal(message: str) -> Dict[str, Any]:
         "chars": chars,
         "words": len(words),
         "raw_gv": float(godscore),
+        "history_turns": len(history),
     }
 
     return {
@@ -101,15 +148,13 @@ def health():
 def api_chat_get():
     return {
         "ok": True,
-        "message": 'Use POST /api/chat with JSON like {"message":"...","history":[],"mode":"simple"}'
+        "message": 'Use POST /api/chat with JSON like {"message":"...","history":[],"messages":[],"mode":"simple"}'
     }
 
 
 @app.post("/api/chat")
 def api_chat(req: ChatRequest):
-    user_message = (req.message or "").strip()
-    history = req.history or []
-    mode = (req.mode or "simple").strip()
+    user_message, history, mode = coerce_request_context(req)
 
     if not user_message:
         return {
@@ -122,11 +167,12 @@ def api_chat(req: ChatRequest):
             "engine": "none",
             "debug": {
                 "llm_ready": bool(llm_available()),
+                "openai_model": os.getenv("OPENAI_MODEL", "unset"),
                 "llm_error": "empty_message",
             },
         }
 
-    signal = compute_signal(user_message)
+    signal = compute_signal(user_message, history=history)
 
     llm_text = None
     llm_error = None
