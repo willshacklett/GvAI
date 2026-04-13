@@ -869,6 +869,11 @@ html, body {
             <button class="chip tone-chip" data-tone="simple">Simple explanation</button>
             <button class="chip tone-chip" data-tone="dramatic">Dramatic prose</button>
           </div>
+          <div class="tone-row">
+            <button class="chip enforce-chip active" data-enforce="guide">Guide</button>
+            <button class="chip enforce-chip" data-enforce="warn">Warn</button>
+            <button class="chip enforce-chip" data-enforce="gate">Gate</button>
+          </div>
           <div class="composer input-container">
             <textarea id="composerInput" placeholder="Message GvAI..."></textarea>
             <div class="composer-actions">
@@ -972,6 +977,7 @@ function gvaiData() {
 
     const state = {
       tone: "clean",
+      enforcementMode: "guide",
       chats: [],
       activeChatId: null,
       pending: false,
@@ -1467,7 +1473,8 @@ if (data && data.gv !== undefined) {
       const payload = {
         message: text,
         history: messages,
-        mode: state.tone
+        mode: state.tone,
+        enforcement_mode: state.enforcementMode
       };
 
       const res = await fetch(API_ENDPOINT, {
@@ -1544,6 +1551,10 @@ if (data && data.gv !== undefined) {
       if (Array.isArray(signal.recent_scores) && signal.recent_scores.length)
         extras.push(`Recent scores: ${signal.recent_scores.join(" → ")}`);
       if (signal.recoverability_note) extras.push(signal.recoverability_note);
+      if (signal.enforcement_mode) extras.push(`Enforcement: ${signal.enforcement_mode}`);
+      if (signal.escalation_risk && Array.isArray(signal.escalation_risk.triggers) && signal.escalation_risk.triggers.length) {
+        extras.push(`Escalation triggers: ${signal.escalation_risk.triggers.join(", ")}`);
+      }
 
       const allReasons = [...reasons, ...extras];
 
@@ -1680,6 +1691,13 @@ if (data && data.gv !== undefined) {
       document.getElementById("signalTone").textContent = nextTone;
     }
 
+    function setEnforcementMode(nextMode) {
+      state.enforcementMode = nextMode;
+      document.querySelectorAll(".enforce-chip").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.enforce === nextMode);
+      });
+    }
+
     sendBtn.onclick = sendMessage;
 
     composerInput.addEventListener("input", autoGrow);
@@ -1715,6 +1733,9 @@ if (data && data.gv !== undefined) {
     document.addEventListener("click", (e) => {
       const toneBtn = e.target.closest(".tone-chip");
       if (toneBtn) setTone(toneBtn.dataset.tone);
+
+      const enforceBtn = e.target.closest(".enforce-chip");
+      if (enforceBtn) setEnforcementMode(enforceBtn.dataset.enforce);
 
       if (e.target.id === "mobileSidebarBtn") {
         document.body.classList.toggle("mobile-sidebar-open");

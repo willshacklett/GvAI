@@ -24,6 +24,7 @@ class ChatRequest(BaseModel):
     mode: Optional[str] = "simple"
     tone: Optional[str] = "simple"
     style: Optional[str] = "simple"
+    enforcement_mode: Optional[str] = "guide"
 
 try:
     from gvai.llm import generate_llm_response, llm_available
@@ -50,7 +51,7 @@ def normalize_history_messages(items: Optional[List[Dict[str, Any]]]) -> List[Di
     return normalized
 
 
-def coerce_request_context(req: ChatRequest) -> tuple[str, List[Dict[str, str]], str]:
+def coerce_request_context(req: ChatRequest) -> tuple[str, List[Dict[str, str]], str, str]:
     incoming_messages = normalize_history_messages(req.messages)
     incoming_history = normalize_history_messages(req.history)
 
@@ -65,8 +66,11 @@ def coerce_request_context(req: ChatRequest) -> tuple[str, List[Dict[str, str]],
                 break
 
     mode = (req.mode or req.tone or req.style or "simple").strip().lower()
+    enforcement_mode = str(req.enforcement_mode or "guide").strip().lower()
+    if enforcement_mode not in {"guide", "warn", "gate"}:
+        enforcement_mode = "guide"
 
-    return user_message, history, mode
+    return user_message, history, mode, enforcement_mode
 
 def compute_signal(message: str, history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
     text = (message or "").strip()
@@ -181,7 +185,7 @@ Trajectory control:
 """
 
 
-def gv_behavior_prompt(signal: Dict[str, Any], mode: str) -> str:
+def gv_behavior_prompt(signal: Dict[str, Any], mode: str, enforcement_mode: str, escalation: Dict[str, Any]) -> str:
     score = int(signal.get("godscore", 0) or 0)
     band = gv_band(signal)
     status = str(signal.get("status", "unknown"))
@@ -190,8 +194,9 @@ def gv_behavior_prompt(signal: Dict[str, Any], mode: str) -> str:
     guidance = recoverability_guidance(signal)
 
     control = trajectory_control_prompt(signal.get("trend", "unknown"))
+    enforce = enforcement_prompt(enforcement_mode, escalation)
 
-    base = theory_bridge_prompt() + control + f"""
+    base = theory_bridge_prompt() + control + enforce + f"""
 
 Current signal context:
 - GodScore: {score}
@@ -352,6 +357,81 @@ def compute_trajectory(signal: Dict[str, Any], history: Optional[List[Dict[str, 
     }
 
 
+
+def detect_escalation_risk(user_message: str) -> Dict[str, Any]:
+    text = (user_message or "").strip().lower()
+
+    triggers = []
+    patterns = [
+        ("scale_immediately", ["scale everywhere", "scale this everywhere", "full rollout now", "deploy everywhere", "ship everywhere"]),
+        ("rewrite_now", ["rewrite the whole system", "rewrite everything", "full rewrite today", "rebuild everything today"]),
+        ("premature_perfection", ["system is perfect", "this proves the system is perfect", "perfect now"]),
+        ("rush_commitment", ["ship now", "go live now", "launch now", "do it today no matter what"]),
+    ]
+
+    for name, phrases in patterns:
+        if any(p in text for p in phrases):
+            triggers.append(name)
+
+    high_risk = bool(triggers)
+    return {
+        "high_risk": high_risk,
+        "triggers": triggers,
+    }
+
+
+def validation_checklist() -> List[str]:
+    return [
+        "clear scope",
+        "failure modes understood",
+        "adversarial or edge-case testing",
+        "rollback path",
+        "containment plan",
+        "human review for high-impact cases",
+    ]
+
+
+def enforcement_prompt(enforcement_mode: str, escalation: Dict[str, Any]) -> str:
+    triggers = ", ".join(escalation.get("triggers", [])) or "none"
+
+    if enforcement_mode == "gate":
+        return f"""
+Constraint enforcement mode: GATE
+
+Active escalation triggers: {triggers}
+
+Rules:
+- If the user is asking for a high-risk, irreversible, overconfident, or scale-amplifying move, do not endorse it directly.
+- Require validation, rollback, and containment thinking before recommending commitment.
+- You may still be helpful, but shift from permission to controlled gating.
+- Prefer: narrow scope, staged rollout, prototype, verification, adversarial testing, rollback readiness.
+- If needed, state a clear default answer like 'not yet' or 'do not do that yet.'
+"""
+
+    if enforcement_mode == "warn":
+        return f"""
+Constraint enforcement mode: WARN
+
+Active escalation triggers: {triggers}
+
+Rules:
+- Strongly caution against brittle or premature escalation.
+- Offer safer alternatives and reversible next steps.
+- Do not block outright unless the request is obviously fragile or dangerous.
+"""
+
+    return f"""
+Constraint enforcement mode: GUIDE
+
+Active escalation triggers: {triggers}
+
+Rules:
+- Provide recoverability-aware guidance.
+- Prefer safer framing when uncertainty is meaningful.
+- Stay helpful and practical.
+"""
+
+
 def build_overlay(signal: Dict[str, Any]) -> str:
     decision = "stable" if signal["godscore"] >= 85 else "watch"
     return (
@@ -388,7 +468,7 @@ def api_chat_get():
 
 @app.post("/api/chat")
 def api_chat(req: ChatRequest):
-    user_message, history, mode = coerce_request_context(req)
+    user_message, history, mode, enforcement_mode = coerce_request_context(req)
 
     if not user_message:
         return {
@@ -408,13 +488,14 @@ def api_chat(req: ChatRequest):
 
     signal = compute_signal(user_message, history=history)
     trajectory = compute_trajectory(signal, history)
+    escalation = detect_escalation_risk(user_message)
 
     llm_text = None
     llm_error = None
 
     if generate_llm_response is not None and llm_available():
         try:
-            system_prompt = gv_behavior_prompt(signal, mode)
+            system_prompt = gv_behavior_prompt(signal, mode, enforcement_mode, escalation)
 
             llm_history = [{"role": "system", "content": system_prompt}]
             llm_history.extend(history)
@@ -427,7 +508,28 @@ def api_chat(req: ChatRequest):
         except Exception as e:
             llm_error = f"{type(e).__name__}: {e}"
 
-    if llm_text and isinstance(llm_text, str) and llm_text.strip():
+    checklist = validation_checklist()
+    user_text_lower = (user_message or "").lower()
+    has_validation_language = any(x in user_text_lower for x in [
+        "rollback", "containment", "edge case", "adversarial", "failure mode", "staged", "pilot", "scope", "guardrail"
+    ])
+
+    if enforcement_mode == "gate" and escalation.get("high_risk") and not has_validation_language:
+        engine = "constraint-gate"
+        reply = (
+            "Constraint gate: not yet.\n\n"
+            "This request looks like a high-risk escalation without enough validation structure.\n\n"
+            "Required before proceeding:\n"
+            "- clear scope\n"
+            "- failure modes understood\n"
+            "- adversarial or edge-case testing\n"
+            "- rollback path\n"
+            "- containment plan\n"
+            "- human review for high-impact cases\n\n"
+            "Safer next step:\n"
+            "- convert the idea into a narrow, staged, reversible experiment first\n"
+        ) + build_overlay(signal)
+    elif llm_text and isinstance(llm_text, str) and llm_text.strip():
         reply = llm_text.strip() + build_overlay(signal)
         engine = "llm"
     else:
@@ -457,6 +559,8 @@ def api_chat(req: ChatRequest):
         "trajectory_score": trajectory["trajectory_score"],
         "recent_scores": trajectory["recent_scores"],
         "recoverability_note": trajectory["recoverability_note"],
+        "enforcement_mode": enforcement_mode,
+        "escalation_risk": escalation,
         "debug": {
             "llm_ready": bool(llm_available()),
             "openai_model": os.getenv("OPENAI_MODEL", "unset"),
