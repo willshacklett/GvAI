@@ -151,6 +151,36 @@ def gv_band(signal: Dict[str, Any]) -> str:
     return "low"
 
 
+
+
+def trajectory_control_prompt(trend: str) -> str:
+    if trend == "improving":
+        return """
+Trajectory control:
+- System is improving
+- You may increase confidence slightly, but avoid overcommitment
+- Continue recommending structured, testable actions
+"""
+
+    if trend == "drifting":
+        return """
+Trajectory control:
+- System is drifting (losing recoverability)
+- Reduce scope
+- Prefer reversible actions only
+- Slow decisions down
+- Challenge assumptions more aggressively
+- Avoid confident conclusions
+"""
+
+    return """
+Trajectory control:
+- System is stable but uncertain
+- Maintain balanced caution
+- Prefer reversible steps when unclear
+"""
+
+
 def gv_behavior_prompt(signal: Dict[str, Any], mode: str) -> str:
     score = int(signal.get("godscore", 0) or 0)
     band = gv_band(signal)
@@ -159,12 +189,15 @@ def gv_behavior_prompt(signal: Dict[str, Any], mode: str) -> str:
     reasons_text = "; ".join(str(r) for r in reasons[:4]) if reasons else "No reasons provided"
     guidance = recoverability_guidance(signal)
 
-    base = theory_bridge_prompt() + f"""
+    control = trajectory_control_prompt(signal.get("trend", "unknown"))
+
+    base = theory_bridge_prompt() + control + f"""
 
 Current signal context:
 - GodScore: {score}
 - Status: {status}
 - Stability band: {band}
+- Trajectory: {signal.get("trend", "unknown")}
 - User-selected mode: {mode}
 - Signal reasons: {reasons_text}
 
