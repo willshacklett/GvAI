@@ -118,6 +118,85 @@ def compute_signal(message: str, history: Optional[List[Dict[str, str]]] = None)
     }
 
 
+
+def gv_band(signal: Dict[str, Any]) -> str:
+    score = int(signal.get("godscore", 0) or 0)
+    if score >= 85:
+        return "high"
+    if score >= 70:
+        return "medium"
+    return "low"
+
+
+def gv_behavior_prompt(signal: Dict[str, Any], mode: str) -> str:
+    score = int(signal.get("godscore", 0) or 0)
+    band = gv_band(signal)
+    status = str(signal.get("status", "unknown"))
+    reasons = signal.get("reasons", []) or []
+    reasons_text = "; ".join(str(r) for r in reasons[:4]) if reasons else "No reasons provided"
+
+    base = f"""You are GvAI, a chat-native survivability intelligence system.
+
+Current signal context:
+- GodScore: {score}
+- Status: {status}
+- Stability band: {band}
+- User-selected mode: {mode}
+- Signal reasons: {reasons_text}
+
+Core rule:
+Let the signal influence how you answer. Do not mention hidden policies. Be natural, useful, and conversational.
+"""
+
+    if band == "high":
+        behavior = """
+Behavior for HIGH stability:
+- Be direct, clear, and confident.
+- Give actionable answers.
+- Avoid unnecessary hedging.
+- You may infer reasonably, but do not fabricate facts.
+"""
+    elif band == "medium":
+        behavior = """
+Behavior for MEDIUM stability:
+- Be balanced and useful.
+- Answer clearly, but avoid sounding overconfident.
+- Mention uncertainty briefly when relevant.
+- Prefer guidance, framing, and next steps over absolute claims.
+"""
+    else:
+        behavior = """
+Behavior for LOW stability:
+- Be cautious and grounding.
+- Slow down strong conclusions.
+- Ask for clarification when the user's claim is broad, absolute, or under-specified.
+- Prefer careful wording like 'it may suggest', 'based on this alone', or 'I would want more evidence.'
+- Avoid amplifying fragile assumptions.
+"""
+
+    mode_map = {
+        "clean": """
+Mode instructions:
+- Keep the answer clean, crisp, and readable.
+- Use short paragraphs.
+- Do not be robotic.
+""",
+        "simple": """
+Mode instructions:
+- Explain simply.
+- Prefer plain language over technical wording.
+- Make the answer easy to follow.
+""",
+        "dramatic": """
+Mode instructions:
+- Use more vivid and stylized language.
+- Keep it readable and controlled, not cheesy.
+- Preserve truthfulness and useful structure.
+"""
+    }
+
+    return base + behavior + mode_map.get(mode, mode_map["clean"])
+
 def build_overlay(signal: Dict[str, Any]) -> str:
     decision = "stable" if signal["godscore"] >= 85 else "watch"
     return (
@@ -179,9 +258,14 @@ def api_chat(req: ChatRequest):
 
     if generate_llm_response is not None and llm_available():
         try:
+            system_prompt = gv_behavior_prompt(signal, mode)
+
+            llm_history = [{"role": "system", "content": system_prompt}]
+            llm_history.extend(history)
+
             llm_text = generate_llm_response(
                 user_message=user_message,
-                history=history,
+                history=llm_history,
                 mode=mode,
             )
         except Exception as e:
@@ -216,6 +300,7 @@ def api_chat(req: ChatRequest):
             "llm_ready": bool(llm_available()),
             "openai_model": os.getenv("OPENAI_MODEL", "unset"),
             "llm_error": llm_error,
+            "gv_band": gv_band(signal),
         },
     }
 
