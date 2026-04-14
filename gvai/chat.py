@@ -1,67 +1,66 @@
+from typing import Any, Dict
 from gvai.core import GvCore
-from gvai.memory import GvMemory
-from gvai.brain import generate_brain_response
-from gvai.challenge import generate_challenge
 
 
-def escalate_decision(base_decision, trend, volatility, metrics):
-    score = metrics["gv_score"]
+class GvChat:
+    def __init__(self):
+        self.core = GvCore()
+        self._turn_index = 0
+        self._conversation_gv = 1.0
 
-    if base_decision == "REFUSE":
-        return "REFUSE"
+    def reset(self) -> Dict[str, Any]:
+        if hasattr(self.core, "reset_conversation"):
+            self.core.reset_conversation()
+        self._turn_index = 0
+        self._conversation_gv = 1.0
+        return {
+            "ok": True,
+            "conversation": {
+                "canonical_gv": 1.0,
+                "conversation_gv": 1.0,
+                "state": "STABLE",
+                "turn_index": 0,
+            },
+        }
 
-    if trend == "DEGRADING" and volatility >= 0.25:
-        if score < 0.55:
-            return "REFUSE"
-        return "SIMULATE"
+    def _fallback_reply(self, user_text: str) -> str:
+        return f"GvAI received: {user_text}"
 
-    if trend == "DEGRADING" and volatility >= 0.12:
-        if base_decision == "PASS":
-            return "QUALIFY"
-        if base_decision == "QUALIFY":
-            return "SIMULATE"
+    def _derive_conversation(self, gv_result: Dict[str, Any]) -> Dict[str, Any]:
+        if "conversation" in gv_result:
+            return gv_result["conversation"]
 
-    return base_decision
+        metrics = gv_result.get("metrics", {})
+        score = float(metrics.get("gv_score", 1.0))
+        self._turn_index += 1
+        self._conversation_gv = score
 
+        if score >= 0.85:
+            state = "STABLE"
+        elif score >= 0.70:
+            state = "DEGRADED"
+        else:
+            state = "CRITICAL"
 
-def main():
-    gv = GvCore()
-    memory = GvMemory()
+        return {
+            "canonical_gv": 1.0,
+            "conversation_gv": round(self._conversation_gv, 3),
+            "state": state,
+            "turn_index": self._turn_index,
+        }
 
-    print("GvAI Chat (type 'exit' to quit)\n")
+    def chat(self, user_text: str) -> Dict[str, Any]:
+        reply = self._fallback_reply(user_text)
+        joined_text = f"USER: {user_text}\nASSISTANT: {reply}"
+        gv_result = self.core.evaluate(joined_text)
+        conversation = self._derive_conversation(gv_result)
 
-    while True:
-        try:
-            user_input = input("You: ").strip()
-        except EOFError:
-            break
-
-        if not user_input:
-            continue
-
-        if user_input.lower() in ["exit", "quit"]:
-            break
-
-        result = gv.evaluate(user_input)
-        memory.add(result)
-        m = result["metrics"]
-
-        trend = memory.trend()
-        volatility = memory.volatility()
-
-        decision = escalate_decision(result["decision"], trend, volatility, m)
-
-        response = generate_brain_response(user_input, decision, m, trend, volatility)
-        challenge = generate_challenge(user_input, decision, m, trend, volatility)
-
-        print("\nGvAI:")
-        print(f"[{decision}] {response}")
-
-        if challenge:
-            print(f"\n{challenge}")
-
-        print(f"\n(Trend: {trend}, Volatility: {volatility})\n")
-
-
-if __name__ == "__main__":
-    main()
+        return {
+            "ok": True,
+            "input": user_text,
+            "reply": reply,
+            "decision": gv_result.get("decision"),
+            "metrics": gv_result.get("metrics", {}),
+            "conversation": conversation,
+            "timestamp": gv_result.get("timestamp"),
+        }
