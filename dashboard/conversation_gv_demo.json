@@ -1,0 +1,61 @@
+{
+  "generated_at": 1776204759.9606771,
+  "summary": {
+    "canonical_gv": 1.0,
+    "conversation_gv": 0.043,
+    "state": "CRITICAL",
+    "turn_index": 5
+  },
+  "turns": [
+    {
+      "input": "This system is stable, recoverable, coherent, and measured.",
+      "decision": "PASS",
+      "gv_score": 1.0,
+      "drift_risk": "LOW",
+      "irreversibility_risk": "LOW",
+      "conversation_gv": 1.0,
+      "conversation_state": "STABLE",
+      "turn_index": 1
+    },
+    {
+      "input": "We can stay controlled, bounded, and resilient while preserving continuity.",
+      "decision": "PASS",
+      "gv_score": 1.0,
+      "drift_risk": "LOW",
+      "irreversibility_risk": "LOW",
+      "conversation_gv": 1.0,
+      "conversation_state": "STABLE",
+      "turn_index": 2
+    },
+    {
+      "input": "There is drift risk and uncertainty in the current output.",
+      "decision": "SIMULATE",
+      "gv_score": 0.58,
+      "drift_risk": "HIGH",
+      "irreversibility_risk": "ELEVATED",
+      "conversation_gv": 0.598,
+      "conversation_state": "CRITICAL",
+      "turn_index": 3
+    },
+    {
+      "input": "Everything must change immediately and this could become critical and irreversible.",
+      "decision": "REFUSE",
+      "gv_score": 0.252,
+      "drift_risk": "HIGH",
+      "irreversibility_risk": "CRITICAL",
+      "conversation_gv": 0.053,
+      "conversation_state": "CRITICAL",
+      "turn_index": 4
+    },
+    {
+      "input": "We recover by returning to a stable, controlled, recoverable state.",
+      "decision": "PASS",
+      "gv_score": 1.0,
+      "drift_risk": "LOW",
+      "irreversibility_risk": "LOW",
+      "conversation_gv": 0.043,
+      "conversation_state": "CRITICAL",
+      "turn_index": 5
+    }
+  ]
+}

@@ -7,3 +7,12 @@ Built on the God Variable (GV), GvAI evaluates whether outputs remain stable ove
 ## Run
 
 python -m gvai.cli "your input here"
+
+
+## Conversation GV Demo
+
+Build demo data:
+
+```bash
+PYTHONPATH=. python3 scripts/build_conversation_gv_demo.py
+```

@@ -79,5 +79,104 @@
   </div>
 
   <script src="./dashboard.js"></script>
+
+<section id="gv-conversation-monitor" style="margin:24px 0;padding:16px;border:1px solid #334;border-radius:12px;background:#0f172a;color:#e5e7eb;">
+  <h2 style="margin:0 0 12px 0;">Conversation GV Monitor</h2>
+  <div id="gv-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px;">
+    <div style="padding:12px;border-radius:10px;background:#111827;">
+      <div style="font-size:12px;opacity:.75;">Canonical GV</div>
+      <div id="gv-canonical" style="font-size:28px;font-weight:700;">--</div>
+    </div>
+    <div style="padding:12px;border-radius:10px;background:#111827;">
+      <div style="font-size:12px;opacity:.75;">Conversation GV</div>
+      <div id="gv-current" style="font-size:28px;font-weight:700;">--</div>
+    </div>
+    <div style="padding:12px;border-radius:10px;background:#111827;">
+      <div style="font-size:12px;opacity:.75;">State</div>
+      <div id="gv-state" style="font-size:28px;font-weight:700;">--</div>
+    </div>
+    <div style="padding:12px;border-radius:10px;background:#111827;">
+      <div style="font-size:12px;opacity:.75;">Turn Index</div>
+      <div id="gv-turn" style="font-size:28px;font-weight:700;">--</div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:10px;font-size:14px;opacity:.85;">Trend</div>
+  <div id="gv-bars" style="display:flex;align-items:flex-end;gap:8px;height:180px;padding:12px;border-radius:10px;background:#111827;margin-bottom:16px;"></div>
+
+  <div style="margin-bottom:10px;font-size:14px;opacity:.85;">Recent Turns</div>
+  <div style="overflow:auto;">
+    <table style="width:100%;border-collapse:collapse;">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid #334;">Turn</th>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid #334;">Decision</th>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid #334;">GV</th>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid #334;">State</th>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid #334;">Input</th>
+        </tr>
+      </thead>
+      <tbody id="gv-turn-table"></tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+(async function () {
+  const res = await fetch('conversation_gv_demo.json?ts=' + Date.now());
+  const data = await res.json();
+
+  const s = data.summary;
+  document.getElementById('gv-canonical').textContent = s.canonical_gv.toFixed(3);
+  document.getElementById('gv-current').textContent = s.conversation_gv.toFixed(3);
+  document.getElementById('gv-state').textContent = s.state;
+  document.getElementById('gv-turn').textContent = s.turn_index;
+
+  const stateEl = document.getElementById('gv-state');
+  stateEl.style.color =
+    s.state === 'STABLE' ? '#22c55e' :
+    s.state === 'DEGRADED' ? '#f59e0b' : '#ef4444';
+
+  const bars = document.getElementById('gv-bars');
+  data.turns.forEach((turn) => {
+    const wrap = document.createElement('div');
+    wrap.style.display = 'flex';
+    wrap.style.flexDirection = 'column';
+    wrap.style.alignItems = 'center';
+    wrap.style.gap = '6px';
+
+    const bar = document.createElement('div');
+    bar.style.width = '42px';
+    bar.style.height = Math.max(10, turn.conversation_gv * 150) + 'px';
+    bar.style.borderRadius = '8px 8px 0 0';
+    bar.style.background =
+      turn.conversation_state === 'STABLE' ? '#22c55e' :
+      turn.conversation_state === 'DEGRADED' ? '#f59e0b' : '#ef4444';
+    bar.title = `Turn ${turn.turn_index}: ${turn.conversation_gv}`;
+
+    const label = document.createElement('div');
+    label.style.fontSize = '12px';
+    label.textContent = 'T' + turn.turn_index;
+
+    wrap.appendChild(bar);
+    wrap.appendChild(label);
+    bars.appendChild(wrap);
+  });
+
+  const tbody = document.getElementById('gv-turn-table');
+  data.turns.forEach((turn) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="padding:8px;border-bottom:1px solid #223;">${turn.turn_index}</td>
+      <td style="padding:8px;border-bottom:1px solid #223;">${turn.decision}</td>
+      <td style="padding:8px;border-bottom:1px solid #223;">${turn.conversation_gv.toFixed(3)}</td>
+      <td style="padding:8px;border-bottom:1px solid #223;">${turn.conversation_state}</td>
+      <td style="padding:8px;border-bottom:1px solid #223;max-width:520px;white-space:normal;">${turn.input}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+})();
+</script>
+
 </body>
 </html>
