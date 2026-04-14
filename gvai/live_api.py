@@ -1,62 +1,111 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
 from gvai.chat import GvChat
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="../dashboard")
+CORS(
+    app,
+    resources={r"/*": {"origins": "*"}},
+    supports_credentials=False,
+)
+
 chat_engine = GvChat()
+
+
+def _state_payload():
+    state = chat_engine.get_state()
+    conversation = state.get("conversation", {})
+    metrics = state.get("last_metrics", {}) or {}
+    decision = state.get("last_decision")
+
+    return {
+        "ok": True,
+        "conversation": conversation,
+        "last_decision": decision,
+        "last_metrics": metrics,
+        "signal": {
+            "godscore": conversation.get("conversation_gv"),
+            "state": conversation.get("state"),
+            "turn_index": conversation.get("turn_index"),
+            "decision": decision,
+        },
+    }
+
+
+def _chat_payload(user_text: str):
+    result = chat_engine.chat(user_text)
+    conversation = result.get("conversation", {})
+    metrics = result.get("metrics", {}) or {}
+
+    return {
+        "ok": True,
+        "reply": result.get("reply", ""),
+        "input": result.get("input", user_text),
+        "decision": result.get("decision"),
+        "metrics": metrics,
+        "conversation": conversation,
+        "timestamp": result.get("timestamp"),
+        # frontend-friendly aliases
+        "message": result.get("reply", ""),
+        "godscore": conversation.get("conversation_gv"),
+        "state": conversation.get("state"),
+        "turn_index": conversation.get("turn_index"),
+    }
 
 
 @app.get("/")
 def home():
-    return jsonify({
-        "ok": True,
-        "message": "GvAI live API",
-        "routes": ["/", "/health", "/state", "/reset", "/chat"]
-    })
+    try:
+        return send_from_directory("../dashboard", "index.html")
+    except Exception:
+        return jsonify({
+            "ok": True,
+            "message": "GvAI live API",
+            "routes": [
+                "/",
+                "/health",
+                "/state",
+                "/reset",
+                "/chat",
+                "/api/health",
+                "/api/state",
+                "/api/reset",
+                "/api/chat",
+            ],
+        })
 
 
 @app.get("/health")
+@app.get("/api/health")
 def health():
     return jsonify({"ok": True})
 
 
+@app.get("/state")
+@app.get("/api/state")
+def state():
+    return jsonify(_state_payload())
+
+
 @app.post("/reset")
+@app.post("/api/reset")
 def reset():
     return jsonify(chat_engine.reset())
 
 
-@app.post("/chat")
+@app.route("/chat", methods=["GET", "POST"])
+@app.route("/api/chat", methods=["GET", "POST"])
 def chat():
-    data = request.get_json(silent=True) or {}
-    
-    # 🔥 FORCE fresh read every time
-    user_text = str(data.get("message") or data.get("input") or "").strip()
+    if request.method == "GET":
+        user_text = str(request.args.get("message") or request.args.get("input") or "").strip()
+    else:
+        data = request.get_json(silent=True) or {}
+        user_text = str(data.get("message") or data.get("input") or "").strip()
 
     if not user_text:
         return jsonify({"ok": False, "error": "Missing message"}), 400
 
-    result = chat_engine.chat(user_text)
-    return jsonify(result)
-
-
-@app.get("/state")
-def state():
-    if chat_engine.last_result is None:
-        return jsonify({
-            "ok": True,
-            "conversation": {
-                "canonical_gv": 1.0,
-                "conversation_gv": 1.0,
-                "state": "STABLE",
-                "turn_index": 0,
-            }
-        })
-
-    return jsonify({
-        "ok": True,
-        "conversation": chat_engine.last_result["conversation"],
-        "last_decision": chat_engine.last_result["decision"],
-        "last_metrics": chat_engine.last_result["metrics"],
-    })
+    return jsonify(_chat_payload(user_text))
 
 
 if __name__ == "__main__":
