@@ -84,3 +84,80 @@ th, td {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* === GvAI scroll fix === */
+html, body {
+  min-height: 100%;
+  height: auto !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+body {
+  scrollbar-gutter: stable;
+}
+
+/* common app shells */
+#root,
+#__next,
+.app,
+.app-shell,
+.layout,
+.main,
+.main-layout,
+.page,
+.page-shell,
+.chat-page,
+.dashboard,
+.dashboard-shell,
+.workspace {
+  min-height: 100vh !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+/* common chat/content panes */
+.content,
+.content-pane,
+.center-pane,
+.chat-pane,
+.chat-panel,
+.chat-wrap,
+.chat-container,
+.chat-messages,
+.messages,
+.message-list,
+.thread,
+.thread-list,
+.conversation,
+.conversation-list,
+.feed,
+.right-panel,
+.sidebar,
+.left-panel {
+  max-height: none !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* visible scrollbar styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #5b8cff #0b1530;
+}
+
+*::-webkit-scrollbar {
+  width: 12px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #0b1530;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #5b8cff;
+  border-radius: 10px;
+  border: 2px solid #0b1530;
+}
+/* === end GvAI scroll fix === */
+
