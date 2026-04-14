@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import os
+import json
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI
@@ -432,6 +435,76 @@ Rules:
 """
 
 
+
+LOG_DIR = Path("logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+DECISION_LOG_PATH = LOG_DIR / "decision_log.jsonl"
+
+
+def decision_outcome_label(engine: str, enforcement_mode: str, escalation: Dict[str, Any]) -> str:
+    if engine == "constraint-gate":
+        return "gated"
+    if enforcement_mode == "warn" and escalation.get("high_risk"):
+        return "warned"
+    if enforcement_mode == "gate" and escalation.get("high_risk"):
+        return "gated_or_redirected"
+    return "guided"
+
+
+def append_decision_log(
+    *,
+    user_message: str,
+    signal: Dict[str, Any],
+    trajectory: Dict[str, Any],
+    escalation: Dict[str, Any],
+    enforcement_mode: str,
+    engine: str,
+) -> None:
+    try:
+        record = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "user_message": user_message,
+            "godscore": signal.get("godscore"),
+            "status": signal.get("status"),
+            "label": signal.get("label"),
+            "trend": trajectory.get("trend"),
+            "trajectory_score": trajectory.get("trajectory_score"),
+            "recent_scores": trajectory.get("recent_scores"),
+            "recoverability_note": trajectory.get("recoverability_note"),
+            "reasons": signal.get("reasons", []),
+            "enforcement_mode": enforcement_mode,
+            "engine": engine,
+            "escalation_risk": escalation,
+            "decision_outcome": decision_outcome_label(engine, enforcement_mode, escalation),
+        }
+        with DECISION_LOG_PATH.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except Exception:
+        # Logging should never break chat
+        pass
+
+
+def read_recent_decision_logs(limit: int = 20) -> List[Dict[str, Any]]:
+    if not DECISION_LOG_PATH.exists():
+        return []
+
+    rows: List[Dict[str, Any]] = []
+    try:
+        with DECISION_LOG_PATH.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rows.append(json.loads(line))
+                except Exception:
+                    continue
+    except Exception:
+        return []
+
+    return rows[-limit:]
+
+
 def build_overlay(signal: Dict[str, Any]) -> str:
     decision = "stable" if signal["godscore"] >= 85 else "watch"
     return (
@@ -546,6 +619,15 @@ def api_chat(req: ChatRequest):
             f"Status: {signal['label']}"
         )
 
+    append_decision_log(
+        user_message=user_message,
+        signal=signal,
+        trajectory=trajectory,
+        escalation=escalation,
+        enforcement_mode=enforcement_mode,
+        engine=engine,
+    )
+
     return {
         "reply": reply,
         "godscore": signal["godscore"],
@@ -561,12 +643,24 @@ def api_chat(req: ChatRequest):
         "recoverability_note": trajectory["recoverability_note"],
         "enforcement_mode": enforcement_mode,
         "escalation_risk": escalation,
+        "decision_outcome": decision_outcome_label(engine, enforcement_mode, escalation),
         "debug": {
             "llm_ready": bool(llm_available()),
             "openai_model": os.getenv("OPENAI_MODEL", "unset"),
             "llm_error": llm_error,
             "gv_band": gv_band(signal),
         },
+    }
+
+
+
+@app.get("/logs/recent")
+def logs_recent(limit: int = 20):
+    rows = read_recent_decision_logs(limit=limit)
+    return {
+        "ok": True,
+        "count": len(rows),
+        "items": rows,
     }
 
 
