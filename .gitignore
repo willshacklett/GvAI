@@ -15,3 +15,5 @@ dashboard/data/
 # misc
 *.log
 *.png
+__pycache__/
+*.pyc
