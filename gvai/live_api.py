@@ -27,12 +27,15 @@ def reset():
 @app.post("/chat")
 def chat():
     data = request.get_json(silent=True) or {}
-    user_text = (data.get("message") or data.get("input") or "").strip()
+    
+    # 🔥 FORCE fresh read every time
+    user_text = str(data.get("message") or data.get("input") or "").strip()
 
     if not user_text:
-        return jsonify({"ok": False, "error": "Missing 'message' or 'input'"}), 400
+        return jsonify({"ok": False, "error": "Missing message"}), 400
 
-    return jsonify(chat_engine.chat(user_text))
+    result = chat_engine.chat(user_text)
+    return jsonify(result)
 
 
 @app.get("/state")
@@ -50,9 +53,9 @@ def state():
 
     return jsonify({
         "ok": True,
-        "conversation": chat_engine.last_result.get("conversation", {}),
-        "last_decision": chat_engine.last_result.get("decision"),
-        "last_metrics": chat_engine.last_result.get("metrics", {}),
+        "conversation": chat_engine.last_result["conversation"],
+        "last_decision": chat_engine.last_result["decision"],
+        "last_metrics": chat_engine.last_result["metrics"],
     })
 
 
