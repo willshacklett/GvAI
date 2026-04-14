@@ -7,13 +7,14 @@ class GvChat:
         self.core = GvCore()
         self._turn_index = 0
         self._conversation_gv = 1.0
+        self.last_result: Dict[str, Any] | None = None
 
     def reset(self) -> Dict[str, Any]:
         if hasattr(self.core, "reset_conversation"):
             self.core.reset_conversation()
         self._turn_index = 0
         self._conversation_gv = 1.0
-        return {
+        self.last_result = {
             "ok": True,
             "conversation": {
                 "canonical_gv": 1.0,
@@ -22,6 +23,7 @@ class GvChat:
                 "turn_index": 0,
             },
         }
+        return self.last_result
 
     def _fallback_reply(self, user_text: str) -> str:
         return f"GvAI received: {user_text}"
@@ -55,7 +57,7 @@ class GvChat:
         gv_result = self.core.evaluate(joined_text)
         conversation = self._derive_conversation(gv_result)
 
-        return {
+        result = {
             "ok": True,
             "input": user_text,
             "reply": reply,
@@ -64,3 +66,5 @@ class GvChat:
             "conversation": conversation,
             "timestamp": gv_result.get("timestamp"),
         }
+        self.last_result = result
+        return result

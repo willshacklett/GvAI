@@ -37,7 +37,7 @@ def chat():
 
 @app.get("/state")
 def state():
-    if not getattr(chat_engine.core, "history", None):
+    if chat_engine.last_result is None:
         return jsonify({
             "ok": True,
             "conversation": {
@@ -48,17 +48,11 @@ def state():
             }
         })
 
-    latest = chat_engine.core.history[-1]
     return jsonify({
         "ok": True,
-        "conversation": latest.get("conversation", {
-            "canonical_gv": 1.0,
-            "conversation_gv": 1.0,
-            "state": "STABLE",
-            "turn_index": 0,
-        }),
-        "last_decision": latest.get("decision"),
-        "last_metrics": latest.get("metrics", {}),
+        "conversation": chat_engine.last_result.get("conversation", {}),
+        "last_decision": chat_engine.last_result.get("decision"),
+        "last_metrics": chat_engine.last_result.get("metrics", {}),
     })
 
 
