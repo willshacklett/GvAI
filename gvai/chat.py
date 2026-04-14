@@ -1,3 +1,4 @@
+from gvai.llm import generate_llm_response
 from typing import Any, Dict
 from gvai.core import GvCore
 
@@ -52,7 +53,11 @@ class GvChat:
         }
 
     def chat(self, user_text: str) -> Dict[str, Any]:
-        reply = self._fallback_reply(user_text)
+        reply = generate_llm_response(
+            user_message=user_text,
+            history=None,
+            mode="simple",
+        ) or self._fallback_reply(user_text)
         joined_text = f"USER: {user_text}\nASSISTANT: {reply}"
         gv_result = self.core.evaluate(joined_text)
         conversation = self._derive_conversation(gv_result)
