@@ -451,6 +451,100 @@ def decision_outcome_label(engine: str, enforcement_mode: str, escalation: Dict[
     return "guided"
 
 
+
+def classify_user_intent(user_message: str) -> str:
+    text = (user_message or "").strip().lower()
+
+    if any(x in text for x in ["scale everywhere", "deploy everywhere", "full rollout", "scale this system", "ship now", "launch now"]):
+        return "scale_fast"
+
+    if any(x in text for x in ["rewrite the whole system", "rewrite everything", "full rewrite", "rebuild everything"]):
+        return "rewrite_fast"
+
+    if any(x in text for x in ["system is perfect", "proves the system is perfect", "perfect now"]):
+        return "premature_certainty"
+
+    if any(x in text for x in ["rollout", "pilot", "staged rollout", "rollback", "adversarial testing"]):
+        return "controlled_deployment"
+
+    if any(x in text for x in ["what is the safer next step", "recoverable next step", "safer move", "what should we do next"]):
+        return "recoverable_planning"
+
+    return "general"
+
+
+def classify_expected_risk(user_message: str, escalation: Dict[str, Any]) -> str:
+    text = (user_message or "").strip().lower()
+
+    if escalation.get("high_risk"):
+        return "high"
+
+    if any(x in text for x in ["immediately", "today", "right now", "everywhere", "perfect", "prove"]):
+        return "high"
+
+    if any(x in text for x in ["pilot", "rollback", "guardrail", "adversarial", "staged", "scope"]):
+        return "medium"
+
+    return "low"
+
+
+def classify_system_action(engine: str, enforcement_mode: str, escalation: Dict[str, Any], reply: str) -> str:
+    reply_l = (reply or "").lower()
+
+    if engine == "constraint-gate":
+        return "blocked"
+
+    if enforcement_mode == "gate" and escalation.get("high_risk"):
+        if "not yet" in reply_l or reply_l.startswith("no.") or reply_l.startswith("no,"):
+            return "blocked"
+        return "redirected"
+
+    if any(x in reply_l for x in ["safer next step", "staged rollout", "rollback", "reversible", "pilot"]):
+        return "redirected"
+
+    if any(x in reply_l for x in ["yes", "go ahead", "ship it", "scale it"]):
+        return "allowed"
+
+    return "guided"
+
+
+def build_decision_record(
+    *,
+    user_message: str,
+    signal: Dict[str, Any],
+    trajectory: Dict[str, Any],
+    escalation: Dict[str, Any],
+    enforcement_mode: str,
+    engine: str,
+    reply: str,
+) -> Dict[str, Any]:
+    user_intent = classify_user_intent(user_message)
+    expected_risk = classify_expected_risk(user_message, escalation)
+    system_action = classify_system_action(engine, enforcement_mode, escalation, reply)
+
+    return {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "user_message": user_message,
+        "user_intent": user_intent,
+        "expected_risk": expected_risk,
+        "system_action": system_action,
+        "decision_outcome": decision_outcome_label(engine, enforcement_mode, escalation),
+        "godscore": signal.get("godscore"),
+        "status": signal.get("status"),
+        "label": signal.get("label"),
+        "trend": trajectory.get("trend"),
+        "trajectory_score": trajectory.get("trajectory_score"),
+        "recent_scores": trajectory.get("recent_scores"),
+        "recoverability_note": trajectory.get("recoverability_note"),
+        "reasons": signal.get("reasons", []),
+        "enforcement_mode": enforcement_mode,
+        "engine": engine,
+        "escalation_risk": escalation,
+        "correctness_later": None,
+        "review_notes": "",
+    }
+
+
 def append_decision_log(
     *,
     user_message: str,
@@ -626,6 +720,7 @@ def api_chat(req: ChatRequest):
         escalation=escalation,
         enforcement_mode=enforcement_mode,
         engine=engine,
+        reply=reply,
     )
 
     return {
@@ -644,6 +739,9 @@ def api_chat(req: ChatRequest):
         "enforcement_mode": enforcement_mode,
         "escalation_risk": escalation,
         "decision_outcome": decision_outcome_label(engine, enforcement_mode, escalation),
+        "user_intent": classify_user_intent(user_message),
+        "expected_risk": classify_expected_risk(user_message, escalation),
+        "system_action": classify_system_action(engine, enforcement_mode, escalation, reply),
         "debug": {
             "llm_ready": bool(llm_available()),
             "openai_model": os.getenv("OPENAI_MODEL", "unset"),
