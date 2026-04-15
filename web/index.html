@@ -757,6 +757,116 @@
 }
 /* === end chat visibility fix === */
 
+
+/* === GvAI clean layout rebuild === */
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden !important;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  overflow: hidden !important;
+}
+
+.app {
+  display: grid !important;
+  grid-template-columns: 280px minmax(0, 1fr) 340px !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  overflow: hidden !important;
+}
+
+main,
+.main,
+.center,
+.center-pane,
+.chat-pane,
+.chat-shell {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.chat-container {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 20px 20px 180px 20px !important;
+  scroll-padding-bottom: 180px !important;
+}
+
+.message {
+  display: grid !important;
+  grid-template-columns: 44px minmax(0, 1fr) !important;
+  align-items: start !important;
+  gap: 14px !important;
+  min-width: 0 !important;
+}
+
+.bubble,
+.content,
+.details,
+details,
+details[open],
+.message-content,
+.response,
+.response-content {
+  min-width: 0 !important;
+  min-height: auto !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.bubble {
+  display: block !important;
+}
+
+.content {
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+}
+
+.input-container,
+.input-bar {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 30 !important;
+  margin-top: auto !important;
+  background: linear-gradient(180deg, rgba(11,18,32,0.0) 0%, rgba(11,18,32,0.92) 18%, rgba(11,18,32,1) 40%) !important;
+  backdrop-filter: blur(8px);
+  padding-top: 18px !important;
+}
+
+.sidebar,
+.right-panel,
+.signal-panel,
+aside {
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(120,160,255,.45);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+/* === end GvAI clean layout rebuild === */
+
 </style>
 
 <style>
