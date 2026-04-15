@@ -39,7 +39,7 @@
         radial-gradient(900px 500px at 90% 10%, rgba(64,186,255,.12), transparent 45%),
         linear-gradient(180deg, #04102a, #08142f 35%, #071126 100%);
       color:var(--text);
-      overflow:hidden;
+      
     }
 
     .app{
@@ -411,7 +411,7 @@
     .composer textarea{
       width:100%;
       min-height:58px;
-      max-height:220px;
+      
       resize:none;
       border:none;
       outline:none;
@@ -544,7 +544,7 @@
       height:10px;
       border-radius:999px;
       background:rgba(255,255,255,.06);
-      overflow:hidden;
+      
       border:1px solid rgba(255,255,255,.06);
     }
 
@@ -736,7 +736,7 @@
 /* === chat visibility fix === */
 .chat-container{
   flex:1;
-  overflow-y:auto;
+  
   padding-bottom:180px !important;
   min-height:0;
 }
@@ -774,6 +774,11 @@ html, body {
 }
 
 .app {
+display: grid !important;
+grid-template-columns: 280px minmax(0,1fr) 340px !important;
+height: 100vh !important;
+overflow: hidden !important;
+
   display: grid !important;
   grid-template-columns: 280px minmax(0, 1fr) 340px !important;
   height: 100vh !important;
@@ -793,6 +798,10 @@ main,
 }
 
 .chat-container {
+overflow-y: auto !important;
+height: 100% !important;
+padding-bottom: 120px !important;
+
   display: flex !important;
   flex-direction: column !important;
   min-height: 0 !important;
@@ -827,6 +836,9 @@ details[open],
 }
 
 .bubble {
+max-height: none !important;
+overflow: visible !important;
+
   display: block !important;
 }
 
@@ -882,6 +894,10 @@ html, body {
 }
 
 .chat-container {
+overflow-y: auto !important;
+height: 100% !important;
+padding-bottom: 120px !important;
+
     min-height: 0;
   flex: 1;
   overflow-y: auto;
