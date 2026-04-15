@@ -732,6 +732,31 @@
   transition: transform 0.18s ease;
 }
 
+
+/* === chat visibility fix === */
+.chat-container{
+  flex:1;
+  overflow-y:auto;
+  padding-bottom:180px !important;
+  min-height:0;
+}
+
+.message,
+.bubble,
+.content,
+.details{
+  max-height:none !important;
+  height:auto !important;
+  overflow:visible !important;
+}
+
+.input-container{
+  position:sticky;
+  bottom:0;
+  z-index:20;
+}
+/* === end chat visibility fix === */
+
 </style>
 
 <style>
