@@ -1904,7 +1904,23 @@ if (data && data.gv !== undefined) {
     resetSignalPanel();
     bindHeroPrompts();
     autoGrow();
-  </script>
+  
+window.__gv_state__ = () => currentGvState;
+
+function setGvState(nextState) {
+  currentGvState = nextState || null;
+  try {
+    localStorage.setItem("gv_state", JSON.stringify(currentGvState));
+  } catch (e) {}
+}
+
+try {
+  const saved = localStorage.getItem("gv_state");
+  if (saved) currentGvState = JSON.parse(saved);
+} catch (e) {}
+
+</script>
+
 </div>
 </body>
 </html>
