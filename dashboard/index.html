@@ -78,7 +78,17 @@
     </div>
   </div>
 
-  <script src="./dashboard.js"></script>
+  <script src="./dashboard.js">
+function setGvState(nextState) {
+  currentGvState = nextState || null;
+  try { localStorage.setItem("gv_state", JSON.stringify(currentGvState)); } catch (e) {}
+}
+try {
+  const saved = localStorage.getItem("gv_state");
+  if (saved) currentGvState = JSON.parse(saved);
+} catch (e) {}
+</script>
+
 
 <section id="gv-conversation-monitor" style="margin:24px 0;padding:16px;border:1px solid #334;border-radius:12px;background:#0f172a;color:#e5e7eb;">
   <h2 style="margin:0 0 12px 0;">Conversation GV Monitor</h2>
