@@ -74,6 +74,11 @@ def dashboard_index():
 def dashboard_files(filename: str):
     return send_from_directory(str(DASHBOARD_DIR), filename)
 
+
+@app.get("/assets/<path:filename>")
+def serve_assets(filename):
+    return send_from_directory("assets", filename)
+
 @app.get("/style.css")
 def root_style():
     return send_from_directory(str(DASHBOARD_DIR), "style.css")
