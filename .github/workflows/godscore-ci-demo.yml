@@ -1,39 +1,12 @@
 name: GodScore CI Demo
 
 on:
-  workflow_dispatch:
-    inputs:
-      scenario:
-        description: "Scenario to simulate"
-        required: true
-        default: "collapse"
-        type: choice
-        options:
-          - stable
-          - recoverable
-          - collapse
-      enforce:
-        description: "Fail build on critical/collapse"
-        required: true
-        default: false
-        type: boolean
-      fail_on_warning:
-        description: "Fail build on warning too"
-        required: true
-        default: false
-        type: boolean
   push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   godscore:
     runs-on: ubuntu-latest
-
-    outputs:
-      godscore: ${{ steps.godscore.outputs.godscore }}
-      status: ${{ steps.godscore.outputs.status }}
-      passed: ${{ steps.godscore.outputs.passed }}
 
     steps:
       - name: Checkout
@@ -42,33 +15,24 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install numpy pandas matplotlib
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Run GodScore CI
-        id: godscore
-        env:
-          GODSCORE_SCENARIO: ${{ github.event.inputs.scenario || 'collapse' }}
-          GODSCORE_ENFORCE: ${{ github.event.inputs.enforce || 'false' }}
-          GODSCORE_FAIL_ON_WARNING: ${{ github.event.inputs.fail_on_warning || 'false' }}
-        run: |
         continue-on-error: true
-          PYTHONPATH=. python scripts/run_godscore_action.py
-
-      - name: Show outputs
-        if: always()
         run: |
-          echo "godscore=${{ steps.godscore.outputs.godscore }}"
-          echo "status=${{ steps.godscore.outputs.status }}"
-          echo "passed=${{ steps.godscore.outputs.passed }}"
+          PYTHONPATH=. python scripts/run_godscore_action.py
 
       - name: Upload artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: godscore-ci-result
-          path: ci/action_result.json
+          path: |
+            godscore_result.json
+            *.json
+          if-no-files-found: ignore
