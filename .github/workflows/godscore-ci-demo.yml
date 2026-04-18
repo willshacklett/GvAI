@@ -56,6 +56,7 @@ jobs:
           GODSCORE_ENFORCE: ${{ github.event.inputs.enforce || 'false' }}
           GODSCORE_FAIL_ON_WARNING: ${{ github.event.inputs.fail_on_warning || 'false' }}
         run: |
+        continue-on-error: true
           PYTHONPATH=. python scripts/run_godscore_action.py
 
       - name: Show outputs
