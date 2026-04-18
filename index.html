@@ -6,14 +6,17 @@
   <title>GvAI</title>
   <style>
     :root {
-      --bg: #081224;
-      --panel: #0f1b33;
-      --panel-2: #132345;
-      --line: #21365f;
-      --text: #e8eefc;
-      --muted: #9db0d7;
-      --accent: #80aaff;
-      --accent-2: #5e8fff;
+      --bg: #071121;
+      --bg2: #0b1830;
+      --panel: rgba(14, 27, 52, 0.95);
+      --panel-2: rgba(18, 35, 69, 0.98);
+      --line: rgba(255,255,255,0.08);
+      --text: #e9efff;
+      --muted: #98acd6;
+      --accent: #82abff;
+      --accent-2: #5c8cff;
+      --user: #22437d;
+      --assistant: #101f3d;
     }
 
     * { box-sizing: border-box; }
@@ -21,174 +24,238 @@
     html, body {
       margin: 0;
       padding: 0;
-      background: radial-gradient(circle at top, #0b1830 0%, var(--bg) 55%);
+      min-height: 100%;
       color: var(--text);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      min-height: 100%;
+      background:
+        radial-gradient(circle at top, var(--bg2) 0%, var(--bg) 58%);
     }
 
     body {
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
-      min-height: 100vh;
     }
 
     .header {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 16px 20px;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-      background: rgba(6, 12, 24, 0.82);
-      backdrop-filter: blur(10px);
       position: sticky;
       top: 0;
-      z-index: 10;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(6, 12, 24, 0.84);
+      backdrop-filter: blur(10px);
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
+      min-width: 0;
     }
 
     .logo {
-      width: 42px;
-      height: 42px;
-      border-radius: 10px;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
       object-fit: contain;
       background: rgba(255,255,255,0.04);
       border: 1px solid rgba(255,255,255,0.06);
       padding: 4px;
+      flex: 0 0 auto;
     }
 
-    .brand h1 {
+    .brand-text {
+      min-width: 0;
+    }
+
+    .brand-text h1 {
       margin: 0;
-      font-size: 20px;
-      line-height: 1.1;
+      font-size: 19px;
+      line-height: 1.05;
     }
 
-    .brand p {
-      margin: 2px 0 0 0;
-      font-size: 12px;
+    .brand-text p {
+      margin: 3px 0 0 0;
       color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .top-links {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .top-links a {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.02);
     }
 
     .shell {
-      width: min(980px, calc(100% - 24px));
-      margin: 18px auto;
+      width: min(1180px, calc(100% - 20px));
+      margin: 16px auto 0 auto;
+      flex: 1;
       display: flex;
       flex-direction: column;
       gap: 14px;
-      flex: 1;
     }
 
     .hero {
-      background: linear-gradient(180deg, rgba(20,34,63,0.95), rgba(11,22,43,0.95));
-      border: 1px solid rgba(255,255,255,0.08);
+      background: linear-gradient(180deg, rgba(18,35,68,0.95), rgba(10,22,44,0.95));
+      border: 1px solid var(--line);
       border-radius: 18px;
-      padding: 18px;
+      padding: 18px 18px 16px 18px;
     }
 
     .hero h2 {
       margin: 0 0 8px 0;
-      font-size: 22px;
+      font-size: 31px;
+      line-height: 1.05;
     }
 
     .hero p {
       margin: 0;
       color: var(--muted);
+      font-size: 15px;
     }
 
     .chat {
+      flex: 1;
+      min-height: 72vh;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      min-height: 62vh;
-      background: linear-gradient(180deg, rgba(15,27,51,0.95), rgba(9,18,36,0.95));
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 18px;
-      padding: 14px;
+      background: linear-gradient(180deg, rgba(14,27,52,0.96), rgba(7,17,33,0.98));
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.28);
     }
 
     .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      overflow-y: auto;
-      padding: 4px;
-      flex: 1;
-      min-height: 420px;
-      max-height: 68vh;
+      gap: 14px;
+      scroll-behavior: smooth;
+    }
+
+    .row {
+      display: flex;
+      width: 100%;
+    }
+
+    .row.user {
+      justify-content: flex-end;
+    }
+
+    .row.assistant {
+      justify-content: flex-start;
     }
 
     .msg {
+      width: fit-content;
       max-width: min(760px, 92%);
-      border-radius: 16px;
-      padding: 12px 14px;
+      border-radius: 18px;
       border: 1px solid rgba(255,255,255,0.07);
+      padding: 12px 14px 13px 14px;
+      line-height: 1.48;
       white-space: pre-wrap;
-      line-height: 1.45;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.16);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.16);
     }
 
     .msg.user {
-      align-self: flex-end;
-      background: linear-gradient(180deg, #22407a, #193460);
+      background: linear-gradient(180deg, #274b8b, #1d3868);
     }
 
     .msg.assistant {
-      align-self: flex-start;
-      background: linear-gradient(180deg, #101d37, #0d1930);
+      background: linear-gradient(180deg, #112343, #0c1a31);
     }
 
-    .msg .meta {
-      display: block;
+    .meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
       font-size: 12px;
-      color: #b9c8e8;
-      margin-bottom: 6px;
-      opacity: 0.9;
+      color: #bed0f2;
+      opacity: 0.95;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #8cb0ff;
+      box-shadow: 0 0 10px rgba(140,176,255,0.8);
+    }
+
+    .msg-text {
+      font-size: 16px;
+    }
+
+    .composer-wrap {
+      border-top: 1px solid var(--line);
+      padding: 14px;
+      background: rgba(5, 11, 22, 0.35);
     }
 
     .composer {
       display: flex;
-      gap: 10px;
+      gap: 12px;
       align-items: flex-end;
-      border-top: 1px solid rgba(255,255,255,0.08);
-      padding-top: 12px;
     }
 
     textarea {
       flex: 1;
-      resize: vertical;
-      min-height: 62px;
+      min-height: 66px;
       max-height: 180px;
-      padding: 14px 14px;
-      border-radius: 14px;
+      resize: vertical;
+      border-radius: 16px;
       border: 1px solid rgba(255,255,255,0.1);
-      background: rgba(4, 10, 20, 0.8);
-      color: var(--text);
       outline: none;
+      background: rgba(3, 9, 18, 0.9);
+      color: var(--text);
+      padding: 16px;
       font: inherit;
+      line-height: 1.4;
     }
 
     textarea::placeholder {
-      color: #8094bf;
+      color: #7e95c2;
     }
 
-    button {
+    .send {
       border: 0;
-      border-radius: 14px;
-      padding: 14px 18px;
+      border-radius: 16px;
+      min-width: 108px;
+      height: 58px;
+      padding: 0 18px;
       background: linear-gradient(180deg, var(--accent), var(--accent-2));
       color: white;
-      font-weight: 600;
+      font-weight: 700;
+      font-size: 15px;
       cursor: pointer;
-      min-width: 96px;
+      box-shadow: 0 12px 28px rgba(92,140,255,0.25);
     }
 
-    button:disabled {
-      opacity: 0.55;
+    .send:disabled {
+      opacity: 0.6;
       cursor: wait;
     }
 
@@ -196,26 +263,21 @@
       text-align: center;
       color: var(--muted);
       font-size: 12px;
-      margin-top: 4px;
-      margin-bottom: 16px;
+      margin: 10px 0 16px 0;
     }
 
-    .tiny-links {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-top: 10px;
-    }
+    @media (max-width: 760px) {
+      .header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
 
-    .tiny-links a {
-      color: var(--accent);
-      text-decoration: none;
-      font-size: 12px;
-    }
+      .top-links {
+        width: 100%;
+      }
 
-    @media (max-width: 720px) {
-      .shell {
-        width: calc(100% - 14px);
+      .hero h2 {
+        font-size: 25px;
       }
 
       .composer {
@@ -223,12 +285,17 @@
         align-items: stretch;
       }
 
-      button {
+      .send {
         width: 100%;
+        height: 54px;
       }
 
       .msg {
         max-width: 100%;
+      }
+
+      .shell {
+        width: calc(100% - 12px);
       }
     }
   </style>
@@ -237,38 +304,43 @@
   <header class="header">
     <div class="brand">
       <img class="logo" src="web/gv-logo.png" alt="GvAI logo" />
-      <div>
+      <div class="brand-text">
         <h1>GvAI</h1>
         <p>Chat-native survivability intelligence</p>
       </div>
+    </div>
+
+    <div class="top-links">
+      <a href="dashboard/">Dashboard</a>
+      <a href="https://api.gvai.io/api/chat" target="_blank" rel="noopener noreferrer">API</a>
     </div>
   </header>
 
   <main class="shell">
     <section class="hero">
       <h2>Talk to GvAI</h2>
-      <p>Ask a question, test an idea, or push on the God Variable work directly.</p>
-      <div class="tiny-links">
-        <a href="dashboard/">Dashboard</a>
-        <a href="https://api.gvai.io/api/chat" target="_blank" rel="noopener noreferrer">API</a>
-      </div>
+      <p>Ask a question, test an idea, or push directly on the God Variable work.</p>
     </section>
 
     <section class="chat">
       <div id="messages" class="messages">
-        <div class="msg assistant">
-          <span class="meta">GvAI</span>
-          I’m here. What do you want to work on today?
+        <div class="row assistant">
+          <div class="msg assistant">
+            <div class="meta"><span class="dot"></span><span>GvAI</span></div>
+            <div class="msg-text">I’m here. What do you want to work on today?</div>
+          </div>
         </div>
       </div>
 
-      <div class="composer">
-        <textarea id="prompt" placeholder="Message GvAI..."></textarea>
-        <button id="sendBtn" type="button">Send</button>
+      <div class="composer-wrap">
+        <div class="composer">
+          <textarea id="prompt" placeholder="Message GvAI..."></textarea>
+          <button id="sendBtn" class="send" type="button">Send</button>
+        </div>
       </div>
     </section>
 
-    <div class="footer-note">Root is chat now. Dashboard is still available from the link above.</div>
+    <div class="footer-note">Root is chat. Dashboard is still available from the link above.</div>
   </main>
 
   <script>
@@ -276,16 +348,6 @@
     const messagesEl = document.getElementById("messages");
     const promptEl = document.getElementById("prompt");
     const sendBtn = document.getElementById("sendBtn");
-
-    function addMessage(role, text) {
-      const div = document.createElement("div");
-      div.className = `msg ${role}`;
-      const meta = role === "user" ? "You" : "GvAI";
-      div.innerHTML = `<span class="meta">${meta}</span>${escapeHtml(text).replace(/\\n/g, "<br>")}`;
-      messagesEl.appendChild(div);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-      return div;
-    }
 
     function escapeHtml(str) {
       return String(str)
@@ -298,14 +360,31 @@
 
     function extractReply(payload) {
       if (!payload) return "";
-      return (
-        payload.reply ||
-        payload.answer ||
-        payload.response ||
-        payload.output ||
-        payload.message ||
-        ""
-      );
+      return payload.reply || payload.answer || payload.response || payload.output || payload.message || "";
+    }
+
+    function addMessage(role, text) {
+      const row = document.createElement("div");
+      row.className = `row ${role}`;
+
+      const card = document.createElement("div");
+      card.className = `msg ${role}`;
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.innerHTML = `<span class="dot"></span><span>${role === "user" ? "You" : "GvAI"}</span>`;
+
+      const body = document.createElement("div");
+      body.className = "msg-text";
+      body.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
+
+      card.appendChild(meta);
+      card.appendChild(body);
+      row.appendChild(card);
+      messagesEl.appendChild(row);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+
+      return body;
     }
 
     async function sendMessage() {
@@ -316,7 +395,7 @@
       promptEl.value = "";
       sendBtn.disabled = true;
 
-      const typing = addMessage("assistant", "Thinking...");
+      const thinkingBody = addMessage("assistant", "GvAI is thinking...");
 
       try {
         const res = await fetch(API_URL, {
@@ -331,9 +410,9 @@
 
         const data = await res.json();
         const reply = extractReply(data) || "I got a response back, but it didn’t include a standard reply field.";
-        typing.innerHTML = `<span class="meta">GvAI</span>${escapeHtml(reply).replace(/\\n/g, "<br>")}`;
+        thinkingBody.innerHTML = escapeHtml(reply).replace(/\n/g, "<br>");
       } catch (err) {
-        typing.innerHTML = `<span class="meta">GvAI</span>API request failed: ${escapeHtml(err.message)}.`;
+        thinkingBody.innerHTML = `API request failed: ${escapeHtml(err.message)}.`;
       } finally {
         sendBtn.disabled = false;
         promptEl.focus();
@@ -342,6 +421,7 @@
     }
 
     sendBtn.addEventListener("click", sendMessage);
+
     promptEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
