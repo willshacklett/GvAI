@@ -46,11 +46,13 @@
     }
   </style>
 
+
+
 <style id="gv-voice-style">
   #gv-talk-btn {
     position: fixed;
     right: 18px;
-    bottom: 90px;
+    bottom: 88px;
     z-index: 9999;
     background: #0b2a63;
     color: #f2c14e;
@@ -60,6 +62,12 @@
     font: 600 14px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     cursor: pointer;
     box-shadow: 0 10px 24px rgba(0,0,0,0.28);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  }
+
+  #gv-talk-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.33);
   }
 
   #gv-talk-btn.listening {
@@ -70,20 +78,20 @@
   #gv-talk-status {
     position: fixed;
     right: 18px;
-    bottom: 52px;
+    bottom: 50px;
     z-index: 9999;
-    background: rgba(5, 15, 35, 0.9);
+    background: rgba(5, 15, 35, 0.94);
     color: #e8edf7;
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 10px;
-    padding: 6px 10px;
-    font: 500 12px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    padding: 7px 10px;
+    font: 500 12px/1.25 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     display: none;
-    max-width: 240px;
+    max-width: 260px;
   }
 
   @keyframes gvPulse {
-    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(242,193,78,0.45); }
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(242,193,78,0.42); }
     70% { transform: scale(1.03); box-shadow: 0 0 0 14px rgba(242,193,78,0); }
     100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(242,193,78,0); }
   }
@@ -97,8 +105,8 @@
     }
     #gv-talk-status {
       right: 14px;
-      bottom: 46px;
-      max-width: 200px;
+      bottom: 45px;
+      max-width: 220px;
     }
   }
 </style>
@@ -119,6 +127,10 @@
     <p>Your system is now clean, stable, and rendering correctly.</p>
   </div>
 
+
+
+
+
 <button id="gv-talk-btn" type="button" aria-label="Talk to GvAI">🎤 Talk</button>
 <div id="gv-talk-status" aria-live="polite"></div>
 
@@ -131,43 +143,75 @@
   const talkBtn = document.getElementById("gv-talk-btn");
   const statusEl = document.getElementById("gv-talk-status");
 
-  function setStatus(msg, show = true) {
+  function setStatus(msg, visible = true) {
     if (!statusEl) return;
     statusEl.textContent = msg || "";
-    statusEl.style.display = show && msg ? "block" : "none";
+    statusEl.style.display = (visible && msg) ? "block" : "none";
+  }
+
+  function clearStatusSoon(ms) {
+    window.setTimeout(() => setStatus("", false), ms || 1800);
+  }
+
+  function isVisible(el) {
+    if (!el) return false;
+    const rect = el.getBoundingClientRect();
+    const style = window.getComputedStyle(el);
+    return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
   }
 
   function findInput() {
     const selectors = [
-      "#message-input",
-      "#user-input",
-      "#chat-input",
-      "textarea",
-      "input[type='text']",
-      "input:not([type])"
+      '#message-input',
+      '#user-input',
+      '#chat-input',
+      'textarea[placeholder*="message" i]',
+      'textarea[placeholder*="ask" i]',
+      'textarea[placeholder*="chat" i]',
+      'textarea',
+      'input[type="text"][placeholder*="message" i]',
+      'input[type="text"][placeholder*="ask" i]',
+      'input[type="text"]',
+      'input:not([type])'
     ];
-    for (const s of selectors) {
-      const el = document.querySelector(s);
-      if (el) return el;
+
+    for (const sel of selectors) {
+      const nodes = document.querySelectorAll(sel);
+      for (const el of nodes) {
+        if (isVisible(el) && !el.disabled && !el.readOnly) return el;
+      }
     }
+
     return null;
   }
 
   function setInputValue(el, value) {
     if (!el) return false;
+
     el.focus();
-    const prior = el.value || "";
-    el.value = prior ? (prior.trimEnd() + " " + value) : value;
+
+    const prior = typeof el.value === "string" ? el.value : "";
+    const next = prior.trim() ? (prior.trimEnd() + " " + value) : value;
+
+    const proto = Object.getPrototypeOf(el);
+    const desc = Object.getOwnPropertyDescriptor(proto, "value");
+    if (desc && desc.set) {
+      desc.set.call(el, next);
+    } else {
+      el.value = next;
+    }
+
     el.dispatchEvent(new Event("input", { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
     return true;
   }
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
   if (!SpeechRecognition) {
     talkBtn.addEventListener("click", function () {
       setStatus("Voice input is not supported in this browser.");
-      setTimeout(() => setStatus("", false), 2500);
+      clearStatusSoon(2500);
     });
     return;
   }
@@ -180,19 +224,21 @@
 
   let listening = false;
   let finalTranscript = "";
+  let heardAnything = false;
 
   function startListening() {
     finalTranscript = "";
+    heardAnything = false;
     try {
       recognition.start();
-    } catch (e) {
+    } catch (err) {
       setStatus("Mic is already starting. Try again.");
-      setTimeout(() => setStatus("", false), 1800);
+      clearStatusSoon(1800);
     }
   }
 
   function stopListening() {
-    try { recognition.stop(); } catch (e) {}
+    try { recognition.stop(); } catch (err) {}
   }
 
   talkBtn.addEventListener("click", function () {
@@ -212,15 +258,23 @@
 
   recognition.onresult = function (event) {
     let interim = "";
+
     for (let i = event.resultIndex; i < event.results.length; i++) {
-      const text = event.results[i][0].transcript;
+      const chunk = event.results[i][0].transcript || "";
+      if (chunk.trim()) heardAnything = true;
+
       if (event.results[i].isFinal) {
-        finalTranscript += text + " ";
+        finalTranscript += chunk + " ";
       } else {
-        interim += text;
+        interim += chunk;
       }
     }
-    setStatus(interim ? ("Hearing: " + interim) : "Listening…");
+
+    if (interim.trim()) {
+      setStatus("Hearing: " + interim.trim());
+    } else {
+      setStatus("Listening…");
+    }
   };
 
   recognition.onerror = function (event) {
@@ -228,37 +282,44 @@
     talkBtn.classList.remove("listening");
     talkBtn.textContent = "🎤 Talk";
 
-    const map = {
+    const messages = {
       "not-allowed": "Microphone permission blocked.",
       "service-not-allowed": "Microphone service blocked.",
       "no-speech": "No speech heard.",
       "audio-capture": "No microphone detected.",
-      "network": "Speech service network issue."
+      "network": "Speech service network issue.",
+      "aborted": "Voice input stopped."
     };
-    setStatus(map[event.error] || ("Voice error: " + event.error));
-    setTimeout(() => setStatus("", false), 2500);
+
+    setStatus(messages[event.error] || ("Voice error: " + event.error));
+    clearStatusSoon(2500);
   };
 
   recognition.onend = function () {
-    const wasListening = listening;
+    const transcript = finalTranscript.trim();
+
     listening = false;
     talkBtn.classList.remove("listening");
     talkBtn.textContent = "🎤 Talk";
 
-    const transcript = finalTranscript.trim();
     if (transcript) {
       const input = findInput();
       if (input) {
         setInputValue(input, transcript);
         setStatus("Transcript added to message box.");
       } else {
-        setStatus("Could not find chat input.");
+        setStatus("Could not find the chat input.");
       }
-    } else if (wasListening) {
-      setStatus("No transcript captured.");
+      clearStatusSoon(1800);
+      return;
     }
 
-    setTimeout(() => setStatus("", false), 1800);
+    if (heardAnything) {
+      setStatus("No final transcript captured.");
+    } else {
+      setStatus("No speech captured.");
+    }
+    clearStatusSoon(1800);
   };
 })();
 </script>
