@@ -2,6 +2,8 @@ from pathlib import Path
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from gvai.chat import GvChat
+from gvai.web_search import search_web
+from gvai.ai_bridge import chat_provider, available_providers
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB_DIR = ROOT / "web"
@@ -123,6 +125,74 @@ def chat():
     if not user_text:
         return jsonify({"ok": False, "error": "Missing message"}), 400
     return jsonify(_chat_payload(user_text, gv_state=gv_state))
+
+
+
+@app.post("/api/search")
+def api_search():
+    payload = request.get_json(silent=True) or {}
+    query = (payload.get("query") or "").strip()
+    max_results = int(payload.get("max_results") or 5)
+    result = search_web(query, max_results=max_results)
+    return jsonify(result)
+
+@app.get("/api/providers")
+def api_providers():
+    return jsonify({
+        "providers": available_providers()
+    })
+
+@app.post("/api/ai/chat")
+def api_ai_chat():
+    payload = request.get_json(silent=True) or {}
+    provider = (payload.get("provider") or "openai").strip()
+    message = payload.get("message")
+    messages = payload.get("messages") or []
+    system_prompt = payload.get("system_prompt")
+    model = payload.get("model")
+
+    result = chat_provider(
+        provider,
+        message=message,
+        messages=messages,
+        system_prompt=system_prompt,
+        model=model,
+    )
+    return jsonify(result)
+
+@app.post("/api/ai/compare")
+def api_ai_compare():
+    payload = request.get_json(silent=True) or {}
+    providers = payload.get("providers") or available_providers()
+    message = payload.get("message")
+    messages = payload.get("messages") or []
+    system_prompt = payload.get("system_prompt")
+    model_map = payload.get("models") or {}
+
+    out = {
+        "providers": [],
+        "results": [],
+        "errors": [],
+    }
+
+    for provider in providers:
+        try:
+            result = chat_provider(
+                provider,
+                message=message,
+                messages=messages,
+                system_prompt=system_prompt,
+                model=model_map.get(provider),
+            )
+            out["providers"].append(provider)
+            out["results"].append(result)
+        except Exception as e:
+            out["errors"].append({
+                "provider": provider,
+                "error": str(e),
+            })
+
+    return jsonify(out)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)
