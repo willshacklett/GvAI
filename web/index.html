@@ -324,5 +324,49 @@
 })();
 </script>
 
+
+<script id="gv-state-layer">
+window.GV_STATE = {
+  user: {
+    name: "Will",
+    handle: "PapaShack",
+    role: "builder",
+    relationship: "primary developer of GvAI"
+  },
+  context: {
+    project: "GvAI",
+    focus: "building survivability-aware AI system",
+    tone: "direct practical",
+    priorities: [
+      "identity continuity",
+      "repo x-ray intelligence",
+      "voice interaction",
+      "survivability-first UX"
+    ]
+  }
+};
+
+async function gvLoadState() {
+  try {
+    const r = await fetch("/api/state");
+    if (!r.ok) return;
+    const data = await r.json();
+    if (data && typeof data === "object") window.GV_STATE = data;
+  } catch (e) {}
+}
+
+async function gvSaveState() {
+  try {
+    await fetch("/api/state", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state: window.GV_STATE })
+    });
+  } catch (e) {}
+}
+
+gvLoadState();
+</script>
+
 </body>
 </html>

@@ -1,9 +1,42 @@
+import json
 from pathlib import Path
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from gvai.chat import GvChat
 from gvai.web_search import search_web
 from gvai.ai_bridge import chat_provider, available_providers
+
+
+STATE_PATH = Path("data/gv_state.json")
+
+def _default_state():
+    return {
+        "user": {
+            "name": "",
+            "handle": "",
+            "role": "",
+            "relationship": ""
+        },
+        "context": {
+            "project": "GvAI",
+            "focus": "",
+            "tone": "",
+            "priorities": []
+        }
+    }
+
+def load_gv_state():
+    if not STATE_PATH.exists():
+        return _default_state()
+    try:
+        return json.loads(STATE_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return _default_state()
+
+def save_gv_state(state):
+    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    STATE_PATH.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB_DIR = ROOT / "web"
@@ -131,6 +164,15 @@ def chat():
 @app.post("/api/search")
 def api_search():
     payload = request.get_json(silent=True) or {}
+    incoming_state = payload.get("state") or {}
+    saved_state = load_gv_state()
+    merged_state = saved_state.copy()
+    if isinstance(saved_state.get("user"), dict) and isinstance(incoming_state.get("user"), dict):
+        merged_state["user"] = {**saved_state.get("user", {}), **incoming_state.get("user", {})}
+    if isinstance(saved_state.get("context"), dict) and isinstance(incoming_state.get("context"), dict):
+        merged_state["context"] = {**saved_state.get("context", {}), **incoming_state.get("context", {})}
+    if incoming_state:
+        save_gv_state(merged_state)
     query = (payload.get("query") or "").strip()
     max_results = int(payload.get("max_results") or 5)
     result = search_web(query, max_results=max_results)
@@ -145,6 +187,15 @@ def api_providers():
 @app.post("/api/ai/chat")
 def api_ai_chat():
     payload = request.get_json(silent=True) or {}
+    incoming_state = payload.get("state") or {}
+    saved_state = load_gv_state()
+    merged_state = saved_state.copy()
+    if isinstance(saved_state.get("user"), dict) and isinstance(incoming_state.get("user"), dict):
+        merged_state["user"] = {**saved_state.get("user", {}), **incoming_state.get("user", {})}
+    if isinstance(saved_state.get("context"), dict) and isinstance(incoming_state.get("context"), dict):
+        merged_state["context"] = {**saved_state.get("context", {}), **incoming_state.get("context", {})}
+    if incoming_state:
+        save_gv_state(merged_state)
     provider = (payload.get("provider") or "openai").strip()
     message = payload.get("message")
     messages = payload.get("messages") or []
@@ -163,6 +214,15 @@ def api_ai_chat():
 @app.post("/api/ai/compare")
 def api_ai_compare():
     payload = request.get_json(silent=True) or {}
+    incoming_state = payload.get("state") or {}
+    saved_state = load_gv_state()
+    merged_state = saved_state.copy()
+    if isinstance(saved_state.get("user"), dict) and isinstance(incoming_state.get("user"), dict):
+        merged_state["user"] = {**saved_state.get("user", {}), **incoming_state.get("user", {})}
+    if isinstance(saved_state.get("context"), dict) and isinstance(incoming_state.get("context"), dict):
+        merged_state["context"] = {**saved_state.get("context", {}), **incoming_state.get("context", {})}
+    if incoming_state:
+        save_gv_state(merged_state)
     providers = payload.get("providers") or available_providers()
     message = payload.get("message")
     messages = payload.get("messages") or []
