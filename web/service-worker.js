@@ -1,9 +1,9 @@
-const CACHE_NAME = "gvai-pwa-v1";
+const CACHE_NAME = "gvai-pwa-v2";
 const ASSETS = [
   "./",
   "./index.html",
   "./style.css",
-  "./dashboard.js",
+  "./dashboard.js?v=voice2",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png"
