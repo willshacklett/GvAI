@@ -391,6 +391,56 @@ if ("serviceWorker" in navigator) {
 </button>
 
 <script src="./dashboard.js?v=voice2"></script>
-<script src="./voice.js?v=prompt1"></script>
+
+<script>
+(function () {
+  function bootVoice() {
+    const input = document.getElementById("prompt");
+    const btn = document.getElementById("voiceBtn");
+    if (!input || !btn) return;
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      btn.disabled = true;
+      btn.title = "Voice not supported in this browser";
+      return;
+    }
+
+    const rec = new SR();
+    rec.lang = "en-US";
+    rec.interimResults = true;
+    rec.continuous = false;
+
+    let finalText = "";
+
+    btn.onclick = function () {
+      finalText = "";
+      btn.textContent = "🛑";
+      rec.start();
+    };
+
+    rec.onresult = function (event) {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const t = event.results[i][0].transcript;
+        if (event.results[i].isFinal) finalText += t;
+        else interim += t;
+      }
+
+      input.value = (finalText + interim).trim();
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      input.focus();
+    };
+
+    rec.onend = function () {
+      btn.textContent = "🎙️";
+    };
+  }
+
+  window.addEventListener("DOMContentLoaded", bootVoice);
+})();
+</script>
+
 </body>
 </html>
