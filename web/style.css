@@ -1,0 +1,19 @@
+
+/* GvAI PWA mobile polish */
+@media (max-width: 700px) {
+  body {
+    overscroll-behavior: none;
+  }
+
+  .app,
+  main,
+  #app {
+    min-height: 100dvh;
+  }
+
+  input,
+  textarea,
+  button {
+    font-size: 16px;
+  }
+}
