@@ -392,12 +392,16 @@ if ("serviceWorker" in navigator) {
 
 <script src="./dashboard.js?v=voice2"></script>
 
-<script>
+
+
+<script id="gvai-inline-voice">
 (function () {
   function bootVoice() {
     const input = document.getElementById("prompt");
     const btn = document.getElementById("voiceBtn");
-    if (!input || !btn) return;
+    if (!input || !btn || btn.dataset.ready === "1") return;
+
+    btn.dataset.ready = "1";
 
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
@@ -416,7 +420,12 @@ if ("serviceWorker" in navigator) {
     btn.onclick = function () {
       finalText = "";
       btn.textContent = "🛑";
-      rec.start();
+      try {
+        rec.start();
+      } catch (err) {
+        console.warn("Voice start failed", err);
+        btn.textContent = "🎙️";
+      }
     };
 
     rec.onresult = function (event) {
@@ -439,6 +448,7 @@ if ("serviceWorker" in navigator) {
   }
 
   window.addEventListener("DOMContentLoaded", bootVoice);
+  setInterval(bootVoice, 1000);
 })();
 </script>
 
