@@ -1,10 +1,6 @@
 fastapi
-uvicorn
-pydantic
-numpy
-requests
-openai
+uvicorn[standard]
 flask
 flask-cors
-gunicorn
+openai
 python-dotenv
