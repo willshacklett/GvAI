@@ -1,2 +1,28 @@
 
 
+
+/* Forced floating GvAI voice button */
+#gvVoiceDock {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 999999;
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.35);
+  background: rgba(56, 112, 255, .95);
+  color: white;
+  font-size: 28px;
+  cursor: pointer;
+  box-shadow: 0 12px 30px rgba(0,0,0,.35);
+}
+
+#gvVoiceDock:hover {
+  transform: translateY(-1px);
+}
+
+#gvVoiceDock:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
