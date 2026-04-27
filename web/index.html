@@ -392,5 +392,126 @@ if ("serviceWorker" in navigator) {
 
 
 
+
+<script id="gvai-voice-system">
+(function () {
+  const API_BASE = "https://web-production-8e937.up.railway.app";
+
+  function findPrompt() {
+    return document.querySelector("#prompt") || document.querySelector("textarea");
+  }
+
+  function findSendButton() {
+    return Array.from(document.querySelectorAll("button"))
+      .find(b => (b.textContent || "").trim().toLowerCase() === "send");
+  }
+
+  function addVoiceButton() {
+    const input = findPrompt();
+    const sendBtn = findSendButton();
+    if (!input || !sendBtn || document.querySelector("#voiceBtn")) return;
+
+    const btn = document.createElement("button");
+    btn.id = "voiceBtn";
+    btn.type = "button";
+    btn.textContent = "🎙️";
+    btn.title = "Talk to GvAI";
+    btn.style.marginRight = "10px";
+    btn.style.minWidth = "56px";
+    btn.style.minHeight = "56px";
+    btn.style.borderRadius = "16px";
+    btn.style.border = "1px solid rgba(255,255,255,.2)";
+    btn.style.background = "rgba(255,255,255,.08)";
+    btn.style.color = "white";
+    btn.style.fontSize = "22px";
+    btn.style.cursor = "pointer";
+
+    sendBtn.parentNode.insertBefore(btn, sendBtn);
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      btn.disabled = true;
+      btn.title = "Voice input not supported in this browser";
+      return;
+    }
+
+    const rec = new SR();
+    rec.lang = "en-US";
+    rec.interimResults = true;
+    rec.continuous = false;
+
+    let finalText = "";
+
+    btn.onclick = function () {
+      finalText = "";
+      btn.textContent = "🛑";
+      try { rec.start(); } catch (e) { btn.textContent = "🎙️"; }
+    };
+
+    rec.onresult = function (event) {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const t = event.results[i][0].transcript;
+        if (event.results[i].isFinal) finalText += t;
+        else interim += t;
+      }
+
+      input.value = (finalText + interim).trim();
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      input.focus();
+    };
+
+    rec.onend = function () {
+      btn.textContent = "🎙️";
+    };
+  }
+
+  function speak(text) {
+    if (!("speechSynthesis" in window) || !text) return;
+    window.speechSynthesis.cancel();
+
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 0.95;
+    utter.pitch = 1.0;
+    utter.volume = 1.0;
+    window.speechSynthesis.speak(utter);
+  }
+
+  // Speak GvAI replies after Send button is clicked.
+  function hookSendForSpeech() {
+    const sendBtn = findSendButton();
+    if (!sendBtn || sendBtn.dataset.voiceHooked === "1") return;
+    sendBtn.dataset.voiceHooked = "1";
+
+    sendBtn.addEventListener("click", function () {
+      setTimeout(() => {
+        const bubbles = Array.from(document.querySelectorAll("*"))
+          .filter(el => {
+            const txt = (el.innerText || "").trim();
+            return txt && txt.length > 10 && txt.length < 1500 && /GvAI|Hey|What|I('|’)m|Hello/i.test(txt);
+          });
+
+        const last = bubbles[bubbles.length - 1];
+        if (last) {
+          const clean = last.innerText
+            .replace(/^GvAI\s*/i, "")
+            .replace(/^You\s*/i, "")
+            .trim();
+          speak(clean);
+        }
+      }, 1800);
+    });
+  }
+
+  addVoiceButton();
+  hookSendForSpeech();
+  setInterval(() => {
+    addVoiceButton();
+    hookSendForSpeech();
+  }, 1000);
+})();
+</script>
+
 </body>
 </html>
