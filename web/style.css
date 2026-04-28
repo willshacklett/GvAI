@@ -168,3 +168,45 @@ button:disabled { opacity: .55; cursor: not-allowed; }
   .composer { grid-template-columns: 1fr 58px; }
   #sendBtn { grid-column: 1 / -1; min-height: 52px; }
 }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #102447;
+  padding: 20px;
+}
+
+.card span {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.card strong {
+  font-size: 26px;
+}
+
+pre {
+  white-space: pre-wrap;
+  overflow-x: auto;
+  background: #050b15;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  color: #dce8ff;
+  max-height: 420px;
+}
+
+@media (max-width: 800px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
