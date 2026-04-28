@@ -1,0 +1,13 @@
+:root{--bg:#07101f;--panel:#0d1b33;--line:rgba(255,255,255,.1);--text:#f7fbff;--muted:#9db6df;--accent:#6e9bff}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+.topbar{height:82px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:#08101f}
+.brand{display:flex;align-items:center;gap:14px}.logo{width:44px;height:44px;display:grid;place-items:center;border-radius:12px;border:1px solid var(--line);color:#f4db6b;font-weight:800}
+h1,h2,p{margin:0}.brand h1{font-size:22px}.brand p,.hero p{color:var(--muted);font-size:14px}
+nav{display:flex;gap:10px;align-items:center}nav a,nav button{border:1px solid var(--line);color:#bdd0ff;background:rgba(255,255,255,.04);border-radius:999px;padding:9px 14px;text-decoration:none;cursor:pointer}
+.shell{max-width:1180px;margin:20px auto;padding:0 18px}.hero{background:linear-gradient(180deg,#12284c,#0d1d37);border:1px solid var(--line);border-radius:18px;padding:24px;margin-bottom:16px}.hero h2{font-size:30px;margin-bottom:8px}
+.chat{height:54vh;min-height:380px;overflow-y:auto;border:1px solid var(--line);border-radius:18px 18px 0 0;background:linear-gradient(180deg,#0e203d,#081529);padding:24px}
+.bubble{max-width:680px;border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:16px;white-space:pre-wrap;line-height:1.45}.bubble span{display:block;color:var(--muted);font-size:12px;margin-bottom:8px}.bubble small{display:block;color:#87f0bd;margin-top:10px;font-size:12px}.bubble.gv{background:#102447}.bubble.you{background:#2b5397;margin-left:auto}
+.composer{display:grid;grid-template-columns:1fr 64px 112px;gap:12px;border:1px solid var(--line);border-top:0;border-radius:0 0 18px 18px;padding:14px;background:#071120}
+textarea{min-height:72px;resize:vertical;border-radius:14px;border:1px solid var(--line);background:#050b15;color:var(--text);padding:16px;font:inherit}
+#sendBtn,#voiceBtn{border:0;border-radius:16px;color:white;font-weight:700;cursor:pointer}#sendBtn{background:var(--accent)}#voiceBtn{background:rgba(255,255,255,.12);font-size:24px}button:disabled{opacity:.55;cursor:not-allowed}
+@media(max-width:700px){nav a{display:none}.composer{grid-template-columns:1fr 58px}#sendBtn{grid-column:1/-1;min-height:52px}}
