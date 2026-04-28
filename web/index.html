@@ -1,518 +1,156 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <link rel="icon" type="image/png" href="/gv-tab.png?v=2">
-
-<meta charset="UTF-8" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>GvAI</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <style>
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, sans-serif;
-      background: #0b1220;
-      color: #e5e7eb;
-    }
-
-    .header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 16px 20px;
-      background: #0f172a;
-      border-bottom: 1px solid #1f2937;
-    }
-
-    .logo {
-      width: 40px;
-      height: 40px;
-      border-radius: 10px;
-    }
-
-    .title {
-      font-size: 20px;
-      font-weight: 600;
-    }
-
-    .subtitle {
-      font-size: 12px;
-      color: #9ca3af;
-      margin-top: 2px;
-    }
-
-    .content {
-      padding: 20px;
-    }
-  </style>
-
-
-
-<style id="gv-voice-style">
-  #gv-talk-btn {
-    position: fixed;
-    right: 18px;
-    bottom: 88px;
-    z-index: 9999;
-    background: #0b2a63;
-    color: #f2c14e;
-    border: 1px solid rgba(242, 193, 78, 0.45);
-    border-radius: 999px;
-    padding: 10px 14px;
-    font: 600 14px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    cursor: pointer;
-    box-shadow: 0 10px 24px rgba(0,0,0,0.28);
-    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
-  }
-
-  #gv-talk-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 12px 28px rgba(0,0,0,0.33);
-  }
-
-  #gv-talk-btn.listening {
-    animation: gvPulse 1.1s infinite;
-    background: #12377d;
-  }
-
-  #gv-talk-status {
-    position: fixed;
-    right: 18px;
-    bottom: 50px;
-    z-index: 9999;
-    background: rgba(5, 15, 35, 0.94);
-    color: #e8edf7;
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 10px;
-    padding: 7px 10px;
-    font: 500 12px/1.25 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    display: none;
-    max-width: 260px;
-  }
-
-  @keyframes gvPulse {
-    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(242,193,78,0.42); }
-    70% { transform: scale(1.03); box-shadow: 0 0 0 14px rgba(242,193,78,0); }
-    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(242,193,78,0); }
-  }
-
-  @media (max-width: 700px) {
-    #gv-talk-btn {
-      right: 14px;
-      bottom: 82px;
-      padding: 9px 12px;
-      font-size: 13px;
-    }
-    #gv-talk-status {
-      right: 14px;
-      bottom: 45px;
-      max-width: 220px;
-    }
-  }
-</style>
-
-
-<link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#111827">
-<link rel="apple-touch-icon" href="./icons/icon-192.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="GvAI">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
+  <link rel="stylesheet" href="./style.css?v=clean1" />
 </head>
-
 <body>
-  <div class="header">
-    <img src="/web/gv-logo.png" class="logo" />
-    <div>
-      <div class="title">GvAI</div>
-      <div class="subtitle">Chat-native survivability intelligence</div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">Gv</div>
+      <div>
+        <h1>GvAI</h1>
+        <p>Chat-native survivability intelligence</p>
+      </div>
     </div>
-  </div>
+    <nav>
+      <a href="./dashboard/">Dashboard</a>
+      <a href="https://web-production-8e937.up.railway.app/api/health" target="_blank">API</a>
+      <button id="clearBtn">Clear chat</button>
+    </nav>
+  </header>
 
-  <div class="content">
-    <h2>GvAI is running</h2>
-    <p>Your system is now clean, stable, and rendering correctly.</p>
-  </div>
+  <main class="shell">
+    <section class="hero">
+      <h2>Talk to GvAI</h2>
+      <p>Ask a question, test an idea, or push directly on the God Variable work.</p>
+    </section>
 
+    <section id="chat" class="chat">
+      <div class="bubble gv">
+        <span>GvAI</span>
+        <p>I’m here. What do you want to work on today?</p>
+      </div>
+    </section>
 
+    <section class="composer">
+      <textarea id="prompt" placeholder="Message GvAI..."></textarea>
+      <button id="voiceBtn" title="Talk to GvAI">🎙️</button>
+      <button id="sendBtn">Send</button>
+    </section>
+  </main>
 
+  <script>
+    const API_BASE = "https://web-production-8e937.up.railway.app";
+    const chat = document.getElementById("chat");
+    const prompt = document.getElementById("prompt");
+    const sendBtn = document.getElementById("sendBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const voiceBtn = document.getElementById("voiceBtn");
 
+    function addBubble(role, text, meta) {
+      const div = document.createElement("div");
+      div.className = "bubble " + role;
+      div.innerHTML = `<span>${role === "you" ? "You" : "GvAI"}</span><p>${escapeHtml(text)}</p>${meta ? `<small>${escapeHtml(meta)}</small>` : ""}`;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
 
-<button id="gv-talk-btn" type="button" aria-label="Talk to GvAI">🎤 Talk</button>
-<div id="gv-talk-status" aria-live="polite"></div>
+    function escapeHtml(str) {
+      return String(str || "").replace(/[&<>"']/g, m => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"
+      }[m]));
+    }
 
+    function speak(text) {
+      if (!("speechSynthesis" in window) || !text) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 0.95;
+      u.pitch = 1;
+      u.volume = 1;
+      window.speechSynthesis.speak(u);
+    }
 
-<script id="gv-voice-script">
-(function () {
-  if (window.__gvVoiceInstalled) return;
-  window.__gvVoiceInstalled = true;
+    async function sendMessage() {
+      const message = prompt.value.trim();
+      if (!message) return;
 
-  const talkBtn = document.getElementById("gv-talk-btn");
-  const statusEl = document.getElementById("gv-talk-status");
+      prompt.value = "";
+      addBubble("you", message);
 
-  function setStatus(msg, visible = true) {
-    if (!statusEl) return;
-    statusEl.textContent = msg || "";
-    statusEl.style.display = (visible && msg) ? "block" : "none";
-  }
+      sendBtn.disabled = true;
+      sendBtn.textContent = "Thinking...";
 
-  function clearStatusSoon(ms) {
-    window.setTimeout(() => setStatus("", false), ms || 1800);
-  }
+      try {
+        const res = await fetch(`${API_BASE}/api/chat`, {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({message})
+        });
 
-  function isVisible(el) {
-    if (!el) return false;
-    const rect = el.getBoundingClientRect();
-    const style = window.getComputedStyle(el);
-    return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
-  }
+        const data = await res.json();
+        const text = data.reply || data.response || data.message || data.error || "No response.";
+        const meta = data.gv ? `Gv ${data.gv} • ${data.state || "UNKNOWN"} • ${data.decision || ""}` : "";
 
-  function findInput() {
-    const selectors = [
-      '#message-input',
-      '#user-input',
-      '#chat-input',
-      'textarea[placeholder*="message" i]',
-      'textarea[placeholder*="ask" i]',
-      'textarea[placeholder*="chat" i]',
-      'textarea',
-      'input[type="text"][placeholder*="message" i]',
-      'input[type="text"][placeholder*="ask" i]',
-      'input[type="text"]',
-      'input:not([type])'
-    ];
-
-    for (const sel of selectors) {
-      const nodes = document.querySelectorAll(sel);
-      for (const el of nodes) {
-        if (isVisible(el) && !el.disabled && !el.readOnly) return el;
+        addBubble("gv", text, meta);
+        speak(text);
+      } catch (err) {
+        addBubble("gv", "Backend connection failed. Railway may be asleep or redeploying.");
+      } finally {
+        sendBtn.disabled = false;
+        sendBtn.textContent = "Send";
+        prompt.focus();
       }
     }
 
-    return null;
-  }
-
-  function setInputValue(el, value) {
-    if (!el) return false;
-
-    el.focus();
-
-    const prior = typeof el.value === "string" ? el.value : "";
-    const next = prior.trim() ? (prior.trimEnd() + " " + value) : value;
-
-    const proto = Object.getPrototypeOf(el);
-    const desc = Object.getOwnPropertyDescriptor(proto, "value");
-    if (desc && desc.set) {
-      desc.set.call(el, next);
-    } else {
-      el.value = next;
-    }
-
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-    el.dispatchEvent(new Event("change", { bubbles: true }));
-    return true;
-  }
-
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-  if (!SpeechRecognition) {
-    talkBtn.addEventListener("click", function () {
-      setStatus("Voice input is not supported in this browser.");
-      clearStatusSoon(2500);
+    sendBtn.addEventListener("click", sendMessage);
+    prompt.addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
     });
-    return;
-  }
 
-  const recognition = new SpeechRecognition();
-  recognition.lang = "en-US";
-  recognition.interimResults = true;
-  recognition.continuous = false;
-  recognition.maxAlternatives = 1;
-
-  let listening = false;
-  let finalTranscript = "";
-  let heardAnything = false;
-
-  function startListening() {
-    finalTranscript = "";
-    heardAnything = false;
-    try {
-      recognition.start();
-    } catch (err) {
-      setStatus("Mic is already starting. Try again.");
-      clearStatusSoon(1800);
-    }
-  }
-
-  function stopListening() {
-    try { recognition.stop(); } catch (err) {}
-  }
-
-  talkBtn.addEventListener("click", function () {
-    if (listening) {
-      stopListening();
-      return;
-    }
-    startListening();
-  });
-
-  recognition.onstart = function () {
-    listening = true;
-    talkBtn.classList.add("listening");
-    talkBtn.textContent = "🎙️ Listening";
-    setStatus("Listening… tap again to stop.");
-  };
-
-  recognition.onresult = function (event) {
-    let interim = "";
-
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const chunk = event.results[i][0].transcript || "";
-      if (chunk.trim()) heardAnything = true;
-
-      if (event.results[i].isFinal) {
-        finalTranscript += chunk + " ";
-      } else {
-        interim += chunk;
-      }
-    }
-
-    if (interim.trim()) {
-      setStatus("Hearing: " + interim.trim());
-    } else {
-      setStatus("Listening…");
-    }
-  };
-
-  recognition.onerror = function (event) {
-    listening = false;
-    talkBtn.classList.remove("listening");
-    talkBtn.textContent = "🎤 Talk";
-
-    const messages = {
-      "not-allowed": "Microphone permission blocked.",
-      "service-not-allowed": "Microphone service blocked.",
-      "no-speech": "No speech heard.",
-      "audio-capture": "No microphone detected.",
-      "network": "Speech service network issue.",
-      "aborted": "Voice input stopped."
-    };
-
-    setStatus(messages[event.error] || ("Voice error: " + event.error));
-    clearStatusSoon(2500);
-  };
-
-  recognition.onend = function () {
-    const transcript = finalTranscript.trim();
-
-    listening = false;
-    talkBtn.classList.remove("listening");
-    talkBtn.textContent = "🎤 Talk";
-
-    if (transcript) {
-      const input = findInput();
-      if (input) {
-        setInputValue(input, transcript);
-        setStatus("Transcript added to message box.");
-      } else {
-        setStatus("Could not find the chat input.");
-      }
-      clearStatusSoon(1800);
-      return;
-    }
-
-    if (heardAnything) {
-      setStatus("No final transcript captured.");
-    } else {
-      setStatus("No speech captured.");
-    }
-    clearStatusSoon(1800);
-  };
-})();
-</script>
-
-
-<script id="gv-state-layer">
-window.GV_STATE = {
-  user: {
-    name: "Will",
-    handle: "PapaShack",
-    role: "builder",
-    relationship: "primary developer of GvAI"
-  },
-  context: {
-    project: "GvAI",
-    focus: "building survivability-aware AI system",
-    tone: "direct practical",
-    priorities: [
-      "identity continuity",
-      "repo x-ray intelligence",
-      "voice interaction",
-      "survivability-first UX"
-    ]
-  }
-};
-
-async function gvLoadState() {
-  try {
-    const r = await fetch("/api/state");
-    if (!r.ok) return;
-    const data = await r.json();
-    if (data && typeof data === "object") window.GV_STATE = data;
-  } catch (e) {}
-}
-
-async function gvSaveState() {
-  try {
-    await fetch("/api/state", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ state: window.GV_STATE })
+    clearBtn.addEventListener("click", () => {
+      chat.innerHTML = `<div class="bubble gv"><span>GvAI</span><p>I’m here. What do you want to work on today?</p></div>`;
     });
-  } catch (e) {}
-}
 
-gvLoadState();
-</script>
-
-
-<script>
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js").catch(console.warn);
-  });
-}
-</script>
-
-
-
-<script src="./dashboard.js?v=voice2"></script>
-
-
-
-
-
-<script id="gvai-voice-system">
-(function () {
-  const API_BASE = "https://web-production-8e937.up.railway.app";
-
-  function findPrompt() {
-    return document.querySelector("#prompt") || document.querySelector("textarea");
-  }
-
-  function findSendButton() {
-    return Array.from(document.querySelectorAll("button"))
-      .find(b => (b.textContent || "").trim().toLowerCase() === "send");
-  }
-
-  function addVoiceButton() {
-    const input = findPrompt();
-    const sendBtn = findSendButton();
-    if (!input || !sendBtn || document.querySelector("#voiceBtn")) return;
-
-    const btn = document.createElement("button");
-    btn.id = "voiceBtn";
-    btn.type = "button";
-    btn.textContent = "🎙️";
-    btn.title = "Talk to GvAI";
-    btn.style.marginRight = "10px";
-    btn.style.minWidth = "56px";
-    btn.style.minHeight = "56px";
-    btn.style.borderRadius = "16px";
-    btn.style.border = "1px solid rgba(255,255,255,.2)";
-    btn.style.background = "rgba(255,255,255,.08)";
-    btn.style.color = "white";
-    btn.style.fontSize = "22px";
-    btn.style.cursor = "pointer";
-
-    sendBtn.parentNode.insertBefore(btn, sendBtn);
-
+    // Voice input
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
-      btn.disabled = true;
-      btn.title = "Voice input not supported in this browser";
-      return;
-    }
+      voiceBtn.disabled = true;
+      voiceBtn.title = "Voice input not supported in this browser";
+    } else {
+      const rec = new SR();
+      rec.lang = "en-US";
+      rec.interimResults = true;
+      rec.continuous = false;
+      let finalText = "";
 
-    const rec = new SR();
-    rec.lang = "en-US";
-    rec.interimResults = true;
-    rec.continuous = false;
+      voiceBtn.addEventListener("click", () => {
+        finalText = "";
+        voiceBtn.textContent = "🛑";
+        try { rec.start(); } catch { voiceBtn.textContent = "🎙️"; }
+      });
 
-    let finalText = "";
-
-    btn.onclick = function () {
-      finalText = "";
-      btn.textContent = "🛑";
-      try { rec.start(); } catch (e) { btn.textContent = "🎙️"; }
-    };
-
-    rec.onresult = function (event) {
-      let interim = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const t = event.results[i][0].transcript;
-        if (event.results[i].isFinal) finalText += t;
-        else interim += t;
-      }
-
-      input.value = (finalText + interim).trim();
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-      input.focus();
-    };
-
-    rec.onend = function () {
-      btn.textContent = "🎙️";
-    };
-  }
-
-  function speak(text) {
-    if (!("speechSynthesis" in window) || !text) return;
-    window.speechSynthesis.cancel();
-
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.rate = 0.95;
-    utter.pitch = 1.0;
-    utter.volume = 1.0;
-    window.speechSynthesis.speak(utter);
-  }
-
-  // Speak GvAI replies after Send button is clicked.
-  function hookSendForSpeech() {
-    const sendBtn = findSendButton();
-    if (!sendBtn || sendBtn.dataset.voiceHooked === "1") return;
-    sendBtn.dataset.voiceHooked = "1";
-
-    sendBtn.addEventListener("click", function () {
-      setTimeout(() => {
-        const bubbles = Array.from(document.querySelectorAll("*"))
-          .filter(el => {
-            const txt = (el.innerText || "").trim();
-            return txt && txt.length > 10 && txt.length < 1500 && /GvAI|Hey|What|I('|’)m|Hello/i.test(txt);
-          });
-
-        const last = bubbles[bubbles.length - 1];
-        if (last) {
-          const clean = last.innerText
-            .replace(/^GvAI\s*/i, "")
-            .replace(/^You\s*/i, "")
-            .trim();
-          speak(clean);
+      rec.onresult = event => {
+        let interim = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const t = event.results[i][0].transcript;
+          if (event.results[i].isFinal) finalText += t;
+          else interim += t;
         }
-      }, 1800);
-    });
-  }
+        prompt.value = (finalText + interim).trim();
+        prompt.focus();
+      };
 
-  addVoiceButton();
-  hookSendForSpeech();
-  setInterval(() => {
-    addVoiceButton();
-    hookSendForSpeech();
-  }, 1000);
-})();
-</script>
-
-<script src="./gvai-voice.js?v=force1"></script>
+      rec.onend = () => {
+        voiceBtn.textContent = "🎙️";
+      };
+    }
+  </script>
 </body>
 </html>
