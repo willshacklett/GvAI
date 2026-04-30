@@ -336,6 +336,7 @@
       }
     }
   </style>
+<script src="/api_config.js?v=railway2"></script>
 </head>
 <body>
   <header class="header">
@@ -349,7 +350,7 @@
 
     <div class="top-links">
       <a href="dashboard/">Dashboard</a>
-      <a href="https://api.gvai.io/api/chat" target="_blank" rel="noopener noreferrer">API</a>
+      <a href="https://web-production-8e937.up.railway.app/api/chat" target="_blank" rel="noopener noreferrer">API</a>
       <button id="clearBtn" type="button">Clear chat</button>
     </div>
   </header>
@@ -375,7 +376,7 @@
   </main>
 
   <script>
-    const API_URL = "https://api.gvai.io/api/chat";
+    const API_URL = "https://web-production-8e937.up.railway.app/api/chat";
     const STORAGE_KEY = "gvai_chat_memory_v1";
     const messagesEl = document.getElementById("messages");
     const promptEl = document.getElementById("prompt");
