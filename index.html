@@ -335,7 +335,23 @@
         width: calc(100% - 12px);
       }
     }
-  </style>
+  
+#micBtn {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  border: 1px solid rgba(120,160,255,.45);
+  background: #13264a;
+  color: white;
+  font-size: 22px;
+  cursor: pointer;
+  margin-left: 10px;
+}
+#micBtn.listening {
+  background: #315edc;
+  box-shadow: 0 0 18px rgba(99,140,255,.9);
+}
+</style>
 <script src="/api_config.js?v=railway2"></script>
 </head>
 <body>
@@ -367,8 +383,9 @@
       <div class="composer-wrap">
         <div class="composer">
           <textarea id="prompt" placeholder="Message GvAI..."></textarea>
-<button onclick="startMic()" style="margin-left:8px;">🎤</button>
-          <button id="sendBtn" class="send" type="button">Send</button>
+
+          <button id="micBtn" type="button" onclick="startMic()" title="Voice input">🎤</button>
+<button id="sendBtn" class="send" type="button">Send</button>
         </div>
       </div>
     </section>
@@ -604,5 +621,52 @@ function startVoice() {
 </script>
 
 <!-- pages-force-deploy-mic-v1 -->
+
+<script>
+function startMic() {
+  const micBtn = document.getElementById("micBtn");
+  const input =
+    document.getElementById("msg") ||
+    document.querySelector("textarea") ||
+    document.querySelector("input");
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    alert("Voice input is not supported in this browser. Try Chrome desktop.");
+    return;
+  }
+
+  const recog = new SpeechRecognition();
+  recog.lang = "en-US";
+  recog.interimResults = false;
+  recog.maxAlternatives = 1;
+
+  micBtn?.classList.add("listening");
+
+  recog.onresult = function(event) {
+    const transcript = event.results[0][0].transcript;
+    if (input) input.value = transcript;
+
+    if (typeof send === "function") {
+      send();
+    } else {
+      document.getElementById("sendBtn")?.click();
+    }
+  };
+
+  recog.onerror = function(event) {
+    console.error("Mic error:", event.error);
+    alert("Mic error: " + event.error);
+  };
+
+  recog.onend = function() {
+    micBtn?.classList.remove("listening");
+  };
+
+  recog.start();
+}
+</script>
+
 </body>
 </html>
