@@ -573,5 +573,34 @@
 
     renderFromMemory();
   </script>
+
+<script>
+function startVoice() {
+  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+    alert("Voice not supported in this browser");
+    return;
+  }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new SpeechRecognition();
+
+  recognition.lang = "en-US";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  recognition.start();
+
+  recognition.onresult = function(event) {
+    const transcript = event.results[0][0].transcript;
+    document.getElementById("msg").value = transcript;
+    send();
+  };
+
+  recognition.onerror = function(event) {
+    console.error("Voice error:", event.error);
+  };
+}
+</script>
+
 </body>
 </html>
