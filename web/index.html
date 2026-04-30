@@ -1,68 +1,44 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html>
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>GvAI</title>
-  <link rel="stylesheet" href="./style.css?v=stablevoice2" />
+  <style>
+    body { background:#0b1220; color:white; font-family:sans-serif; padding:20px; }
+    input { width:300px; padding:8px; }
+    button { padding:8px; }
+    .sources { margin-top:10px; font-size:12px; opacity:0.7; }
+  </style>
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand"><div class="logo">Gv</div><div><h1>GvAI</h1><p>Chat-native survivability intelligence</p></div></div>
-    <nav><a href="./dashboard/">Dashboard</a><a href="https://web-production-8e937.up.railway.app/api/health" target="_blank">API</a><button id="clearBtn">Clear chat</button></nav>
-  </header>
 
-  <main class="shell">
-    <section class="hero"><h2>Talk to GvAI</h2><p>Ask a question, test an idea, or push directly on the God Variable work.</p></section>
-    <section id="chat" class="chat"><div class="bubble gv"><span>GvAI</span><p>I’m here. What do you want to work on today?</p></div></section>
-    <section class="composer">
-      <textarea id="prompt" placeholder="Message GvAI..."></textarea>
-      <button id="voiceBtn" title="Talk to GvAI">🎙️</button>
-      <button id="sendBtn">Send</button>
-    </section>
-  </main>
+<h2>GvAI (Local)</h2>
+
+<input id="msg" placeholder="Ask GvAI..." />
+<button onclick="send()">Send</button>
+
+<div id="answer" style="margin-top:20px;"></div>
+<div id="sources" class="sources"></div>
 
 <script>
-const API_BASE = "https://web-production-8e937.up.railway.app";
-const chat = document.getElementById("chat");
-const promptBox = document.getElementById("prompt");
-const sendBtn = document.getElementById("sendBtn");
-const clearBtn = document.getElementById("clearBtn");
-const voiceBtn = document.getElementById("voiceBtn");
+async function send() {
+  const msg = document.getElementById("msg").value;
 
-function esc(s){return String(s||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]));}
-function bubble(role,text,meta=""){const d=document.createElement("div");d.className="bubble "+role;d.innerHTML=`<span>${role==="you"?"You":"GvAI"}</span><p>${esc(text)}</p>${meta?`<small>${esc(meta)}</small>`:""}`;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;}
-function speak(text){if(!("speechSynthesis" in window)||!text)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.rate=.95;u.pitch=1;u.volume=1;speechSynthesis.speak(u);}
+  const res = await fetch("/api/chat", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({message: msg})
+  });
 
-async function send(){
-  const message = promptBox.value.trim();
-  if(!message)return;
-  promptBox.value="";
-  bubble("you",message);
-  sendBtn.disabled=true; sendBtn.textContent="Thinking...";
-  try{
-    const r=await fetch(`${API_BASE}/api/chat`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message})});
-    const data=await r.json();
-    const text=data.reply||data.response||data.error||"No response.";
-    const meta=data.gv?`Gv ${data.gv} • ${data.state||""} • ${data.decision||""}`:"";
-    bubble("gv",text,meta);
-    speak(text);
-  }catch(e){ bubble("gv","API request failed. Backend may be redeploying."); }
-  finally{sendBtn.disabled=false;sendBtn.textContent="Send";promptBox.focus();}
-}
-sendBtn.onclick=send;
-promptBox.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}});
-clearBtn.onclick=()=>{chat.innerHTML='<div class="bubble gv"><span>GvAI</span><p>I’m here. What do you want to work on today?</p></div>';};
+  const data = await res.json();
 
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-if(!SR){voiceBtn.disabled=true;voiceBtn.title="Voice input not supported in this browser";}
-else{
-  const rec=new SR(); rec.lang="en-US"; rec.interimResults=true; rec.continuous=false;
-  let finalText="";
-  voiceBtn.onclick=()=>{finalText="";voiceBtn.textContent="🛑";try{rec.start();}catch{voiceBtn.textContent="🎙️";}};
-  rec.onresult=e=>{let interim="";for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)finalText+=t;else interim+=t;}promptBox.value=(finalText+interim).trim();promptBox.focus();};
-  rec.onend=()=>{voiceBtn.textContent="🎙️";};
+  document.getElementById("answer").innerText = data.response;
+
+  document.getElementById("sources").innerText =
+    "Sources: " + (data.sources || [])
+      .map(s => s.source + "#" + s.chunk_id)
+      .join(", ");
 }
 </script>
+
 </body>
 </html>
