@@ -336,22 +336,36 @@
       }
     }
   
-#micBtn {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
-  border: 1px solid rgba(120,160,255,.45);
-  background: #13264a;
-  color: white;
-  font-size: 22px;
-  cursor: pointer;
-  margin-left: 10px;
-}
+
 #micBtn.listening {
   background: #315edc;
   box-shadow: 0 0 18px rgba(99,140,255,.9);
 }
+
+#micBtn {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  border: 1px solid rgba(120,160,255,.5);
+  background: linear-gradient(145deg, #142850, #1b3c7a);
+  color: white;
+  font-size: 26px;
+  cursor: pointer;
+  margin-left: 10px;
+  transition: all 0.2s ease;
+}
+
+#micBtn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 18px rgba(120,160,255,.6);
+}
+
+#micBtn.listening {
+  background: linear-gradient(145deg, #315edc, #6f9cff);
+  box-shadow: 0 0 28px rgba(99,140,255,1);
+}
 </style>
+
 <script src="/api_config.js?v=railway2"></script>
 </head>
 <body>
@@ -384,7 +398,7 @@
         <div class="composer">
           <textarea id="prompt" placeholder="Message GvAI..."></textarea>
 
-          <button id="micBtn" type="button" onclick="startMic()" title="Voice input">🎤</button>
+          <button id="micBtn" style="vertical-align:middle;" type="button" onclick="startMic()" title="Voice input">🎙️</button>
 <button id="sendBtn" class="send" type="button">Send</button>
         </div>
       </div>
