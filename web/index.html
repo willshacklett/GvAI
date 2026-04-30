@@ -8,6 +8,7 @@
     button { padding:8px; }
     .sources { margin-top:10px; font-size:12px; opacity:0.7; }
   </style>
+  <script src="/api_config.js"></script>
 </head>
 <body>
 
@@ -23,7 +24,7 @@
 async function send() {
   const msg = document.getElementById("msg").value;
 
-  const res = await fetch("/api/chat", {
+  const res = await fetch((window.GVAI_API_BASE || "") + "/api/chat", {
     method: "POST",
     headers: {"Content-Type":"application/json"},
     body: JSON.stringify({message: msg})
