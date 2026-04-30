@@ -29,6 +29,7 @@ jobs:
           rm -rf _site
           mkdir -p _site
           cp index.html _site/index.html
+          if [ -f api_config.js ]; then cp api_config.js _site/api_config.js; fi
           if [ -d web ]; then cp -R web _site/web; fi
           if [ -d dashboard ]; then cp -R dashboard _site/dashboard; fi
 
