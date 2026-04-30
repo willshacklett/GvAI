@@ -11,5 +11,5 @@ window.GVAI_API_BASE = (() => {
   }
 
   // Production frontend
-  return "https://gvai-api.onrender.com";
+  return "https://web-production-8e937.up.railway.app";
 })();
