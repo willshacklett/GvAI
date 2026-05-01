@@ -1,8 +1,9 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from pathlib import Path
-from gvai.web_search import search_web
+
 from gvai.grounding import grounding_packet, search_knowledge, rebuild_index
+from gvai.web_search import search_web
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
 CORS(app)
@@ -11,21 +12,48 @@ CORS(app)
 def root():
     if Path("web/index.html").exists():
         return send_from_directory("web", "index.html")
-    return jsonify({"ok": True, "status": "GvAI running"})
+    return jsonify({"ok": True, "runtime": "railway", "service": "gvai-api"})
 
 @app.get("/api/health")
 def health():
-    return jsonify({"ok": True, "service": "gvai-api"})
+    return jsonify({"ok": True, "runtime": "railway", "service": "gvai-api"})
 
 @app.get("/api/grounding/search")
 def grounding_search():
     q = request.args.get("q", "")
     return jsonify({"ok": True, "query": q, "hits": search_knowledge(q)})
 
+@app.post("/api/grounding/rebuild")
+def grounding_rebuild():
+    return jsonify(rebuild_index())
+
+def needs_web(msg: str) -> bool:
+    m = (msg or "").lower()
+    return any(k in m for k in [
+        "weather", "today", "now", "current", "latest", "news",
+        "score", "stock", "price", "live", "this weekend"
+    ])
+
 @app.post("/api/chat")
 def chat():
     data = request.get_json(silent=True) or {}
     msg = data.get("message") or data.get("input") or ""
+    if not isinstance(msg, str):
+        msg = str(msg)
+
+    if needs_web(msg):
+        web = search_web(msg)
+        answer = f"🌐 I looked that up for you:\n{web.get('result', 'web search failed')}"
+        return jsonify({
+            "ok": True,
+            "reply": answer,
+            "response": answer,
+            "web": web,
+            "grounded": False,
+            "sources": [],
+            "input": msg
+        })
+
     gp = grounding_packet(msg)
 
     system = (
