@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from pathlib import Path
+from gvai.web_search import search_web
 from gvai.grounding import grounding_packet, search_knowledge, rebuild_index
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
