@@ -92,38 +92,27 @@ if __name__ == "__main__":
 
 
 def attach_gv_conscience(payload, user_message="", reply_text=""):
-    """
-    Attach and enforce GV conscience judgment on chat responses.
-    GV is final output control.
-    """
+    """Attach and enforce GV conscience judgment on chat responses."""
     if not isinstance(payload, dict):
         payload = {"reply": str(payload)}
 
     original_reply = reply_text or payload.get("reply", "")
-    action = f"User asked: {user_message}\nAI replied: {original_reply}"
+    action = "User asked: " + str(user_message) + "\nAI replied: " + str(original_reply)
     gv_judgment = evaluate_action(action)
 
     mode = gv_judgment.get("mode", "QUALIFY")
 
     if mode == "BLOCK":
-        safe_reply = "GV BLOCKED this response.
-
-Reason: The requested action increases drift, deception, or irreversible risk.
-
-Correct path: clarify objective, verify truth, preserve rollback, and choose a recoverable next step."
+        safe_reply = "GV BLOCKED this response. Reason: The requested action increases drift, deception, or irreversible risk. Correct path: clarify objective, verify truth, preserve rollback, and choose a recoverable next step."
         payload["reply"] = safe_reply
         payload["response"] = safe_reply
         payload["gv_enforced"] = True
         payload["gv_original_reply"] = original_reply
-
     elif mode == "QUALIFY":
-        qualified_reply = f"{original_reply}
-
-GV qualification: this answer is usable only with constraints. Verify assumptions, keep rollback available, monitor drift, and avoid irreversible action."
+        qualified_reply = str(original_reply) + "\n\nGV qualification: this answer is usable only with constraints. Verify assumptions, keep rollback available, monitor drift, and avoid irreversible action."
         payload["reply"] = qualified_reply
         payload["response"] = qualified_reply
         payload["gv_enforced"] = True
-
     else:
         payload["gv_enforced"] = False
 
