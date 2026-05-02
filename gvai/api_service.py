@@ -9,6 +9,7 @@ from gvai.conscience import evaluate_action
 from gvai.model_router import call_model, active_provider, available_providers
 from gvai.arbitrator import arbitrate_responses
 from gvai.gv_mode import gv_mode_prompt
+from gvai.adaptive_control import update_adaptive_control, get_adaptive_control_state
 
 app = Flask(__name__)
 
@@ -75,6 +76,11 @@ def build_gv_runtime_policy(user_message=""):
 
 
 
+
+
+@app.get("/api/gv-control")
+def api_gv_control():
+    return jsonify(get_adaptive_control_state())
 
 @app.post("/api/gv-mode")
 def api_gv_mode():
@@ -180,6 +186,7 @@ def attach_gv_conscience(payload, user_message="", reply_text=""):
     else:
         payload["gv_enforced"] = False
 
+    payload["gv_control"] = update_adaptive_control(gv_judgment)
     payload["gv"] = gv_judgment
     return payload
 
