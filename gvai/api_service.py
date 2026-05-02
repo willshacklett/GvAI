@@ -4,8 +4,11 @@ import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from openai import OpenAI
+from gvai.conscience_routes import register_conscience_routes
 
 app = Flask(__name__)
+
+register_conscience_routes(app)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))

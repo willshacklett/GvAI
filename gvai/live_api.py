@@ -5,8 +5,11 @@ from pathlib import Path
 from gvai.grounding import grounding_packet, search_knowledge, rebuild_index
 from gvai.web_search import search_web
 from gvai.conscience import evaluate_action, gv_conscience_statement
+from gvai.conscience_routes import register_conscience_routes
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
+
+register_conscience_routes(app)
 CORS(app)
 
 @app.get("/")
