@@ -74,21 +74,16 @@ Do not pretend stale knowledge is current."""
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-    gv = 0.86 if live else 0.91
-    state = "STABLE" if gv >= 0.85 else "DEGRADED"
-
-    return jsonify({
+    payload = {
         "ok": True,
         "reply": reply,
         "response": reply,
-        "gv": gv,
-        "state": state,
-        "decision": "ANSWER_WITH_LIVE_CONTEXT" if live else "ANSWER",
-        "drift_risk": "LOW" if gv >= 0.85 else "MEDIUM",
-        "irreversibility_risk": "LOW",
+        "live_sources": live,
         "live_search": live,
+        "decision": "ANSWER_WITH_LIVE_CONTEXT" if live else "ANSWER",
         "timestamp": time.time()
-    })
+    }
+    return jsonify(attach_gv_conscience(payload, message, reply))
 
 
 if __name__ == "__main__":
