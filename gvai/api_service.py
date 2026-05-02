@@ -41,6 +41,36 @@ def search_web(query: str):
 def health():
     return jsonify({"ok": True, "service": "gvai-api", "runtime": "railway"})
 
+def build_gv_runtime_policy(user_message=""):
+    """
+    Pre-generation GV policy.
+    This lets GV shape the model before it answers.
+    """
+    precheck = evaluate_action("User request: " + str(user_message))
+
+    mode = precheck.get("mode", "QUALIFY")
+
+    if mode == "BLOCK":
+        policy = (
+            "GV PRECHECK MODE: BLOCK. Do not provide harmful, deceptive, coercive, "
+            "or irreversible-risk instructions. Redirect to clarification, verification, "
+            "rollback, and recoverable next steps."
+        )
+    elif mode == "QUALIFY":
+        policy = (
+            "GV PRECHECK MODE: QUALIFY. Answer only with constraints. State assumptions, "
+            "avoid irreversible claims, preserve rollback, monitor drift, and prefer "
+            "recoverable next steps."
+        )
+    else:
+        policy = (
+            "GV PRECHECK MODE: ALLOW. Answer normally while preserving truth, continuity, "
+            "agency, stability, and recoverability."
+        )
+
+    return precheck, policy
+
+
 @app.post("/api/chat")
 def chat():
     data = request.get_json(silent=True) or {}
@@ -49,13 +79,17 @@ def chat():
     if not message:
         return jsonify({"ok": False, "error": "Missing message"}), 400
 
+    gv_precheck, gv_runtime_policy = build_gv_runtime_policy(message)
+
     live = search_web(message) if needs_live_search(message) else []
 
     system = """You are GvAI, a survivability-first AI built around the God Variable.
 Answer clearly, honestly, and practically.
 If live context is provided, use it. If context is incomplete, say so.
 Track stability, drift, recoverability, and irreversibility risk.
-Do not pretend stale knowledge is current."""
+Do not pretend stale knowledge is current.
+
+""" + gv_runtime_policy
 
     user_content = message
     if live:
@@ -81,6 +115,7 @@ Do not pretend stale knowledge is current."""
         "live_sources": live,
         "live_search": live,
         "decision": "ANSWER_WITH_LIVE_CONTEXT" if live else "ANSWER",
+        "gv_precheck": gv_precheck,
         "timestamp": time.time()
     }
     return jsonify(attach_gv_conscience(payload, message, reply))
