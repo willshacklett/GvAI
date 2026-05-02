@@ -100,8 +100,7 @@ def attach_gv_conscience(payload, user_message="", reply_text=""):
         payload = {"reply": str(payload)}
 
     original_reply = reply_text or payload.get("reply", "")
-    action = f"User asked: {user_message}
-AI replied: {original_reply}"
+    action = f"User asked: {user_message}\\nAI replied: {original_reply}"
     gv_judgment = evaluate_action(action)
 
     mode = gv_judgment.get("mode", "QUALIFY")
