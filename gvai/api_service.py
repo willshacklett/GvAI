@@ -8,6 +8,7 @@ from gvai.conscience_routes import register_conscience_routes
 from gvai.conscience import evaluate_action
 from gvai.model_router import call_model, active_provider, available_providers
 from gvai.arbitrator import arbitrate_responses
+from gvai.gv_mode import gv_mode_prompt
 
 app = Flask(__name__)
 
@@ -73,6 +74,13 @@ def build_gv_runtime_policy(user_message=""):
 
 
 
+
+
+@app.post("/api/gv-mode")
+def api_gv_mode():
+    data = request.get_json(silent=True) or {}
+    message = data.get("message", "")
+    return jsonify(gv_mode_prompt(message))
 
 @app.post("/api/arbitrate")
 def api_arbitrate():
