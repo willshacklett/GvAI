@@ -7,6 +7,7 @@ from openai import OpenAI
 from gvai.conscience_routes import register_conscience_routes
 from gvai.conscience import evaluate_action
 from gvai.model_router import call_model, active_provider, available_providers
+from gvai.arbitrator import arbitrate_responses
 
 app = Flask(__name__)
 
@@ -71,6 +72,21 @@ def build_gv_runtime_policy(user_message=""):
     return precheck, policy
 
 
+
+
+@app.post("/api/arbitrate")
+def api_arbitrate():
+    data = request.get_json(silent=True) or {}
+    message = data.get("message", "")
+    candidates = data.get("candidates", [])
+
+    if not candidates:
+        return jsonify({
+            "ok": False,
+            "error": "Missing candidates. Send candidates as a list of {provider, model, reply}."
+        }), 400
+
+    return jsonify(arbitrate_responses(message, candidates))
 
 @app.get("/api/providers")
 def api_providers():
