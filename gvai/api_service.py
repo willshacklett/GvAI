@@ -93,13 +93,49 @@ if __name__ == "__main__":
 
 def attach_gv_conscience(payload, user_message="", reply_text=""):
     """
-    Attach GV conscience judgment to any chat response.
-    This makes GV a runtime behavior layer, not just a standalone endpoint.
+    Attach and enforce GV conscience judgment on chat responses.
+    GV is final output control.
     """
     if not isinstance(payload, dict):
         payload = {"reply": str(payload)}
 
-    action = f"User asked: {user_message}\nAI replied: {reply_text or payload.get('reply', '')}"
-    payload["gv"] = evaluate_action(action)
+    original_reply = reply_text or payload.get("reply", "")
+    action = f"User asked: {user_message}
+AI replied: {original_reply}"
+    gv_judgment = evaluate_action(action)
+
+    mode = gv_judgment.get("mode", "QUALIFY")
+
+    if mode == "BLOCK":
+        safe_reply = (
+            "GV BLOCKED this response.
+
+"
+            "Reason: The requested action increases drift, deception, or irreversible risk.
+
+"
+            "Correct path: clarify objective, verify truth, preserve rollback, and choose a recoverable next step."
+        )
+        payload["reply"] = safe_reply
+        payload["response"] = safe_reply
+        payload["gv_enforced"] = True
+        payload["gv_original_reply"] = original_reply
+
+    elif mode == "QUALIFY":
+        qualified_reply = (
+            f"{original_reply}
+
+"
+            "GV qualification: this answer is usable only with constraints. "
+            "Verify assumptions, keep rollback available, monitor drift, and avoid irreversible action."
+        )
+        payload["reply"] = qualified_reply
+        payload["response"] = qualified_reply
+        payload["gv_enforced"] = True
+
+    else:
+        payload["gv_enforced"] = False
+
+    payload["gv"] = gv_judgment
     return payload
 
