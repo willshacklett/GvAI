@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from openai import OpenAI
 from gvai.conscience_routes import register_conscience_routes
+from gvai.conscience import evaluate_action
 
 app = Flask(__name__)
 
@@ -93,3 +94,17 @@ Do not pretend stale knowledge is current."""
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8000"))
     app.run(host="0.0.0.0", port=port)
+
+
+def attach_gv_conscience(payload, user_message="", reply_text=""):
+    """
+    Attach GV conscience judgment to any chat response.
+    This makes GV a runtime behavior layer, not just a standalone endpoint.
+    """
+    if not isinstance(payload, dict):
+        payload = {"reply": str(payload)}
+
+    action = f"User asked: {user_message}\nAI replied: {reply_text or payload.get('reply', '')}"
+    payload["gv"] = evaluate_action(action)
+    return payload
+
