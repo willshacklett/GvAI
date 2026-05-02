@@ -4,6 +4,7 @@ from pathlib import Path
 
 from gvai.grounding import grounding_packet, search_knowledge, rebuild_index
 from gvai.web_search import search_web
+from gvai.conscience import evaluate_action, gv_conscience_statement
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
 CORS(app)
@@ -85,6 +86,21 @@ def chat():
         "sources": gp["sources"],
         "input": msg
     })
+
+
+
+# --- GV CONSCIENCE ROUTES ---
+@app.route("/api/conscience", methods=["GET"])
+def api_conscience_statement():
+    return jsonify(gv_conscience_statement())
+
+@app.route("/api/conscience/evaluate", methods=["POST"])
+def api_conscience_evaluate():
+    payload = request.get_json(silent=True) or {}
+    action = payload.get("action", "")
+    context = payload.get("context", "")
+    return jsonify(evaluate_action(action, context))
+# --- END GV CONSCIENCE ROUTES ---
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
