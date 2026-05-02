@@ -6,13 +6,13 @@ from flask_cors import CORS
 from openai import OpenAI
 from gvai.conscience_routes import register_conscience_routes
 from gvai.conscience import evaluate_action
+from gvai.model_router import call_model, active_provider, available_providers
 
 app = Flask(__name__)
 
 register_conscience_routes(app)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 def needs_live_search(message: str) -> bool:
     m = (message or "").lower()
@@ -71,6 +71,15 @@ def build_gv_runtime_policy(user_message=""):
     return precheck, policy
 
 
+
+@app.get("/api/providers")
+def api_providers():
+    return jsonify({
+        "active_provider": active_provider(),
+        "available_providers": available_providers(),
+        "note": "GV governs behavior; model providers supply raw generation."
+    })
+
 @app.post("/api/chat")
 def chat():
     data = request.get_json(silent=True) or {}
@@ -96,15 +105,8 @@ Do not pretend stale knowledge is current.
         user_content += "\n\nLIVE_WEB_CONTEXT:\n" + "\n".join(f"- {x}" for x in live)
 
     try:
-        completion = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user_content},
-            ],
-            temperature=0.35,
-        )
-        reply = completion.choices[0].message.content
+        model_result = call_model(system, user_content)
+        reply = model_result.get("reply", "")
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
@@ -115,6 +117,9 @@ Do not pretend stale knowledge is current.
         "live_sources": live,
         "live_search": live,
         "decision": "ANSWER_WITH_LIVE_CONTEXT" if live else "ANSWER",
+        "model_provider": model_result.get("provider"),
+        "model_name": model_result.get("model"),
+        "available_providers": available_providers(),
         "gv_precheck": gv_precheck,
         "timestamp": time.time()
     }
