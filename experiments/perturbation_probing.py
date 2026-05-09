@@ -78,8 +78,8 @@ def measure_recovery_after_perturbation(seed, probe_idx, pre_series):
         t = min(probe_idx + step, N - 1)
         rho, noise_scale, drift = ar_params(t)
 
-        # Use reduced noise during recovery probe so recovery can be measured.
-        x = rho * x + rng.normal(0, noise_scale * 0.25) + drift
+        # Deterministic recovery trajectory (minimal noise contamination).
+        x = rho * x + rng.normal(0, noise_scale * 0.02) + drift
 
         deviation = abs(x - attractor)
         deviations.append(deviation)
@@ -158,6 +158,16 @@ def main():
     overall_va_rho = spearman_manual(all_va, all_recovery)
     overall_ac_rho = spearman_manual(all_ac, all_recovery)
 
+
+    # Monotonicity sanity check:
+    # Does recovery generally worsen later in degradation?
+    probe_times = [r["probe_index"] for r in rows]
+
+    overall_probe_vs_recovery = spearman_manual(
+        probe_times,
+        all_recovery
+    )
+
     valid_seed_rhos = [
         r["spearman_mean_risk_vs_recovery"]
         for r in per_seed_stats
@@ -170,6 +180,7 @@ def main():
         "overall_spearman_mean_risk_vs_true_recovery": overall_mean_rho,
         "overall_spearman_va_risk_vs_true_recovery": overall_va_rho,
         "overall_spearman_ac_risk_vs_true_recovery": overall_ac_rho,
+        "overall_probe_index_vs_true_recovery": overall_probe_vs_recovery,
         "median_seed_spearman_mean_risk": float(np.median(valid_seed_rhos)) if valid_seed_rhos else None,
         "mean_seed_spearman_mean_risk": float(np.mean(valid_seed_rhos)) if valid_seed_rhos else None,
     }
