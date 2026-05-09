@@ -86,10 +86,20 @@ def compute_gv_risk_window(x):
     max_risk = float(np.max(list(risks.values())))
     hybrid_risk = float(0.5 * mean_risk + 0.5 * max_risk)
 
+    # Experimental recoverability core:
+    # AC is weighted highest because perturbation sanity testing showed
+    # ac_risk tracks measured recovery more directly than VA in clean AR.
+    recovery_core_risk = float(
+        0.60 * risks["ac_risk"]
+        + 0.25 * risks["rl_risk"]
+        + 0.15 * risks["pr_risk"]
+    )
+
     result["risks"] = risks
     result["mean_risk"] = mean_risk
     result["max_risk"] = max_risk
     result["hybrid_risk"] = hybrid_risk
+    result["recovery_core_risk"] = recovery_core_risk
 
     result["gv_alerts"] = {
         "mean_risk_alert": bool(mean_risk >= 0.45),
