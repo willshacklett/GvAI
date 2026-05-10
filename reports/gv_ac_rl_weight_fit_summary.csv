@@ -1,0 +1,8 @@
+metric,spearman_vs_true_recovery
+ac_risk,0.8428594497803903
+rl_risk,0.8428594497803903
+ac_rl_equal,0.8428594497803903
+ac_rl_fitted,0.8428594497803903
+mean_risk,0.7078800045000071
+fitted_weight_ac,0.1608119887212104
+fitted_weight_rl,0.8391880112787896
