@@ -95,20 +95,29 @@ def compute_gv_risk_window(x):
         + 0.15 * risks["pr_risk"]
     )
 
+    # Experimental primary recoverability core.
+    # OOD testing favored the AC/RL core over mean_risk:
+    # ac_rl_core @ 0.40: detect=0.91, median_lead=73, max_null_fp=0.07
+    ac_rl_core = float(0.5 * risks["ac_risk"] + 0.5 * risks["rl_risk"])
+
     result["risks"] = risks
     result["mean_risk"] = mean_risk
     result["max_risk"] = max_risk
     result["hybrid_risk"] = hybrid_risk
     result["recovery_core_risk"] = recovery_core_risk
+    result["ac_rl_core"] = ac_rl_core
 
     result["gv_alerts"] = {
-        "mean_risk_alert": bool(mean_risk >= 0.45),
+        "ac_rl_core_alert": bool(ac_rl_core >= 0.40),
+        "mean_risk_alert_legacy": bool(mean_risk >= 0.45),
         "hybrid_risk_alert_experimental": bool(hybrid_risk >= 0.70),
-        "recommended_alert": bool(mean_risk >= 0.45),
+        "recommended_alert": bool(ac_rl_core >= 0.40),
     }
 
     if result["gv_alerts"]["recommended_alert"]:
         result["gv_status"] = "DEGRADED_RECOVERABILITY"
+    elif result["gv_alerts"]["mean_risk_alert_legacy"]:
+        result["gv_status"] = "LEGACY_COMPOSITE_WARNING"
     elif result["gv_alerts"]["hybrid_risk_alert_experimental"]:
         result["gv_status"] = "EXPERIMENTAL_WARNING"
     else:
