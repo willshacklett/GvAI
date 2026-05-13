@@ -19,6 +19,7 @@ RETURN_TOLERANCE = 0.75
 # - recovery success
 # - recovery speed
 # - recovery slowing trend
+# - early-warning slope
 # - drift away from baseline
 #
 # This is not final truth.
@@ -71,12 +72,17 @@ def rho_total(signal, trial_index, trial_times, recovery_times):
     recent = recovery_times[max(0, trial_index - 4):trial_index + 1]
     slowing = clamp01(trend_slope(recent) / RECOVERY_WINDOW)
 
+    # Early-warning slope:
+    # if recovery time is increasing, rho_total should fall BEFORE total failure.
+    early_warning_penalty = clamp01(trend_slope(recent) / 12.0)
+
     drift = clamp01(abs(signal[t] - BASELINE) / 10.0)
 
     recoverability_density = (
-        0.40 * success +
-        0.30 * speed +
-        0.20 * (1.0 - slowing) +
+        0.35 * success +
+        0.25 * speed +
+        0.15 * (1.0 - slowing) +
+        0.15 * (1.0 - early_warning_penalty) +
         0.10 * (1.0 - drift)
     )
 

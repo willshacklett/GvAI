@@ -77,3 +77,21 @@ Operationally:
 The goal is not to protect the equation.
 
 The goal is to make the equation executable so it can be broken.
+
+---
+
+# Fourth Test Direction
+
+The equation-base harness fixed false positives but still warned too late.
+
+New addition:
+
+`rho_total` now includes an early-warning slope term.
+
+Meaning:
+
+- if recovery still succeeds but takes longer over time, GV should drop earlier
+- full recovery failure is no longer required before warning
+- slowing recovery is treated as loss of recoverability density
+
+This directly tests whether critical slowing down belongs inside the GV equation.
