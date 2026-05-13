@@ -225,3 +225,22 @@ This creates a hybrid warning model:
 `GV threshold OR recovery-doubling`
 
 The goal is to improve sensitivity to critical slowing without introducing false positives.
+
+---
+
+# Eleventh Test Direction
+
+The previous hybrid rule became too sensitive:
+
+- critical slowing: 100/100 detected
+- noisy recoverable: 98/100 false positives
+
+New correction:
+
+Recovery doubling now requires persistence.
+
+New rule:
+
+Warn only if recovery time doubles in at least 2 of the last 3 trials.
+
+This tests whether persistent degradation separates true recoverability loss from temporary noise.

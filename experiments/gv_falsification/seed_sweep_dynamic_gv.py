@@ -25,6 +25,15 @@ def first_warning(gv, threshold):
 
 
 def doubled_recovery_warning(recovery_times):
+    """
+    Persistence rule:
+
+    Do not warn on one temporary slowdown.
+
+    Warn only if recovery time doubles in
+    2 out of the last 3 trials.
+    """
+
     valid = [r for r in recovery_times if r is not None]
 
     if len(valid) < 6:
@@ -32,11 +41,21 @@ def doubled_recovery_warning(recovery_times):
 
     baseline = float(np.median(valid[:5]))
 
+    doubled_flags = []
+
     for idx, rt in enumerate(recovery_times):
         if rt is None:
+            doubled_flags.append(True)
             continue
 
-        if rt >= baseline * 2.0:
+        doubled_flags.append(rt >= baseline * 2.0)
+
+        if idx < 2:
+            continue
+
+        recent = doubled_flags[idx - 2:idx + 1]
+
+        if sum(recent) >= 2:
             return idx
 
     return None
