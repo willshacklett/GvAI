@@ -111,3 +111,17 @@ This tests the key claim:
 GV should detect loss of recoverability before visible collapse.
 
 If GV cannot warn on this scenario, the current equation is missing the central mechanism.
+
+---
+
+# Test Design Finding
+
+The critical slowing scenario exposed a harness flaw.
+
+Disturbances were injected after the signal was already simulated.
+
+That means the system was not dynamically recovering from stress. It was only showing one-point spikes.
+
+Next correction:
+
+Disturbances must be injected during the system update loop so recovery force actually controls the return to baseline.
