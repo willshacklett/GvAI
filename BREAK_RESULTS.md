@@ -37,3 +37,18 @@ A stronger GV test must separate:
 Replace simple volatility scoring with a recovery-trial model:
 
 Inject controlled disturbances and measure whether the system returns to baseline within a fixed window.
+
+---
+
+# Second Test Direction
+
+The next version stops treating volatility as failure.
+
+It tests recoverability directly:
+
+- inject controlled disturbance
+- measure return to baseline
+- score recent recovery success rate
+- drop GV only when recovery repeatedly fails
+
+This separates noise from true loss of recoverability.
