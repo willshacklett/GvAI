@@ -95,3 +95,19 @@ Meaning:
 - slowing recovery is treated as loss of recoverability density
 
 This directly tests whether critical slowing down belongs inside the GV equation.
+
+---
+
+# Fifth Test Direction
+
+This adds the core scientific GV test:
+
+`critical_slowing_before_collapse`
+
+The visible signal remains near baseline before collapse, but the recovery force weakens over time.
+
+This tests the key claim:
+
+GV should detect loss of recoverability before visible collapse.
+
+If GV cannot warn on this scenario, the current equation is missing the central mechanism.

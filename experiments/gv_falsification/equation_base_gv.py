@@ -179,11 +179,55 @@ def scenario_progressive_recovery_loss():
     return x, True
 
 
+def scenario_critical_slowing_before_collapse():
+    """
+    Core GV scientific test.
+
+    The visible signal stays near baseline before COLLAPSE_AT,
+    but the system's recovery force weakens earlier.
+
+    This creates critical slowing down:
+    - same disturbance size
+    - progressively weaker pull back to baseline
+    - recovery takes longer before collapse is obvious
+
+    If GV is real as recoverability loss, it should warn before COLLAPSE_AT here.
+    """
+    rng = np.random.default_rng(SEED)
+    x = np.ones(STEPS) * BASELINE
+
+    recovery_force = 0.45
+
+    for t in range(1, STEPS):
+        noise = rng.normal(0, 0.10)
+
+        if 350 < t < COLLAPSE_AT:
+            # recovery force gradually weakens before visible collapse
+            weakening = (t - 350) / (COLLAPSE_AT - 350)
+            recovery_force = 0.45 * (1.0 - 0.85 * weakening)
+
+        if t >= COLLAPSE_AT:
+            # after collapse, drift overwhelms recovery
+            recovery_force = 0.02
+            external_drift = 0.06 * (t - COLLAPSE_AT)
+        else:
+            external_drift = 0.0
+
+        pull_to_baseline = recovery_force * (BASELINE - x[t - 1])
+        x[t] = x[t - 1] + pull_to_baseline + external_drift + noise
+
+    for t in range(100, STEPS, TRIAL_EVERY):
+        inject_disturbance(x, t)
+
+    return x, True
+
+
 SCENARIOS = {
     "true_collapse": scenario_true_collapse,
     "stable_noise": scenario_stable_noise,
     "noisy_but_recoverable": scenario_noisy_but_recoverable,
     "progressive_recovery_loss": scenario_progressive_recovery_loss,
+    "critical_slowing_before_collapse": scenario_critical_slowing_before_collapse,
 }
 
 
