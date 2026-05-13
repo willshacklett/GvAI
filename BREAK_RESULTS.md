@@ -183,3 +183,26 @@ Output:
 `data/gv_falsification/dynamic_seed_sweep.csv`
 
 This moves GV from one terminal result toward repeatable evidence.
+
+---
+
+# Ninth Test Direction
+
+The seed sweep showed excellent quiet behavior but weak sensitivity:
+
+- stable/noisy recoverable cases stayed quiet
+- abrupt collapse stayed undetected, as expected
+- critical slowing was detected inconsistently
+
+New correction:
+
+`rho_total` now penalizes relative recovery-time increase.
+
+This means GV compares current recovery time against the system's own early recovery baseline.
+
+New terms:
+
+- relative recovery slowing
+- consecutive recovery degradation
+
+This tests whether GV can detect weakening recoverability before outright failure.

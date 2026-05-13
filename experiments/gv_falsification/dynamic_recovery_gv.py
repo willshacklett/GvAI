@@ -48,16 +48,42 @@ def rho_total(signal, trial_index, trials, recovery_times):
     success = 1.0 if rt is not None else 0.0
     speed = 0.0 if rt is None else 1.0 - clamp01(rt / RECOVERY_WINDOW)
 
-    recent = recovery_times[max(0, trial_index - 4):trial_index + 1]
-    slowing_penalty = clamp01(trend_slope(recent) / 10.0)
+    recent = recovery_times[max(0, trial_index - 5):trial_index + 1]
+    valid_recent = [v for v in recent if v is not None]
+
+    slowing_penalty = clamp01(trend_slope(recent) / 8.0)
+
+    # Relative recovery penalty:
+    # GV should drop when recovery is still succeeding but taking much longer
+    # than the system's own earlier recovery baseline.
+    prior = recovery_times[:trial_index]
+    valid_prior = [v for v in prior if v is not None]
+
+    if rt is not None and len(valid_prior) >= 3:
+        baseline_rt = max(1.0, float(np.median(valid_prior[:5])))
+        relative_slowing_penalty = clamp01((rt - baseline_rt) / RECOVERY_WINDOW)
+    elif rt is None:
+        relative_slowing_penalty = 1.0
+    else:
+        relative_slowing_penalty = 0.0
+
+    # Consecutive degradation penalty:
+    # If recent recovery times keep getting worse, treat it as loss of recoverability density.
+    if len(valid_recent) >= 3:
+        recent_tail = valid_recent[-3:]
+        consecutive_degradation = 1.0 if recent_tail[0] <= recent_tail[1] <= recent_tail[2] and recent_tail[-1] > recent_tail[0] else 0.0
+    else:
+        consecutive_degradation = 0.0
 
     drift_penalty = clamp01(abs(signal[t] - BASELINE) / 10.0)
 
     rho = (
-        0.35 * success +
-        0.25 * speed +
-        0.25 * (1.0 - slowing_penalty) +
-        0.15 * (1.0 - drift_penalty)
+        0.25 * success +
+        0.20 * speed +
+        0.20 * (1.0 - slowing_penalty) +
+        0.20 * (1.0 - relative_slowing_penalty) +
+        0.10 * (1.0 - consecutive_degradation) +
+        0.05 * (1.0 - drift_penalty)
     )
 
     return clamp01(rho)
