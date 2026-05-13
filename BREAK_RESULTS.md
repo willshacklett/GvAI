@@ -52,3 +52,28 @@ It tests recoverability directly:
 - drop GV only when recovery repeatedly fails
 
 This separates noise from true loss of recoverability.
+
+---
+
+# Third Test Direction
+
+This version makes the GV equation structure the base of the harness:
+
+`Gv = integral(rho_total(x,t)) + alpha`
+
+Operationally:
+
+- `rho_total` = recoverability density
+- `alpha` = continuity anchor
+- the integral is approximated as recent mean recoverability density
+
+`rho_total` is currently composed of:
+
+- recovery success
+- recovery speed
+- recovery slowing trend
+- drift away from baseline
+
+The goal is not to protect the equation.
+
+The goal is to make the equation executable so it can be broken.
