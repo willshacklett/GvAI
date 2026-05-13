@@ -164,3 +164,22 @@ Next correction:
 `TRIAL_EVERY = 20`
 
 This tests whether GV failed because the equation was wrong or because measurement resolution was too low.
+
+---
+
+# Eighth Test Direction
+
+This adds a seed sweep and threshold sweep.
+
+Purpose:
+
+- test whether the critical-slowing result survives across random seeds
+- measure false positives
+- measure lead time distribution
+- compare warning thresholds
+
+Output:
+
+`data/gv_falsification/dynamic_seed_sweep.csv`
+
+This moves GV from one terminal result toward repeatable evidence.
