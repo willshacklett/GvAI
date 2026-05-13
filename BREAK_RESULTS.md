@@ -144,3 +144,23 @@ This test separates:
 - noisy but recoverable dynamics
 - critical slowing before collapse
 - abrupt collapse without early warning
+
+---
+
+# Seventh Test Direction
+
+The dynamic harness showed the first real signal:
+
+In `critical_slowing_dynamic`, recovery time increased before collapse.
+
+But trial spacing was too coarse:
+
+`TRIAL_EVERY = 60`
+
+So GV did not sample recoverability often enough to warn before collapse.
+
+Next correction:
+
+`TRIAL_EVERY = 20`
+
+This tests whether GV failed because the equation was wrong or because measurement resolution was too low.
