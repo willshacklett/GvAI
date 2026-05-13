@@ -125,3 +125,22 @@ That means the system was not dynamically recovering from stress. It was only sh
 Next correction:
 
 Disturbances must be injected during the system update loop so recovery force actually controls the return to baseline.
+
+---
+
+# Sixth Test Direction
+
+This adds a dynamic recovery harness.
+
+Key correction:
+
+Disturbances are injected inside the system update loop.
+
+That means recovery force now controls actual return behavior after stress.
+
+This test separates:
+
+- stable dynamic recovery
+- noisy but recoverable dynamics
+- critical slowing before collapse
+- abrupt collapse without early warning
