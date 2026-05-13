@@ -206,3 +206,22 @@ New terms:
 - consecutive recovery degradation
 
 This tests whether GV can detect weakening recoverability before outright failure.
+
+---
+
+# Tenth Test Direction
+
+The previous result suggested that threshold-only GV was insufficient.
+
+New warning rule:
+
+Warn if either condition occurs:
+
+- `GV < threshold`
+- recovery time doubles from the system's own baseline
+
+This creates a hybrid warning model:
+
+`GV threshold OR recovery-doubling`
+
+The goal is to improve sensitivity to critical slowing without introducing false positives.

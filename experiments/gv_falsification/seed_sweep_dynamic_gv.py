@@ -24,6 +24,24 @@ def first_warning(gv, threshold):
     return int(hits[0]) if len(hits) else None
 
 
+def doubled_recovery_warning(recovery_times):
+    valid = [r for r in recovery_times if r is not None]
+
+    if len(valid) < 6:
+        return None
+
+    baseline = float(np.median(valid[:5]))
+
+    for idx, rt in enumerate(recovery_times):
+        if rt is None:
+            continue
+
+        if rt >= baseline * 2.0:
+            return idx
+
+    return None
+
+
 def verdict_for(collapse_expected, warning):
     if collapse_expected:
         if warning is not None and warning < COLLAPSE_AT:
@@ -48,17 +66,40 @@ def main():
             signal, collapse_expected = maker()
             gv, trials, recovery_times, rho_values = mod.gv_equation(signal)
 
+            doubled_warning_idx = doubled_recovery_warning(recovery_times)
+
             for threshold in THRESHOLDS:
-                warning = first_warning(gv, threshold)
-                lead_time = COLLAPSE_AT - warning if warning is not None else None
-                verdict = verdict_for(collapse_expected, warning)
+                gv_warning = first_warning(gv, threshold)
+
+                recovery_warning = None
+                if doubled_warning_idx is not None:
+                    recovery_warning = trials[doubled_warning_idx]
+
+                combined_warning_candidates = [
+                    w for w in [gv_warning, recovery_warning]
+                    if w is not None
+                ]
+
+                combined_warning = (
+                    min(combined_warning_candidates)
+                    if combined_warning_candidates else None
+                )
+
+                lead_time = (
+                    COLLAPSE_AT - combined_warning
+                    if combined_warning is not None else None
+                )
+
+                verdict = verdict_for(collapse_expected, combined_warning)
 
                 rows.append({
                     "seed": seed,
                     "scenario": scenario_name,
                     "threshold": threshold,
+                    "gv_warning": gv_warning,
+                    "recovery_warning": recovery_warning,
+                    "combined_warning": combined_warning,
                     "collapse_expected": collapse_expected,
-                    "first_warning": warning,
                     "lead_time": lead_time,
                     "verdict": verdict,
                     "min_gv": round(float(np.nanmin(gv)), 4),
