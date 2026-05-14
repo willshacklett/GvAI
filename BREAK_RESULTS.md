@@ -278,3 +278,24 @@ This tests the core distinction:
 
 - noisy recoverable systems self-correct
 - true recoverability loss does not self-correct
+
+---
+
+# First Boundary Result
+
+The dynamic seed sweep produced the first clean GV mechanism result.
+
+Across 100 seeds:
+
+- stable dynamic systems stayed quiet
+- noisy recoverable systems stayed quiet
+- critical slowing systems warned early
+- abrupt collapse systems were missed
+
+This is a boundary, not a failure.
+
+GV is not currently behaving as a generic predictor.
+
+GV is behaving as a recoverability-loss detector.
+
+It warns only when collapse is preceded by measurable degradation in recovery capacity.
