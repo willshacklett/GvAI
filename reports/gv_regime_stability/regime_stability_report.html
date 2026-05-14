@@ -1,0 +1,38 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>GV Regime Stability</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body{margin:0;background:#05070d;color:#ecfaff;font-family:Arial,sans-serif}
+header{padding:48px;text-align:center;border-bottom:1px solid rgba(255,255,255,.12)}
+h1{font-size:48px;margin:0;text-shadow:0 0 26px rgba(0,255,200,.45)}
+.subtitle{opacity:.75;margin-top:14px;font-size:18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;padding:28px}
+.card{border-radius:22px;padding:22px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}
+.label{opacity:.65;text-transform:uppercase;letter-spacing:1px;font-size:12px}
+.value{margin-top:8px;font-size:28px;font-weight:bold}
+.statement{margin:28px;padding:28px;border-radius:22px;background:rgba(0,255,200,.08);border:1px solid rgba(0,255,200,.22);font-size:22px;line-height:1.55}
+.chart-wrap{padding:28px}
+canvas{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.12);border-radius:22px;padding:20px;margin-bottom:28px}
+</style></head><body>
+<header><h1>GV Regime Stability</h1><div class="subtitle">Noise-limited or precursor-strength limited?</div></header>
+<section class="grid">
+<div class="card"><div class="label">Noise tested</div><div class="value">0.05–0.35</div></div>
+<div class="card"><div class="label">Alpha tested</div><div class="value">0.75–0.85</div></div>
+<div class="card"><div class="label">Lower bound</div><div class="value">≈ 0.001</div></div>
+<div class="card"><div class="label">Weak precursor</div><div class="value">Missed</div></div>
+</section>
+<div class="statement"><strong>Boundary result:</strong> GV appears precursor-strength limited, not primarily noise-limited. Weak slowing was missed, but moderate slowing was detected reliably across tested noise regimes.</div>
+<section class="chart-wrap"><canvas id="detectionChart"></canvas><canvas id="leadChart"></canvas></section>
+<script>
+const labels=["0.0005","0.0010","0.0015","0.0020"];
+new Chart(document.getElementById("detectionChart"),{type:"line",data:{labels,datasets:[
+{label:"α 0.75 detection %",data:[0,99.75,100,100],borderWidth:3,tension:.25},
+{label:"α 0.80 detection %",data:[0,100,100,100],borderWidth:3,tension:.25},
+{label:"α 0.85 detection %",data:[0,100,100,100],borderWidth:3,tension:.25}
+]},options:{plugins:{title:{display:true,text:"Detection Rate vs Precursor Strength"}},scales:{y:{min:0,max:100}}}});
+new Chart(document.getElementById("leadChart"),{type:"line",data:{labels,datasets:[
+{label:"α 0.75 avg lead time",data:[0,75.5,197.15,260],borderWidth:3,tension:.25},
+{label:"α 0.80 avg lead time",data:[0,85.7,203.1,264.9],borderWidth:3,tension:.25},
+{label:"α 0.85 avg lead time",data:[0,108.75,220.3,277.05],borderWidth:3,tension:.25}
+]},options:{plugins:{title:{display:true,text:"Lead Time vs Precursor Strength"}}}});
+</script></body></html>
