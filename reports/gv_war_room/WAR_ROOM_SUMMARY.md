@@ -2,12 +2,13 @@
 
 Purpose: run the current fastest battle pipeline without changing detector logic.
 
-Runs: 2
+Runs: 3
 
 Failures: 0
 
 ## Results
 
+- baseline_tournament: returncode=0, output_exists=True
 - transition_vs_magnitude: returncode=0, output_exists=True
 - external_candidate_windows: returncode=0, output_exists=True
 

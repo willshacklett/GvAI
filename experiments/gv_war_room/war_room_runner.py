@@ -6,6 +6,11 @@ from datetime import datetime
 
 RUNS = [
     {
+        "name": "baseline_tournament",
+        "cmd": [sys.executable, "experiments/gv_war_room/war_room_baseline_tournament.py"],
+        "expected_output": "reports/gv_war_room/WAR_ROOM_BASELINE_TOURNAMENT.md",
+    },
+    {
         "name": "transition_vs_magnitude",
         "cmd": [sys.executable, "experiments/gv_google_cluster/run_google_trace_pipeline.py"],
         "expected_output": "reports/gv_google_cluster/google_cluster_transition_pass.csv",

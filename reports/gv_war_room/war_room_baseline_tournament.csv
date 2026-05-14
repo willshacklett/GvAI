@@ -1,0 +1,14 @@
+index,time,value,gv_hit,zscore_hit,variance_hit,gv_unique,boring_baseline_overlap
+10,10.0,25.0,False,True,False,False,False
+11,11.0,28.0,False,True,False,False,False
+35,35.0,55.0,False,True,False,False,False
+36,36.0,62.0,False,True,False,False,False
+37,37.0,67.0,False,False,True,False,False
+38,38.0,71.0,False,False,True,False,False
+39,39.0,76.0,False,False,True,False,False
+40,40.0,81.0,True,False,True,False,True
+41,41.0,88.0,True,False,True,False,True
+42,42.0,96.0,True,False,True,False,True
+43,43.0,105.0,True,False,False,True,False
+44,44.0,117.0,False,True,False,False,False
+45,45.0,132.0,False,True,True,False,False
