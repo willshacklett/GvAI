@@ -2007,5 +2007,16 @@
     "timestamp_utc": "2026-05-10T04:14:18.969075+00:00",
     "sha": "eb33d9b",
     "source": "github-actions"
+  },
+  {
+    "seq": 183,
+    "godscore": 5,
+    "status": "collapse",
+    "mean_step": 20,
+    "collapse_step": 31,
+    "lead_time": 11,
+    "timestamp_utc": "2026-05-14T00:11:40.047469+00:00",
+    "sha": "d7effcc",
+    "source": "github-actions"
   }
 ]
