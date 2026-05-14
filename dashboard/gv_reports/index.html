@@ -1,0 +1,134 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>GV Reports</title>
+
+  <style>
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top left, rgba(0,255,200,0.14), transparent 35%),
+        radial-gradient(circle at bottom right, rgba(120,90,255,0.16), transparent 35%),
+        #05070d;
+      color: #ecfaff;
+      font-family: Arial, sans-serif;
+    }
+
+    header {
+      padding: 48px;
+      text-align: center;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+    }
+
+    h1 {
+      font-size: 48px;
+      margin: 0;
+      letter-spacing: 1px;
+      text-shadow: 0 0 20px rgba(0,255,200,0.35);
+    }
+
+    .subtitle {
+      margin-top: 14px;
+      opacity: 0.75;
+      font-size: 18px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
+      padding: 40px;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 22px;
+      padding: 26px;
+      text-decoration: none;
+      color: inherit;
+      transition: all 0.25s ease;
+      box-shadow: 0 0 30px rgba(0,255,200,0.06);
+    }
+
+    .card:hover {
+      transform: translateY(-4px) scale(1.01);
+      box-shadow: 0 0 46px rgba(0,255,200,0.22);
+      border-color: rgba(0,255,200,0.28);
+    }
+
+    .title {
+      font-size: 28px;
+      font-weight: bold;
+      margin-bottom: 12px;
+    }
+
+    .meta {
+      opacity: 0.72;
+      line-height: 1.6;
+    }
+
+    .badge {
+      display: inline-block;
+      margin-top: 18px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(0,255,200,0.12);
+      border: 1px solid rgba(0,255,200,0.28);
+      font-size: 13px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .pulse {
+      animation: pulse 2.4s infinite;
+    }
+
+    @keyframes pulse {
+      0% { text-shadow: 0 0 8px rgba(0,255,200,0.35); }
+      50% { text-shadow: 0 0 28px rgba(0,255,200,0.95); }
+      100% { text-shadow: 0 0 8px rgba(0,255,200,0.35); }
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1 class="pulse">GV Reports</h1>
+
+  <div class="subtitle">
+    Recoverability signals, warning lead times, collapse boundaries, and validation experiments.
+  </div>
+</header>
+
+<section class="grid">
+
+  <a class="card" href="sample_service_latency_report.html">
+    <div class="title">
+      Sample Service Latency
+    </div>
+
+    <div class="meta">
+      Semi-real operational recovery sequence.<br><br>
+
+      Includes:
+      <ul>
+        <li>raw system signal</li>
+        <li>GV recoverability curve</li>
+        <li>warning marker</li>
+        <li>failure marker</li>
+        <li>lead-time visualization</li>
+      </ul>
+    </div>
+
+    <div class="badge">
+      Lead Time: 14
+    </div>
+  </a>
+
+</section>
+
+</body>
+</html>

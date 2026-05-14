@@ -1,0 +1,183 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>GV Real-World Validation Report</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top left, rgba(0, 255, 200, 0.18), transparent 35%),
+        radial-gradient(circle at bottom right, rgba(120, 90, 255, 0.20), transparent 35%),
+        #05070d;
+      color: #eafcff;
+      font-family: Arial, sans-serif;
+    }
+    header {
+      padding: 42px;
+      text-align: center;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+    }
+    h1 {
+      font-size: 44px;
+      margin: 0;
+      letter-spacing: 1px;
+    }
+    .subtitle {
+      opacity: 0.78;
+      margin-top: 12px;
+      font-size: 18px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(140px, 1fr));
+      gap: 16px;
+      padding: 24px;
+    }
+    .card {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 0 28px rgba(0,255,200,0.08);
+    }
+    .label {
+      opacity: 0.65;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .value {
+      font-size: 32px;
+      margin-top: 8px;
+      font-weight: bold;
+    }
+    .chart-wrap {
+      padding: 24px;
+    }
+    canvas {
+      background: rgba(255,255,255,0.045);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px;
+      padding: 18px;
+      margin-bottom: 24px;
+      box-shadow: 0 0 36px rgba(0,255,200,0.08);
+    }
+    .pulse {
+      animation: pulse 2.6s infinite;
+    }
+    @keyframes pulse {
+      0% { text-shadow: 0 0 8px rgba(0,255,200,0.35); }
+      50% { text-shadow: 0 0 26px rgba(0,255,200,0.9); }
+      100% { text-shadow: 0 0 8px rgba(0,255,200,0.35); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 class="pulse">GV Real-World Validation</h1>
+    <div class="subtitle">Recoverability loss detector — signal, warning, failure, and lead time.</div>
+  </header>
+
+  <section class="grid">
+    <div class="card"><div class="label">First warning</div><div class="value">42</div></div>
+    <div class="card"><div class="label">First failure</div><div class="value">56</div></div>
+    <div class="card"><div class="label">Lead time</div><div class="value">14</div></div>
+    <div class="card"><div class="label">Min GV</div><div class="value">0.2167</div></div>
+  </section>
+
+  <section class="chart-wrap">
+    <canvas id="signalChart"></canvas>
+    <canvas id="gvChart"></canvas>
+    <canvas id="recoveryChart"></canvas>
+  </section>
+
+<script>
+const report = {"input": "sample_data/gv_real_world_validation/sample_service_latency.csv", "rows": 60, "first_warning": 42, "first_failure": 56, "lead_time": 14, "min_gv": 0.2167, "mean_gv": 0.8319, "series": [{"time": 0.0, "value": 100.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 1.0, "value": 101.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 2.0, "value": 99.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 3.0, "value": 100.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 4.0, "value": 102.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 5.0, "value": 100.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 6.0, "value": 101.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 7.0, "value": 99.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 8.0, "value": 100.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 9.0, "value": 101.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 10.0, "value": 100.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 11.0, "value": 101.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 12.0, "value": 99.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 13.0, "value": 100.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 14.0, "value": 102.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 15.0, "value": 100.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 16.0, "value": 101.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 17.0, "value": 99.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 18.0, "value": 100.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 19.0, "value": 101.0, "gv": 1.0, "event": "normal", "recovery_time": null}, {"time": 20.0, "value": 140.0, "gv": 0.925, "event": "disturbance", "recovery_time": 3}, {"time": 21.0, "value": 125.0, "gv": 0.95, "event": "recovery", "recovery_time": 2}, {"time": 22.0, "value": 112.0, "gv": 0.975, "event": "recovery", "recovery_time": 1}, {"time": 23.0, "value": 103.0, "gv": 0.975, "event": "recovered", "recovery_time": null}, {"time": 24.0, "value": 101.0, "gv": 0.975, "event": "normal", "recovery_time": null}, {"time": 25.0, "value": 100.0, "gv": 0.975, "event": "normal", "recovery_time": null}, {"time": 26.0, "value": 150.0, "gv": 0.925, "event": "disturbance", "recovery_time": 3}, {"time": 27.0, "value": 135.0, "gv": 0.95, "event": "recovery", "recovery_time": 2}, {"time": 28.0, "value": 121.0, "gv": 0.975, "event": "recovery", "recovery_time": 1}, {"time": 29.0, "value": 110.0, "gv": 0.975, "event": "recovery", "recovery_time": null}, {"time": 30.0, "value": 103.0, "gv": 0.975, "event": "recovered", "recovery_time": null}, {"time": 31.0, "value": 101.0, "gv": 0.975, "event": "normal", "recovery_time": null}, {"time": 32.0, "value": 100.0, "gv": 0.975, "event": "normal", "recovery_time": null}, {"time": 33.0, "value": 165.0, "gv": 0.875, "event": "disturbance", "recovery_time": 5}, {"time": 34.0, "value": 151.0, "gv": 0.8333333333333334, "event": "recovery", "recovery_time": 4}, {"time": 35.0, "value": 139.0, "gv": 0.8583333333333334, "event": "recovery", "recovery_time": 3}, {"time": 36.0, "value": 127.0, "gv": 0.9166666666666666, "event": "recovery", "recovery_time": 2}, {"time": 37.0, "value": 118.0, "gv": 0.9166666666666666, "event": "recovery", "recovery_time": null}, {"time": 38.0, "value": 111.0, "gv": 0.9166666666666666, "event": "recovery", "recovery_time": null}, {"time": 39.0, "value": 105.0, "gv": 0.9166666666666666, "event": "recovered", "recovery_time": null}, {"time": 40.0, "value": 102.0, "gv": 0.7666666666666667, "event": "normal", "recovery_time": 8}, {"time": 41.0, "value": 101.0, "gv": 0.7666666666666667, "event": "normal", "recovery_time": null}, {"time": 42.0, "value": 180.0, "gv": 0.6583333333333333, "event": "disturbance", "recovery_time": 7}, {"time": 43.0, "value": 169.0, "gv": 0.6833333333333335, "event": "recovery", "recovery_time": 6}, {"time": 44.0, "value": 158.0, "gv": 0.7666666666666667, "event": "recovery", "recovery_time": 4}, {"time": 45.0, "value": 149.0, "gv": 0.8583333333333334, "event": "recovery", "recovery_time": 3}, {"time": 46.0, "value": 140.0, "gv": 0.9416666666666667, "event": "recovery", "recovery_time": 1}, {"time": 47.0, "value": 132.0, "gv": 0.9416666666666667, "event": "recovery", "recovery_time": null}, {"time": 48.0, "value": 125.0, "gv": 0.9416666666666667, "event": "recovery", "recovery_time": null}, {"time": 49.0, "value": 119.0, "gv": 0.9416666666666667, "event": "recovery", "recovery_time": null}, {"time": 50.0, "value": 114.0, "gv": 0.9416666666666667, "event": "recovery", "recovery_time": null}, {"time": 51.0, "value": 110.0, "gv": 0.21666666666666667, "event": "recovery", "recovery_time": null}, {"time": 52.0, "value": 108.0, "gv": 0.21666666666666667, "event": "recovery", "recovery_time": null}, {"time": 53.0, "value": 106.0, "gv": 0.21666666666666667, "event": "recovered", "recovery_time": null}, {"time": 54.0, "value": 104.0, "gv": 0.21666666666666667, "event": "normal", "recovery_time": null}, {"time": 55.0, "value": 102.0, "gv": 0.21666666666666667, "event": "normal", "recovery_time": null}, {"time": 56.0, "value": 230.0, "gv": 0.21666666666666667, "event": "incident", "recovery_time": null}, {"time": 57.0, "value": 260.0, "gv": 0.21666666666666667, "event": "failure", "recovery_time": null}, {"time": 58.0, "value": 300.0, "gv": 0.21666666666666667, "event": "failure", "recovery_time": null}, {"time": 59.0, "value": 340.0, "gv": 0.21666666666666667, "event": "failure", "recovery_time": null}]};
+const labels = report.series.map(p => p.time);
+const values = report.series.map(p => p.value);
+const gv = report.series.map(p => p.gv);
+const recovery = report.series.map(p => p.recovery_time);
+
+const warning = report.first_warning;
+const failure = report.first_failure;
+
+function verticalMarker(index, label) {
+  return {
+    id: label,
+    afterDraw(chart) {
+      if (index === null) return;
+      const x = chart.scales.x.getPixelForValue(index);
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(x, chart.chartArea.top);
+      ctx.lineTo(x, chart.chartArea.bottom);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = label === "warning" ? "rgba(255, 230, 0, 0.9)" : "rgba(255, 60, 80, 0.9)";
+      ctx.stroke();
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.fillText(label.toUpperCase(), x + 6, chart.chartArea.top + 16);
+      ctx.restore();
+    }
+  }
+}
+
+new Chart(document.getElementById("signalChart"), {
+  type: "line",
+  data: {
+    labels,
+    datasets: [{
+      label: "System value",
+      data: values,
+      borderWidth: 2,
+      tension: 0.25,
+      pointRadius: 2
+    }]
+  },
+  options: {
+    plugins: { title: { display: true, text: "Raw System Signal" } },
+    responsive: true
+  },
+  plugins: [verticalMarker(warning, "warning"), verticalMarker(failure, "failure")]
+});
+
+new Chart(document.getElementById("gvChart"), {
+  type: "line",
+  data: {
+    labels,
+    datasets: [{
+      label: "GV",
+      data: gv,
+      borderWidth: 3,
+      tension: 0.25,
+      pointRadius: 2
+    }]
+  },
+  options: {
+    plugins: { title: { display: true, text: "GV Recoverability Signal" } },
+    scales: { y: { min: 0, max: 1 } },
+    responsive: true
+  },
+  plugins: [verticalMarker(warning, "warning"), verticalMarker(failure, "failure")]
+});
+
+new Chart(document.getElementById("recoveryChart"), {
+  type: "bar",
+  data: {
+    labels,
+    datasets: [{
+      label: "Recovery time",
+      data: recovery
+    }]
+  },
+  options: {
+    plugins: { title: { display: true, text: "Measured Recovery Time" } },
+    responsive: true
+  },
+  plugins: [verticalMarker(warning, "warning"), verticalMarker(failure, "failure")]
+});
+</script>
+</body>
+</html>
