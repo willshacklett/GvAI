@@ -261,3 +261,20 @@ Warn only when both are true:
 This is not alpha tuning.
 
 This tests whether persistent directional recovery degradation separates true loss of recoverability from temporary noise.
+
+---
+
+# Thirteenth Test Direction
+
+Directional degradation did not reduce noisy recoverable false positives.
+
+New mechanism rule:
+
+A warning must survive a cooldown recovery check.
+
+If recovery times return near the system's early baseline within the next few trials, the event is classified as transient, not persistent GV loss.
+
+This tests the core distinction:
+
+- noisy recoverable systems self-correct
+- true recoverability loss does not self-correct

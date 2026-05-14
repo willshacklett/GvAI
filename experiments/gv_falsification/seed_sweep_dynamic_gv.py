@@ -83,6 +83,36 @@ def doubled_recovery_warning(recovery_times):
     return None
 
 
+def transient_recovery_filter(warning_idx, recovery_times, lookahead=5):
+    """
+    Cooldown recovery check.
+
+    A warning is only accepted if degradation does NOT self-correct.
+
+    If recovery times return near the early baseline within the next few trials,
+    classify the warning as transient noise instead of persistent GV loss.
+    """
+
+    if warning_idx is None:
+        return None
+
+    valid = [r for r in recovery_times if r is not None]
+
+    if len(valid) < 6:
+        return warning_idx
+
+    baseline = float(np.median(valid[:5]))
+    recovery_limit = baseline * 1.5
+
+    future = recovery_times[warning_idx + 1:warning_idx + 1 + lookahead]
+
+    for rt in future:
+        if rt is not None and rt <= recovery_limit:
+            return None
+
+    return warning_idx
+
+
 def verdict_for(collapse_expected, warning):
     if collapse_expected:
         if warning is not None and warning < COLLAPSE_AT:
@@ -121,10 +151,30 @@ def main():
                     if w is not None
                 ]
 
-                combined_warning = (
+                raw_combined_warning = (
                     min(combined_warning_candidates)
                     if combined_warning_candidates else None
                 )
+
+                if raw_combined_warning is not None:
+                    warning_idx = None
+                    for i, t in enumerate(trials):
+                        if t == raw_combined_warning:
+                            warning_idx = i
+                            break
+
+                    filtered_warning_idx = transient_recovery_filter(
+                        warning_idx,
+                        recovery_times,
+                        lookahead=5,
+                    )
+
+                    combined_warning = (
+                        trials[filtered_warning_idx]
+                        if filtered_warning_idx is not None else None
+                    )
+                else:
+                    combined_warning = None
 
                 lead_time = (
                     COLLAPSE_AT - combined_warning
@@ -139,6 +189,7 @@ def main():
                     "threshold": threshold,
                     "gv_warning": gv_warning,
                     "recovery_warning": recovery_warning,
+                    "raw_combined_warning": raw_combined_warning,
                     "combined_warning": combined_warning,
                     "collapse_expected": collapse_expected,
                     "lead_time": lead_time,
