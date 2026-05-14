@@ -1,0 +1,20 @@
+{
+  "datasets": [
+    {
+      "name": "google_cluster_data",
+      "status": "candidate",
+      "repo": "https://github.com/google/cluster-data",
+      "notes": "Official Google Borg cluster workload traces. Large dataset; load selected windows only."
+    },
+    {
+      "name": "google_cluster_2011_v2",
+      "status": "candidate_large",
+      "notes": "Approx 41GB compressed according to Google cluster-data docs. Do not download blindly in Codespaces."
+    },
+    {
+      "name": "google_cluster_2019_v3",
+      "status": "candidate_large",
+      "notes": "Eight Borg cells across May 2019. Use sampled windows or prepared subsets."
+    }
+  ]
+}
