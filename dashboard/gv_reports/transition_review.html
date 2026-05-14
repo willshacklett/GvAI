@@ -1,0 +1,180 @@
+
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>GV Transition Review</title>
+
+<style>
+body {
+    margin:0;
+    background:#05070d;
+    color:#ecfaff;
+    font-family:Arial,sans-serif;
+}
+
+header {
+    padding:40px;
+    text-align:center;
+    border-bottom:1px solid rgba(255,255,255,.12);
+}
+
+h1 {
+    margin:0;
+    font-size:42px;
+}
+
+main {
+    max-width:1200px;
+    margin:auto;
+    padding:30px;
+}
+
+.card {
+    background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:22px;
+    padding:24px;
+    margin-bottom:24px;
+}
+
+canvas {
+    width:100%;
+    height:420px;
+    background:#0c1018;
+    border-radius:16px;
+}
+
+table {
+    width:100%;
+    border-collapse:collapse;
+}
+
+td,th {
+    padding:12px;
+    border-bottom:1px solid rgba(255,255,255,.08);
+    text-align:left;
+}
+
+.bad {
+    color:#ff7f7f;
+    font-weight:bold;
+}
+
+.good {
+    color:#8fffd1;
+    font-weight:bold;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>GV Transition Review</h1>
+<p>Battle: transition vs magnitude</p>
+</header>
+
+<main>
+
+<div class="card">
+<h2>Current Result</h2>
+
+<ul>
+<li><span class="bad">Old magnitude pass:</span> 45 / 50 candidate points</li>
+<li><span class="good">Transition pass:</span> 4 / 46 candidate points</li>
+<li>Mean transition GV: 0.9045</li>
+<li>Minimum transition GV: 0.4608</li>
+</ul>
+</div>
+
+<div class="card">
+<h2>Raw Pressure vs Transition GV</h2>
+<canvas id="chart" width="1100" height="420"></canvas>
+</div>
+
+<div class="card">
+<h2>Transition Candidate Review</h2>
+
+<table>
+<tr>
+<th>Time</th>
+<th>Value</th>
+<th>GV Transition</th>
+<th>Slope</th>
+<th>Acceleration</th>
+</tr>
+
+<tr><td>40.0</td><td>81.0</td><td>0.6638</td><td>7.4286</td><td>5.4286</td></tr><tr><td>41.0</td><td>88.0</td><td>0.4976</td><td>8.5714</td><td>10.8571</td></tr><tr><td>42.0</td><td>96.0</td><td>0.4608</td><td>9.8571</td><td>13.4286</td></tr><tr><td>43.0</td><td>105.0</td><td>0.6826</td><td>5.8571</td><td>9.4286</td></tr>
+
+</table>
+
+</div>
+
+</main>
+
+<script>
+const rows = [{"time": 0.0, "value": 10.0, "slope": 0.0, "acceleration": 0.0, "gv_transition": 1.0, "candidate_transition": false}, {"time": 1.0, "value": 11.0, "slope": 0.0, "acceleration": 0.0, "gv_transition": 1.0, "candidate_transition": false}, {"time": 2.0, "value": 10.0, "slope": 0.0, "acceleration": 0.0, "gv_transition": 1.0, "candidate_transition": false}, {"time": 3.0, "value": 12.0, "slope": 0.0, "acceleration": 0.0, "gv_transition": 1.0, "candidate_transition": false}, {"time": 4.0, "value": 11.0, "slope": 0.0, "acceleration": 0.0, "gv_transition": 1.0, "candidate_transition": false}, {"time": 5.0, "value": 15.0, "slope": 0.0, "acceleration": 0.0, "gv_transition": 1.0, "candidate_transition": false}, {"time": 6.0, "value": 18.0, "slope": 0.0, "acceleration": 0.0, "gv_transition": 1.0, "candidate_transition": false}, {"time": 7.0, "value": 14.0, "slope": 0.0, "acceleration": 0.0, "gv_transition": 1.0, "candidate_transition": false}, {"time": 8.0, "value": 12.0, "slope": 0.0, "acceleration": 0.0, "gv_transition": 1.0, "candidate_transition": false}, {"time": 9.0, "value": 11.0, "slope": 0.0, "acceleration": 0.0, "gv_transition": 1.0, "candidate_transition": false}, {"time": 10.0, "value": 25.0, "slope": 0.0, "acceleration": 0.0, "gv_transition": 1.0, "candidate_transition": false}, {"time": 11.0, "value": 28.0, "slope": 0.0, "acceleration": 0.0, "gv_transition": 1.0, "candidate_transition": false}, {"time": 12.0, "value": 24.0, "slope": 0.0, "acceleration": 0.0, "gv_transition": 1.0, "candidate_transition": false}, {"time": 13.0, "value": 19.0, "slope": 0.0, "acceleration": 0.0, "gv_transition": 1.0, "candidate_transition": false}, {"time": 14.0, "value": 15.0, "slope": 0.0, "acceleration": 0.0, "gv_transition": 1.0, "candidate_transition": false}, {"time": 15.0, "value": 13.0, "slope": 0.0, "acceleration": 0.0, "gv_transition": 1.0, "candidate_transition": false}, {"time": 16.0, "value": 12.0, "slope": 0.1429, "acceleration": -0.4286, "gv_transition": 0.9884, "candidate_transition": false}, {"time": 17.0, "value": 30.0, "slope": 0.1429, "acceleration": 0.0, "gv_transition": 0.9882, "candidate_transition": false}, {"time": 18.0, "value": 35.0, "slope": 0.7143, "acceleration": 0.5714, "gv_transition": 0.8992, "candidate_transition": false}, {"time": 19.0, "value": 33.0, "slope": 1.0, "acceleration": -0.8571, "gv_transition": 0.9394, "candidate_transition": false}, {"time": 20.0, "value": 28.0, "slope": 1.2857, "acceleration": -1.1429, "gv_transition": 0.9278, "candidate_transition": false}, {"time": 21.0, "value": 24.0, "slope": 1.2857, "acceleration": 0.0, "gv_transition": 0.9269, "candidate_transition": false}, {"time": 22.0, "value": 19.0, "slope": 1.2857, "acceleration": 1.1429, "gv_transition": 0.8454, "candidate_transition": false}, {"time": 23.0, "value": 16.0, "slope": 0.8571, "acceleration": 0.7143, "gv_transition": 0.9, "candidate_transition": false}, {"time": 24.0, "value": 14.0, "slope": 0.5714, "acceleration": 0.4286, "gv_transition": 0.9358, "candidate_transition": false}, {"time": 25.0, "value": 40.0, "slope": -2.2857, "acceleration": -2.4286, "gv_transition": 1.0, "candidate_transition": false}, {"time": 26.0, "value": 46.0, "slope": 0.7143, "acceleration": 0.0, "gv_transition": 0.9609, "candidate_transition": false}, {"time": 27.0, "value": 44.0, "slope": 1.8571, "acceleration": 0.8571, "gv_transition": 0.8677, "candidate_transition": false}, {"time": 28.0, "value": 39.0, "slope": 2.2857, "acceleration": 1.0, "gv_transition": 0.8553, "candidate_transition": false}, {"time": 29.0, "value": 35.0, "slope": 2.1429, "acceleration": 0.8571, "gv_transition": 0.8736, "candidate_transition": false}, {"time": 30.0, "value": 31.0, "slope": 2.2857, "acceleration": 1.0, "gv_transition": 0.8608, "candidate_transition": false}, {"time": 31.0, "value": 28.0, "slope": 2.1429, "acceleration": 1.2857, "gv_transition": 0.8463, "candidate_transition": false}, {"time": 32.0, "value": 24.0, "slope": 2.0, "acceleration": 1.4286, "gv_transition": 0.8331, "candidate_transition": false}, {"time": 33.0, "value": 21.0, "slope": -2.2857, "acceleration": 0.0, "gv_transition": 1.0, "candidate_transition": false}, {"time": 34.0, "value": 19.0, "slope": -3.5714, "acceleration": -4.2857, "gv_transition": 1.0, "candidate_transition": false}, {"time": 35.0, "value": 55.0, "slope": -3.5714, "acceleration": -5.4286, "gv_transition": 1.0, "candidate_transition": false}, {"time": 36.0, "value": 62.0, "slope": 2.2857, "acceleration": 0.0, "gv_transition": 0.911, "candidate_transition": false}, {"time": 37.0, "value": 67.0, "slope": 3.8571, "acceleration": 1.7143, "gv_transition": 0.8067, "candidate_transition": false}, {"time": 38.0, "value": 71.0, "slope": 5.1429, "acceleration": 2.8571, "gv_transition": 0.757, "candidate_transition": false}, {"time": 39.0, "value": 76.0, "slope": 6.1429, "acceleration": 4.0, "gv_transition": 0.7181, "candidate_transition": false}, {"time": 40.0, "value": 81.0, "slope": 7.4286, "acceleration": 5.4286, "gv_transition": 0.6638, "candidate_transition": true}, {"time": 41.0, "value": 88.0, "slope": 8.5714, "acceleration": 10.8571, "gv_transition": 0.4976, "candidate_transition": true}, {"time": 42.0, "value": 96.0, "slope": 9.8571, "acceleration": 13.4286, "gv_transition": 0.4608, "candidate_transition": true}, {"time": 43.0, "value": 105.0, "slope": 5.8571, "acceleration": 9.4286, "gv_transition": 0.6826, "candidate_transition": true}, {"time": 44.0, "value": 117.0, "slope": 6.1429, "acceleration": 3.8571, "gv_transition": 0.823, "candidate_transition": false}, {"time": 45.0, "value": 132.0, "slope": 7.1429, "acceleration": 3.2857, "gv_transition": 0.8372, "candidate_transition": false}];
+
+const canvas = document.getElementById("chart");
+const ctx = canvas.getContext("2d");
+
+const W = canvas.width;
+const H = canvas.height;
+
+ctx.clearRect(0,0,W,H);
+
+function scaleX(i,maxi){
+    return 60 + (i/maxi)*(W-120);
+}
+
+function scaleY(v,maxv){
+    return H-60 - (v/maxv)*(H-120);
+}
+
+const maxValue = Math.max(...rows.map(r=>r.value));
+const maxGV = 1.0;
+
+ctx.strokeStyle = "#4dd2ff";
+ctx.lineWidth = 3;
+ctx.beginPath();
+
+rows.forEach((r,i)=>{
+    const x = scaleX(i, rows.length-1);
+    const y = scaleY(r.value, maxValue);
+
+    if(i===0) ctx.moveTo(x,y);
+    else ctx.lineTo(x,y);
+});
+
+ctx.stroke();
+
+ctx.strokeStyle = "#8fffd1";
+ctx.lineWidth = 3;
+ctx.beginPath();
+
+rows.forEach((r,i)=>{
+    const x = scaleX(i, rows.length-1);
+    const y = scaleY(r.gv_transition, maxGV);
+
+    if(i===0) ctx.moveTo(x,y);
+    else ctx.lineTo(x,y);
+});
+
+ctx.stroke();
+
+rows.forEach((r,i)=>{
+    if(r.candidate_transition){
+        const x = scaleX(i, rows.length-1);
+        const y = scaleY(r.gv_transition, maxGV);
+
+        ctx.fillStyle = "#ff5f7a";
+        ctx.beginPath();
+        ctx.arc(x,y,7,0,Math.PI*2);
+        ctx.fill();
+    }
+});
+</script>
+
+</body>
+</html>
