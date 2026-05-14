@@ -26,17 +26,21 @@ def first_warning(gv, threshold):
 
 def doubled_recovery_warning(recovery_times):
     """
-    Persistence rule:
+    Mechanism rule:
 
     Do not warn on one temporary slowdown.
 
-    Warn only if recovery time doubles in
-    2 out of the last 3 trials.
+    Warn only when both are true:
+
+    1. recovery time doubles in 2 out of the last 3 trials
+    2. recent median recovery is worse than earlier median recovery
+
+    This tries to separate temporary noise from directional loss of recoverability.
     """
 
     valid = [r for r in recovery_times if r is not None]
 
-    if len(valid) < 6:
+    if len(valid) < 8:
         return None
 
     baseline = float(np.median(valid[:5]))
@@ -46,16 +50,34 @@ def doubled_recovery_warning(recovery_times):
     for idx, rt in enumerate(recovery_times):
         if rt is None:
             doubled_flags.append(True)
+        else:
+            doubled_flags.append(rt >= baseline * 2.0)
+
+        if idx < 7:
             continue
 
-        doubled_flags.append(rt >= baseline * 2.0)
+        recent_flags = doubled_flags[idx - 2:idx + 1]
+        persistence_hit = sum(recent_flags) >= 2
 
-        if idx < 2:
+        earlier_window = [
+            r for r in recovery_times[max(0, idx - 8):max(0, idx - 3)]
+            if r is not None
+        ]
+
+        recent_window = [
+            r for r in recovery_times[max(0, idx - 2):idx + 1]
+            if r is not None
+        ]
+
+        if len(earlier_window) < 3 or len(recent_window) < 2:
             continue
 
-        recent = doubled_flags[idx - 2:idx + 1]
+        earlier_median = float(np.median(earlier_window))
+        recent_median = float(np.median(recent_window))
 
-        if sum(recent) >= 2:
+        directional_degradation = recent_median > earlier_median * 1.35
+
+        if persistence_hit and directional_degradation:
             return idx
 
     return None

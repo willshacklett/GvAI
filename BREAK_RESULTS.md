@@ -244,3 +244,20 @@ New rule:
 Warn only if recovery time doubles in at least 2 of the last 3 trials.
 
 This tests whether persistent degradation separates true recoverability loss from temporary noise.
+
+---
+
+# Twelfth Test Direction
+
+Persistence alone still produced too many false positives in noisy-but-recoverable cases.
+
+New mechanism rule:
+
+Warn only when both are true:
+
+1. recovery time doubles in 2 out of the last 3 trials
+2. recent median recovery time is directionally worse than earlier median recovery time
+
+This is not alpha tuning.
+
+This tests whether persistent directional recovery degradation separates true loss of recoverability from temporary noise.
