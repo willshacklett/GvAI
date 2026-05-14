@@ -1,0 +1,2 @@
+window_id,start_index,end_index,start_time,end_time,label,notes
+1,1,45,1.0,45.0,candidate_stress_window,Unlabeled telemetry window for human review; not a claimed prediction.
