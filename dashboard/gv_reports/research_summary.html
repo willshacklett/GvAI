@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>GV Research Summary</title>
+  <style>
+    body{margin:0;background:#05070d;color:#ecfaff;font-family:Arial,sans-serif;line-height:1.6}
+    header{padding:54px;text-align:center;border-bottom:1px solid rgba(255,255,255,.12)}
+    h1{margin:0;font-size:50px;text-shadow:0 0 28px rgba(0,255,200,.45)}
+    .subtitle{margin-top:14px;opacity:.78;font-size:19px}
+    main{max-width:980px;margin:0 auto;padding:34px}
+    section{margin-bottom:26px;padding:26px;border-radius:24px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}
+    code{background:rgba(0,0,0,.35);padding:3px 7px;border-radius:7px}
+    .truth{font-size:24px;background:rgba(0,255,200,.08)}
+    a{color:#8fffea}
+  </style>
+</head>
+<body>
+<header>
+  <h1>GV Research Summary</h1>
+  <div class="subtitle">Current synthetic findings, boundaries, and failure regions.</div>
+</header>
+<main>
+<section class="truth">GV is currently best described as a <strong>recoverability-loss detector</strong>, not a generic collapse predictor.</section>
+<section><h2>Working abstract</h2><p>GV measures whether a system's ability to recover after disturbance is degrading persistently over time. Synthetic falsification tests show that GV stays quiet on recoverable noise, misses abrupt collapse without precursor degradation, and warns when recovery force weakens before visible failure.</p></section>
+<section><h2>Current operational form</h2><p><code>Gv ≈ f(dR/dt, recovery_time, persistent_degradation_probability)</code></p></section>
+<section><h2>Boundary results</h2><ul><li>Stable α region: 0.75–0.85</li><li>False-positive boundary: ≈ 0.90</li><li>Synthetic precursor lower bound: ≈ 0.001</li><li>Abrupt collapse without precursor: missed</li></ul></section>
+<section><h2>Reality check</h2><ul><li>This is not proof of a universal law.</li><li>Synthetic systems are still controlled.</li><li>Real-world validation is early.</li><li>GV must survive external datasets.</li></ul></section>
+<section><p><a href="index.html">Back to GV Reports</a></p></section>
+</main>
+</body>
+</html>
