@@ -1,0 +1,431 @@
+{
+  "input": "sample_data/gv_real_world_validation/sample_service_latency.csv",
+  "rows": 60,
+  "first_warning": 42,
+  "first_failure": 56,
+  "lead_time": 14,
+  "min_gv": 0.2167,
+  "mean_gv": 0.8319,
+  "series": [
+    {
+      "time": 0.0,
+      "value": 100.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 1.0,
+      "value": 101.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 2.0,
+      "value": 99.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 3.0,
+      "value": 100.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 4.0,
+      "value": 102.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 5.0,
+      "value": 100.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 6.0,
+      "value": 101.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 7.0,
+      "value": 99.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 8.0,
+      "value": 100.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 9.0,
+      "value": 101.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 10.0,
+      "value": 100.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 11.0,
+      "value": 101.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 12.0,
+      "value": 99.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 13.0,
+      "value": 100.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 14.0,
+      "value": 102.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 15.0,
+      "value": 100.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 16.0,
+      "value": 101.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 17.0,
+      "value": 99.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 18.0,
+      "value": 100.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 19.0,
+      "value": 101.0,
+      "gv": 1.0,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 20.0,
+      "value": 140.0,
+      "gv": 0.925,
+      "event": "disturbance",
+      "recovery_time": 3
+    },
+    {
+      "time": 21.0,
+      "value": 125.0,
+      "gv": 0.95,
+      "event": "recovery",
+      "recovery_time": 2
+    },
+    {
+      "time": 22.0,
+      "value": 112.0,
+      "gv": 0.975,
+      "event": "recovery",
+      "recovery_time": 1
+    },
+    {
+      "time": 23.0,
+      "value": 103.0,
+      "gv": 0.975,
+      "event": "recovered",
+      "recovery_time": null
+    },
+    {
+      "time": 24.0,
+      "value": 101.0,
+      "gv": 0.975,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 25.0,
+      "value": 100.0,
+      "gv": 0.975,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 26.0,
+      "value": 150.0,
+      "gv": 0.925,
+      "event": "disturbance",
+      "recovery_time": 3
+    },
+    {
+      "time": 27.0,
+      "value": 135.0,
+      "gv": 0.95,
+      "event": "recovery",
+      "recovery_time": 2
+    },
+    {
+      "time": 28.0,
+      "value": 121.0,
+      "gv": 0.975,
+      "event": "recovery",
+      "recovery_time": 1
+    },
+    {
+      "time": 29.0,
+      "value": 110.0,
+      "gv": 0.975,
+      "event": "recovery",
+      "recovery_time": null
+    },
+    {
+      "time": 30.0,
+      "value": 103.0,
+      "gv": 0.975,
+      "event": "recovered",
+      "recovery_time": null
+    },
+    {
+      "time": 31.0,
+      "value": 101.0,
+      "gv": 0.975,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 32.0,
+      "value": 100.0,
+      "gv": 0.975,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 33.0,
+      "value": 165.0,
+      "gv": 0.875,
+      "event": "disturbance",
+      "recovery_time": 5
+    },
+    {
+      "time": 34.0,
+      "value": 151.0,
+      "gv": 0.8333333333333334,
+      "event": "recovery",
+      "recovery_time": 4
+    },
+    {
+      "time": 35.0,
+      "value": 139.0,
+      "gv": 0.8583333333333334,
+      "event": "recovery",
+      "recovery_time": 3
+    },
+    {
+      "time": 36.0,
+      "value": 127.0,
+      "gv": 0.9166666666666666,
+      "event": "recovery",
+      "recovery_time": 2
+    },
+    {
+      "time": 37.0,
+      "value": 118.0,
+      "gv": 0.9166666666666666,
+      "event": "recovery",
+      "recovery_time": null
+    },
+    {
+      "time": 38.0,
+      "value": 111.0,
+      "gv": 0.9166666666666666,
+      "event": "recovery",
+      "recovery_time": null
+    },
+    {
+      "time": 39.0,
+      "value": 105.0,
+      "gv": 0.9166666666666666,
+      "event": "recovered",
+      "recovery_time": null
+    },
+    {
+      "time": 40.0,
+      "value": 102.0,
+      "gv": 0.7666666666666667,
+      "event": "normal",
+      "recovery_time": 8
+    },
+    {
+      "time": 41.0,
+      "value": 101.0,
+      "gv": 0.7666666666666667,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 42.0,
+      "value": 180.0,
+      "gv": 0.6583333333333333,
+      "event": "disturbance",
+      "recovery_time": 7
+    },
+    {
+      "time": 43.0,
+      "value": 169.0,
+      "gv": 0.6833333333333335,
+      "event": "recovery",
+      "recovery_time": 6
+    },
+    {
+      "time": 44.0,
+      "value": 158.0,
+      "gv": 0.7666666666666667,
+      "event": "recovery",
+      "recovery_time": 4
+    },
+    {
+      "time": 45.0,
+      "value": 149.0,
+      "gv": 0.8583333333333334,
+      "event": "recovery",
+      "recovery_time": 3
+    },
+    {
+      "time": 46.0,
+      "value": 140.0,
+      "gv": 0.9416666666666667,
+      "event": "recovery",
+      "recovery_time": 1
+    },
+    {
+      "time": 47.0,
+      "value": 132.0,
+      "gv": 0.9416666666666667,
+      "event": "recovery",
+      "recovery_time": null
+    },
+    {
+      "time": 48.0,
+      "value": 125.0,
+      "gv": 0.9416666666666667,
+      "event": "recovery",
+      "recovery_time": null
+    },
+    {
+      "time": 49.0,
+      "value": 119.0,
+      "gv": 0.9416666666666667,
+      "event": "recovery",
+      "recovery_time": null
+    },
+    {
+      "time": 50.0,
+      "value": 114.0,
+      "gv": 0.9416666666666667,
+      "event": "recovery",
+      "recovery_time": null
+    },
+    {
+      "time": 51.0,
+      "value": 110.0,
+      "gv": 0.21666666666666667,
+      "event": "recovery",
+      "recovery_time": null
+    },
+    {
+      "time": 52.0,
+      "value": 108.0,
+      "gv": 0.21666666666666667,
+      "event": "recovery",
+      "recovery_time": null
+    },
+    {
+      "time": 53.0,
+      "value": 106.0,
+      "gv": 0.21666666666666667,
+      "event": "recovered",
+      "recovery_time": null
+    },
+    {
+      "time": 54.0,
+      "value": 104.0,
+      "gv": 0.21666666666666667,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 55.0,
+      "value": 102.0,
+      "gv": 0.21666666666666667,
+      "event": "normal",
+      "recovery_time": null
+    },
+    {
+      "time": 56.0,
+      "value": 230.0,
+      "gv": 0.21666666666666667,
+      "event": "incident",
+      "recovery_time": null
+    },
+    {
+      "time": 57.0,
+      "value": 260.0,
+      "gv": 0.21666666666666667,
+      "event": "failure",
+      "recovery_time": null
+    },
+    {
+      "time": 58.0,
+      "value": 300.0,
+      "gv": 0.21666666666666667,
+      "event": "failure",
+      "recovery_time": null
+    },
+    {
+      "time": 59.0,
+      "value": 340.0,
+      "gv": 0.21666666666666667,
+      "event": "failure",
+      "recovery_time": null
+    }
+  ]
+}
