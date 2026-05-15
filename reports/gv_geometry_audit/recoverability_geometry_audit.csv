@@ -1,0 +1,4 @@
+source,rows,features,pc1_explained,pc2_explained,pc3_explained,residual_after_pc1,pc1_gv_corr,pc2_gv_corr_abs,pc3_gv_corr_abs,eigen_ratio_1_to_2,random_projection_avg_corr,random_projection_best_corr,result
+dominant_axis,7,7,0.955444,0.03799,0.003698,0.044556,0.998611,0.035935,0.02725,5.014978,0.868694,0.999666,GV_NOT_DISTINCT_FROM_RANDOM_PROJECTION
+panarchy,600,7,0.942115,0.049595,0.005511,0.057885,0.998445,0.046014,0.021882,4.358477,0.878389,0.999627,GV_NOT_DISTINCT_FROM_RANDOM_PROJECTION
+hypergraph,140,10,0.950194,0.048212,0.000793,0.049806,0.860845,0.506956,0.027988,4.439458,0.762194,0.997886,GV_NOT_DISTINCT_FROM_RANDOM_PROJECTION
