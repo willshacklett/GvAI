@@ -23,4 +23,4 @@ def gv_scalar(e: GVEvidence) -> float:
         + 0.05 * (1.0 - volatility_penalty)
     )
 
-    return round(clamp01(continuity), 6)\n
+    return round(clamp01(continuity), 6)

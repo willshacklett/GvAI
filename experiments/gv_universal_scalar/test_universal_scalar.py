@@ -20,7 +20,7 @@ def main():
     assert rows[1]["gv"] > rows[2]["gv"]
     assert rows[4]["gv"] > rows[3]["gv"]
 
-    print("\nUNIVERSAL SCALAR CONTRACT SMOKE TEST PASSED")
+    print("UNIVERSAL SCALAR CONTRACT SMOKE TEST PASSED")
 
 if __name__ == "__main__":
     main()
