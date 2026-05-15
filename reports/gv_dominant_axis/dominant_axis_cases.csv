@@ -1,0 +1,8 @@
+case,domain,gv,recovery_strength,persistence,directional_degradation,volatility_penalty,recovery_time,hysteresis,future_sensitivity,pc1_recoverability_score
+software_stable,software,0.9975,1.0,1.0,1.0,0.05,0.05,0.02,0.05,1.123099
+queue_transient_surge,queue,0.8225,0.82,0.88,0.82,0.55,0.25,0.15,0.22,0.622715
+service_persistent_degradation,service,0.3705,0.42,0.34,0.28,0.45,0.7,0.62,0.66,-0.487135
+biology_slow_recovery,biology,0.43,0.38,0.42,0.48,0.3,0.62,0.44,0.58,-0.221686
+economics_recovery_loss,economics,0.301,0.3,0.24,0.34,0.42,0.78,0.7,0.8,-0.662362
+generic_irrecoverable_failure,generic,0.0525,0.05,0.05,0.05,0.9,0.98,0.96,0.95,-1.303084
+antifragile_training_response,biology,0.93,0.92,0.95,0.96,0.25,0.18,0.05,0.1,0.928453
