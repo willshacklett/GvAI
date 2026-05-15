@@ -49,6 +49,48 @@ def persistent_hits(raw_hits, min_run=3, max_gap=1):
     return kept
 
 
+
+def directional_degradation_filter(raw_hits, values, min_run=3, max_gap=1, min_net_change=8.0):
+    """
+    Keep only persistent candidates that also show directional degradation.
+
+    A real transition should not merely flicker.
+    It should move the system materially in one direction over the candidate group.
+    """
+    groups = []
+    raw_hits = sorted(raw_hits)
+
+    if not raw_hits:
+        return set()
+
+    current = [raw_hits[0]]
+
+    for idx in raw_hits[1:]:
+        if idx - current[-1] <= max_gap + 1:
+            current.append(idx)
+        else:
+            groups.append(current)
+            current = [idx]
+
+    groups.append(current)
+
+    kept = set()
+
+    for group in groups:
+        if len(group) < min_run:
+            continue
+
+        start = max(0, group[0] - 2)
+        end = min(len(values) - 1, group[-1] + 2)
+
+        net_change = values[end] - values[start]
+
+        if net_change >= min_net_change:
+            kept.update(group)
+
+    return kept
+
+
 def gv_scores(values):
     scores = []
 
@@ -98,7 +140,13 @@ for trace in sorted(TRACE_DIR.glob("*.csv")):
         if g < GV_THRESHOLD
     }
 
-    gv_hits = persistent_hits(raw_gv_hits, min_run=3, max_gap=1)
+    gv_hits = directional_degradation_filter(
+        raw_gv_hits,
+        values,
+        min_run=3,
+        max_gap=1,
+        min_net_change=8.0,
+    )
 
     z_hits = set()
     var_hits = set()
