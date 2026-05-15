@@ -15,6 +15,40 @@ def clamp01(x):
     return max(0.0, min(1.0, float(x)))
 
 
+
+def persistent_hits(raw_hits, min_run=3, max_gap=1):
+    """
+    Keep only transition candidates that persist.
+
+    Single-point spikes are not enough.
+    A transition must sustain across repeated nearby points.
+    """
+    raw_hits = sorted(raw_hits)
+
+    if not raw_hits:
+        return set()
+
+    groups = []
+    current = [raw_hits[0]]
+
+    for idx in raw_hits[1:]:
+        if idx - current[-1] <= max_gap + 1:
+            current.append(idx)
+        else:
+            groups.append(current)
+            current = [idx]
+
+    groups.append(current)
+
+    kept = set()
+
+    for group in groups:
+        if len(group) >= min_run:
+            kept.update(group)
+
+    return kept
+
+
 def gv_scores(values):
     scores = []
 
@@ -59,10 +93,12 @@ for trace in sorted(TRACE_DIR.glob("*.csv")):
 
     gv = gv_scores(values)
 
-    gv_hits = {
+    raw_gv_hits = {
         i for i, g in enumerate(gv)
         if g < GV_THRESHOLD
     }
+
+    gv_hits = persistent_hits(raw_gv_hits, min_run=3, max_gap=1)
 
     z_hits = set()
     var_hits = set()
@@ -96,6 +132,7 @@ for trace in sorted(TRACE_DIR.glob("*.csv")):
 
     results.append({
         "trace": trace.name,
+        "raw_gv_hits": len(raw_gv_hits),
         "gv_hits": len(gv_hits),
         "z_hits": len(z_hits),
         "var_hits": len(var_hits),
@@ -106,10 +143,10 @@ for trace in sorted(TRACE_DIR.glob("*.csv")):
 
 OUT.write_text(
     "# GV Multi-Trace Tournament\n\n"
-    + "| Trace | GV | Z | VAR | GV Unique | Selective | Distinct |\n"
-    + "|---|---:|---:|---:|---:|---|---|\n"
+    + "| Trace | Raw GV | Persistent GV | Z | VAR | GV Unique | Selective | Distinct |\n"
+    + "|---|---:|---:|---:|---:|---:|---|---|\n"
     + "\n".join(
-        f"| {r['trace']} | {r['gv_hits']} | {r['z_hits']} | {r['var_hits']} | {r['gv_unique']} | {r['selective']} | {r['distinct']} |"
+        f"| {r['trace']} | {r['raw_gv_hits']} | {r['gv_hits']} | {r['z_hits']} | {r['var_hits']} | {r['gv_unique']} | {r['selective']} | {r['distinct']} |"
         for r in results
     )
     + "\n",
