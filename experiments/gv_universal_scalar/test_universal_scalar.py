@@ -23,4 +23,4 @@ def main():
     print("\nUNIVERSAL SCALAR CONTRACT SMOKE TEST PASSED")
 
 if __name__ == "__main__":
-    main()\n
+    main()
