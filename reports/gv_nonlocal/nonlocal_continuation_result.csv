@@ -1,0 +1,4 @@
+system,path_score,loop_score,attacked_path,attacked_loop,advantage,result
+structured_continuity,0.734664,0.938399,0.941213,0.967493,-0.117821,NO_NONLOCAL_ADVANTAGE
+random_system,0.893878,0.964964,0.899307,0.961289,-0.000877,NO_NONLOCAL_ADVANTAGE
+fragmented_system,0.709748,0.633121,0.854612,0.933962,-0.222852,NO_NONLOCAL_ADVANTAGE
