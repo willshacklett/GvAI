@@ -94,7 +94,7 @@ def chat():
 
 
 # --- GV CONSCIENCE ROUTES ---
-@app.route("/api/conscience", methods=["GET"])
+@app.route("/api/conscience", methods=["GET"], endpoint="api_conscience_get_unique")
 def api_conscience_statement():
     return jsonify(gv_conscience_statement())
 
