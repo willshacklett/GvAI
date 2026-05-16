@@ -1,0 +1,5 @@
+test,metric,value,interpretation
+structured_continuity_rotation,order_survival,0.249861,High survival suggests meaningful continuity structure.
+random_system,incomparability_rate,0.371819,High incomparability weakens random continuity claims.
+local_global_deception,incomparability_rate,0.0,Global strain hidden behind local stability.
+random_rotation_survival,order_survival,0.348024,"If random survival equals structured survival, GV weakens."
