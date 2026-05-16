@@ -106,16 +106,20 @@ def api_conscience_evaluate():
     return jsonify(evaluate_action(action, context))
 # --- END GV CONSCIENCE ROUTES ---
 
+
+
+# --- GV BASE CODE KERNEL ROUTES ---
+@app.route("/api/gv/kernel", methods=["GET"], endpoint="api_gv_kernel_unique")
+def api_gv_kernel():
+    return jsonify(gv_manifest())
+
+@app.route("/api/gv/evaluate", methods=["GET"], endpoint="api_gv_evaluate_unique")
+def api_gv_evaluate():
+    action = request.args.get("action", "")
+    return jsonify(evaluate_gv_kernel(action))
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
 
 
 
-@app.get("/api/gv/kernel")
-def api_gv_kernel():
-    return jsonify(gv_manifest())
-
-@app.get("/api/gv/evaluate")
-def api_gv_evaluate():
-    action = request.args.get("action", "")
-    return jsonify(evaluate_gv_kernel(action))
