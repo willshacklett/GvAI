@@ -98,7 +98,7 @@ def chat():
 def api_conscience_statement():
     return jsonify(gv_conscience_statement())
 
-@app.route("/api/conscience/evaluate", methods=["POST"])
+@app.route("/api/conscience/evaluate", methods=["POST"], endpoint="api_conscience_evaluate_unique")
 def api_conscience_evaluate():
     payload = request.get_json(silent=True) or {}
     action = payload.get("action", "")
