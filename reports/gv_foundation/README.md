@@ -2,5 +2,5 @@
 
 Purpose:
 
-Re-anchor GV as a foundational continuity condition
-rather than merely a fitted projection metric.
+Define and stress-test the minimal continuity axioms beneath GV
+without reducing the project to one tuned scalar.
