@@ -1,0 +1,4 @@
+system,h0_strength,h1_obstruction,attacked_h0,attacked_h1,result
+structured_continuity,0.959545,0.0,0.95191,0.0,NO_OBSTRUCTION_ADVANTAGE
+random_system,0.918673,0.0,0.89033,0.0,NO_OBSTRUCTION_ADVANTAGE
+fragmented_system,0.616176,0.25,0.907077,0.0,NO_OBSTRUCTION_ADVANTAGE
