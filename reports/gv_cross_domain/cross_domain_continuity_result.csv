@@ -1,0 +1,5 @@
+domain,avg_survival,min_survival,result
+ecology_like,0.951358,0.922231,CONTINUITY_ORDER_RECURS
+infrastructure_like,0.947916,0.92035,CONTINUITY_ORDER_RECURS
+network_like,0.952221,0.933198,CONTINUITY_ORDER_RECURS
+latent_state_like,0.950342,0.926322,CONTINUITY_ORDER_RECURS
