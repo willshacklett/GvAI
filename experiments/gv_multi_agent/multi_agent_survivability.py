@@ -132,12 +132,12 @@ def summarize(rows):
             [r["system_survivability"] for r in rows]
         )), 6),
         "final_survivability": round(rows[-1]["system_survivability"], 6),
-        "min_global_coherence": round(min(
+        "min_global_coherence": round(float(min(
             r["global_coherence"] for r in rows
-        ), 6),
-        "max_fragmentation": round(max(
+        )), 6),
+        "max_fragmentation": round(float(max(
             r["fragmentation"] for r in rows
-        ), 6),
+        )), 6),
         "min_truth": round(min(
             r["mean_truth"] for r in rows
         ), 6),
