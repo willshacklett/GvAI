@@ -1,0 +1,7 @@
+dimension,risk_if_lost,gv_question
+memory continuity,identity fragmentation,Can the system preserve useful history without hallucinating continuity?
+intent continuity,goal drift,Can the system adapt while preserving the core task?
+correction continuity,repeated failure,Can the system recover from error instead of reinforcing it?
+constraint continuity,unsafe optimization,Can the system preserve boundaries under pressure?
+global coherence,local wins with global collapse,Can local adaptation remain globally consistent?
+truth continuity,narrative bias,Can the system preserve failed evidence as constraint?
