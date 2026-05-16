@@ -1,0 +1,8 @@
+mode,order_survival,flip_rate,cycle_rate,incomparability_rate
+baseline,1.0,0.0,8e-05,0.121069
+scale,1.0,0.0,8e-05,0.121069
+monotonic,1.0,0.0,8e-05,0.121069
+noise,0.798176,0.089453,0.00864,0.126619
+rotation,0.147334,0.172007,0.00016,0.690647
+condorcet_attack,0.787652,0.184051,0.03424,0.086845
+incomparability_attack,0.463517,0.456034,0.0,0.070709
