@@ -1,0 +1,4 @@
+system,gluing_score,shuffled_gluing,obstruction_rate,result
+structured_continuity,0.953047,0.944711,0.0,PARTIAL_CONTINUATION
+random_system,0.909748,0.907598,0.0,PARTIAL_CONTINUATION
+fragmented_system,0.759594,0.878399,1.0,NO_CONTINUATION_ADVANTAGE
