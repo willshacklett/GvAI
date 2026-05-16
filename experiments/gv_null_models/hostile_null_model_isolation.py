@@ -200,7 +200,7 @@ def main():
         writer.writeheader()
         writer.writerows(rows)
 
-    noise_lines = "\n".join(
+    noise_lines = "".join(
         f"| {n['noise']} | {round(n['corr'], 6)} | {round(n['pc1_explained'], 6)} |"
         for n in noise_tests
     )
@@ -256,4 +256,4 @@ It tests whether the proposed continuity scalar survives hostile null models.
 
 
 if __name__ == "__main__":
-    main()\n
+    main()

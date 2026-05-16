@@ -1,0 +1,2 @@
+source,rows,features,pc1_explained,gv_pc1_corr,random_avg_corr,random_p95_corr,random_best_corr,gv_percentile_vs_random,shuffled_avg_corr,shuffled_best_corr,rotated_corr,rotated_pc1_explained,result
+reports/gv_hypergraph/hypergraph_manifold_cases.csv,140,10,0.950194,0.860845,0.768444,0.987845,0.999497,0.5395,0.067858,0.281805,0.860845,0.950194,GV_ABOVE_AVERAGE_BUT_NOT_PRIVILEGED
