@@ -6,6 +6,7 @@ from gvai.grounding import grounding_packet, search_knowledge, rebuild_index
 from gvai.web_search import search_web
 from gvai.conscience import evaluate_action, gv_conscience_statement
 from gvai.conscience_routes import register_conscience_routes
+from gvai.gv_kernel import gv_manifest, evaluate_gv_kernel
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
 
@@ -107,3 +108,14 @@ def api_conscience_evaluate():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
+
+
+
+@app.get("/api/gv/kernel")
+def api_gv_kernel():
+    return jsonify(gv_manifest())
+
+@app.get("/api/gv/evaluate")
+def api_gv_evaluate():
+    action = request.args.get("action", "")
+    return jsonify(evaluate_gv_kernel(action))
