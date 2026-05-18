@@ -13,6 +13,7 @@ from gvai.kernel.arbitration import arbitrate
 from gvai.kernel.orchestrator import run_kernel
 from gvai.kernel.observatory import observatory_snapshot
 from gvai.kernel.protocol import build_gv_heartbeat, validate_heartbeat
+from gvai.kernel.phase_timeline import load_timeline, reset_timeline, update_timeline
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
 
@@ -241,6 +242,23 @@ def api_kernel_heartbeat_validate():
     data = request.get_json(silent=True) or {}
 
     return jsonify(validate_heartbeat(data))
+
+
+
+@app.route("/api/kernel/phase/timeline", methods=["GET", "POST"], endpoint="api_kernel_phase_timeline")
+def api_kernel_phase_timeline():
+
+    if request.method == "GET":
+        return jsonify(load_timeline())
+
+    data = request.get_json(silent=True) or {}
+
+    if data.get("reset") is True:
+        return jsonify(reset_timeline())
+
+    heartbeat = data.get("heartbeat") or data
+
+    return jsonify(update_timeline(heartbeat))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
