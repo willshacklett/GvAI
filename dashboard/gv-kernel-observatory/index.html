@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>GV Kernel Observatory</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <p class="eyebrow">GvAI Kernel</p>
+      <h1>GV Kernel Observatory</h1>
+      <p>Live recoverability telemetry for runtime scoring, trajectory, intervention, and arbitration.</p>
+      <button id="refresh">Refresh telemetry</button>
+    </header>
+
+    <section class="grid">
+      <article class="card"><span>Rolling GV</span><strong id="rolling-gv">—</strong></article>
+      <article class="card"><span>Trajectory</span><strong id="trajectory-mode">—</strong></article>
+      <article class="card"><span>Intervention</span><strong id="intervention-level">—</strong></article>
+      <article class="card"><span>Total Events</span><strong id="total-events">—</strong></article>
+    </section>
+
+    <section class="panel">
+      <h2>Risk Trends</h2>
+      <label>Drift Trend <progress id="drift-trend" max="1" value="0"></progress></label>
+      <label>Recoverability Trend <progress id="recoverability-trend" max="1" value="0"></progress></label>
+    </section>
+
+    <section class="panel">
+      <h2>Latest Event</h2>
+      <pre id="latest-event">Waiting for telemetry...</pre>
+    </section>
+
+    <section class="panel">
+      <h2>Kernel Feed</h2>
+      <pre id="feed">Booting observatory...</pre>
+    </section>
+  </main>
+
+  <script src="./observatory.js"></script>
+</body>
+</html>
