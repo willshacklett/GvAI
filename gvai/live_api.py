@@ -6,6 +6,7 @@ from gvai.grounding import grounding_packet, search_knowledge, rebuild_index
 from gvai.web_search import search_web
 from gvai.conscience import evaluate_action, gv_conscience_statement
 from gvai.conscience_routes import register_conscience_routes
+from gvai.kernel.runtime import score_runtime
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
 
@@ -104,6 +105,24 @@ def api_conscience_evaluate():
     context = payload.get("context", "")
     return jsonify(evaluate_action(action, context))
 # --- END GV CONSCIENCE ROUTES ---
+
+
+@app.route("/api/kernel/score", methods=["GET", "POST"], endpoint="api_kernel_score")
+def api_kernel_score():
+    if request.method == "GET":
+        return jsonify({
+            "ok": True,
+            "endpoint": "/api/kernel/score",
+            "method": "POST",
+            "purpose": "GV kernel runtime scoring"
+        })
+
+    data = request.get_json(silent=True) or {}
+    return jsonify(score_runtime(
+        user_message=data.get("user_message", ""),
+        candidate_response=data.get("candidate_response", ""),
+        context=data.get("context", "api-kernel-score")
+    ))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
