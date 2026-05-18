@@ -12,6 +12,7 @@ from gvai.kernel.intervention import decide_intervention
 from gvai.kernel.arbitration import arbitrate
 from gvai.kernel.orchestrator import run_kernel
 from gvai.kernel.observatory import observatory_snapshot
+from gvai.kernel.protocol import build_gv_heartbeat, validate_heartbeat
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
 
@@ -197,6 +198,49 @@ def gv_kernel_observatory_assets(path):
         path
     )
 
+
+
+
+@app.route(
+    "/api/kernel/heartbeat",
+    methods=["GET", "POST"],
+    endpoint="api_kernel_heartbeat"
+)
+def api_kernel_heartbeat():
+
+    if request.method == "GET":
+        payload = build_gv_heartbeat(
+            context="heartbeat-empty"
+        )
+
+        return jsonify(payload)
+
+    data = request.get_json(silent=True) or {}
+
+    payload = build_gv_heartbeat(
+        runtime=data.get("runtime", {}),
+        debt=data.get("debt", {}),
+        phase=data.get("phase", {}),
+        visible_coherence=data.get("visible_coherence"),
+        context=data.get(
+            "context",
+            "heartbeat-runtime"
+        ),
+    )
+
+    return jsonify(payload)
+
+
+@app.route(
+    "/api/kernel/heartbeat/validate",
+    methods=["POST"],
+    endpoint="api_kernel_heartbeat_validate"
+)
+def api_kernel_heartbeat_validate():
+
+    data = request.get_json(silent=True) or {}
+
+    return jsonify(validate_heartbeat(data))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
