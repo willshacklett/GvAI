@@ -10,6 +10,7 @@ from gvai.kernel.runtime import score_runtime
 from gvai.kernel.trajectory import load_state, reset_state, update_state
 from gvai.kernel.intervention import decide_intervention
 from gvai.kernel.arbitration import arbitrate
+from gvai.kernel.orchestrator import run_kernel
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
 
@@ -161,6 +162,17 @@ def api_kernel_arbitrate():
         user_message=data.get("user_message", ""),
         candidates=data.get("candidates", []),
         context=data.get("context", "api-kernel-arbitrate")
+    ))
+
+
+@app.route("/api/kernel/run", methods=["POST"], endpoint="api_kernel_run")
+def api_kernel_run():
+    data = request.get_json(silent=True) or {}
+    return jsonify(run_kernel(
+        user_message=data.get("user_message", ""),
+        candidate_response=data.get("candidate_response", ""),
+        candidates=data.get("candidates", []),
+        context=data.get("context", "api-kernel-run")
     ))
 
 if __name__ == "__main__":
