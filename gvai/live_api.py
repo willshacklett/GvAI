@@ -94,11 +94,11 @@ def chat():
 
 
 # --- GV CONSCIENCE ROUTES ---
-@app.route("/api/conscience", methods=["GET"])
+@app.route("/api/conscience", methods=["GET"], endpoint="api_conscience_statement_get")
 def api_conscience_statement():
     return jsonify(gv_conscience_statement())
 
-@app.route("/api/conscience/evaluate", methods=["POST"])
+@app.route("/api/conscience/evaluate", methods=["POST"], endpoint="api_conscience_evaluate_post")
 def api_conscience_evaluate():
     payload = request.get_json(silent=True) or {}
     action = payload.get("action", "")
