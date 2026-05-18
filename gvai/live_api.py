@@ -11,6 +11,7 @@ from gvai.kernel.trajectory import load_state, reset_state, update_state
 from gvai.kernel.intervention import decide_intervention
 from gvai.kernel.arbitration import arbitrate
 from gvai.kernel.orchestrator import run_kernel
+from gvai.kernel.observatory import observatory_snapshot
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
 
@@ -174,6 +175,11 @@ def api_kernel_run():
         candidates=data.get("candidates", []),
         context=data.get("context", "api-kernel-run")
     ))
+
+
+@app.route("/api/kernel/observatory", methods=["GET"], endpoint="api_kernel_observatory")
+def api_kernel_observatory():
+    return jsonify(observatory_snapshot())
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
