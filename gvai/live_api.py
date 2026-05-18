@@ -181,5 +181,22 @@ def api_kernel_run():
 def api_kernel_observatory():
     return jsonify(observatory_snapshot())
 
+
+
+@app.route("/dashboard/gv-kernel-observatory/")
+def gv_kernel_observatory():
+    return send_from_directory(
+        "dashboard/gv-kernel-observatory",
+        "index.html"
+    )
+
+@app.route("/dashboard/gv-kernel-observatory/<path:path>")
+def gv_kernel_observatory_assets(path):
+    return send_from_directory(
+        "dashboard/gv-kernel-observatory",
+        path
+    )
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
