@@ -9,6 +9,7 @@ from gvai.conscience_routes import register_conscience_routes
 from gvai.kernel.runtime import score_runtime
 from gvai.kernel.trajectory import load_state, reset_state, update_state
 from gvai.kernel.intervention import decide_intervention
+from gvai.kernel.arbitration import arbitrate
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
 
@@ -151,6 +152,16 @@ def api_kernel_intervention():
     data = request.get_json(silent=True) or {}
     state = data.get("state") or load_state()
     return jsonify(decide_intervention(state))
+
+
+@app.route("/api/kernel/arbitrate", methods=["POST"], endpoint="api_kernel_arbitrate")
+def api_kernel_arbitrate():
+    data = request.get_json(silent=True) or {}
+    return jsonify(arbitrate(
+        user_message=data.get("user_message", ""),
+        candidates=data.get("candidates", []),
+        context=data.get("context", "api-kernel-arbitrate")
+    ))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
