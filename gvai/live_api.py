@@ -8,6 +8,7 @@ from gvai.conscience import evaluate_action, gv_conscience_statement
 from gvai.conscience_routes import register_conscience_routes
 from gvai.kernel.runtime import score_runtime
 from gvai.kernel.trajectory import load_state, reset_state, update_state
+from gvai.kernel.intervention import decide_intervention
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
 
@@ -140,6 +141,16 @@ def api_kernel_trajectory():
     label = data.get("label", "api-kernel-trajectory")
 
     return jsonify(update_state(runtime_payload, label=label))
+
+
+@app.route("/api/kernel/intervention", methods=["GET", "POST"], endpoint="api_kernel_intervention")
+def api_kernel_intervention():
+    if request.method == "GET":
+        return jsonify(decide_intervention(load_state()))
+
+    data = request.get_json(silent=True) or {}
+    state = data.get("state") or load_state()
+    return jsonify(decide_intervention(state))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
