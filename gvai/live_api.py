@@ -19,6 +19,7 @@ from gvai.kernel.recovery_half_life import estimate_recovery_half_life
 from gvai.kernel.perturbation_sweep import run_perturbation_sweep
 from gvai.kernel.recovery_pride import recovery_pride_index
 from gvai.kernel.vitals import compute_vitals
+from gvai.kernel.recovery_belief import compute_recovery_belief
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
 
@@ -362,6 +363,24 @@ def api_kernel_vitals():
         phase_lock=lock,
         recovery_pride=pride,
     ))
+
+
+
+@app.route("/api/kernel/recovery/belief", methods=["POST"], endpoint="api_kernel_recovery_belief")
+def api_kernel_recovery_belief():
+    data = request.get_json(silent=True) or {}
+
+    vitals = data.get("vitals")
+
+    if not vitals:
+        vitals = compute_vitals(
+            heartbeat=data.get("heartbeat", {}),
+            timeline=data.get("timeline", {}),
+            phase_lock=data.get("phase_lock", {}),
+            recovery_pride=data.get("recovery_pride", {}),
+        )
+
+    return jsonify(compute_recovery_belief(vitals))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
