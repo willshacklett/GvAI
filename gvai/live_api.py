@@ -18,6 +18,7 @@ from gvai.kernel.phase_lock import detect_phase_lock
 from gvai.kernel.recovery_half_life import estimate_recovery_half_life
 from gvai.kernel.perturbation_sweep import run_perturbation_sweep
 from gvai.kernel.recovery_pride import recovery_pride_index
+from gvai.kernel.vitals import compute_vitals
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
 
@@ -317,6 +318,50 @@ def api_kernel_recovery_pride():
         )
 
     return jsonify(recovery_pride_index(sweep))
+
+
+
+@app.route("/api/kernel/vitals", methods=["GET", "POST"], endpoint="api_kernel_vitals")
+def api_kernel_vitals():
+
+    if request.method == "GET":
+        heartbeat = build_gv_heartbeat(context="vitals-empty")
+        timeline = load_timeline()
+        lock = detect_phase_lock(timeline)
+        sweep = run_perturbation_sweep(steps=6, reset=False)
+        pride = recovery_pride_index(sweep)
+
+        return jsonify(compute_vitals(
+            heartbeat=heartbeat,
+            timeline=timeline,
+            phase_lock=lock,
+            recovery_pride=pride,
+        ))
+
+    data = request.get_json(silent=True) or {}
+
+    heartbeat = data.get("heartbeat") or build_gv_heartbeat(
+        runtime=data.get("runtime", {}),
+        debt=data.get("debt", {}),
+        phase=data.get("phase", {}),
+        visible_coherence=data.get("visible_coherence"),
+        context=data.get("context", "vitals-runtime"),
+    )
+
+    timeline = data.get("timeline") or load_timeline()
+    lock = data.get("phase_lock") or detect_phase_lock(timeline)
+
+    pride = data.get("recovery_pride")
+    if pride is None:
+        sweep = data.get("sweep") or run_perturbation_sweep(steps=6, reset=False)
+        pride = recovery_pride_index(sweep)
+
+    return jsonify(compute_vitals(
+        heartbeat=heartbeat,
+        timeline=timeline,
+        phase_lock=lock,
+        recovery_pride=pride,
+    ))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
