@@ -22,6 +22,7 @@ from gvai.kernel.vitals import compute_vitals
 from gvai.kernel.recovery_belief import compute_recovery_belief
 from gvai.kernel.orchestra import orchestra_confidence
 from gvai.kernel.elevation import elevation_gate
+from gvai.kernel.conductor import conductor_decision
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
 
@@ -403,6 +404,20 @@ def api_kernel_elevation():
 
     return jsonify(elevation_gate(
         musicians=data.get("musicians", []),
+        required_note=float(data.get("required_note", 0.85)),
+        timing_tolerance=float(data.get("timing_tolerance", 0.08)),
+    ))
+
+
+
+@app.route("/api/kernel/conductor", methods=["POST"], endpoint="api_kernel_conductor")
+def api_kernel_conductor():
+    data = request.get_json(silent=True) or {}
+
+    return jsonify(conductor_decision(
+        musicians=data.get("musicians", []),
+        vitals=data.get("vitals", {}),
+        belief=data.get("belief", {}),
         required_note=float(data.get("required_note", 0.85)),
         timing_tolerance=float(data.get("timing_tolerance", 0.08)),
     ))
