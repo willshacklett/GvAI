@@ -15,6 +15,7 @@ from gvai.kernel.observatory import observatory_snapshot
 from gvai.kernel.protocol import build_gv_heartbeat, validate_heartbeat
 from gvai.kernel.phase_timeline import load_timeline, reset_timeline, update_timeline
 from gvai.kernel.phase_lock import detect_phase_lock
+from gvai.kernel.recovery_half_life import estimate_recovery_half_life
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
 
@@ -266,6 +267,12 @@ def api_kernel_phase_timeline():
 @app.route("/api/kernel/phase/lock", methods=["GET"], endpoint="api_kernel_phase_lock")
 def api_kernel_phase_lock():
     return jsonify(detect_phase_lock(load_timeline()))
+
+
+
+@app.route("/api/kernel/recovery/half-life", methods=["GET"], endpoint="api_kernel_recovery_half_life")
+def api_kernel_recovery_half_life():
+    return jsonify(estimate_recovery_half_life(load_timeline()))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
