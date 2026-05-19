@@ -21,6 +21,7 @@ from gvai.kernel.recovery_pride import recovery_pride_index
 from gvai.kernel.vitals import compute_vitals
 from gvai.kernel.recovery_belief import compute_recovery_belief
 from gvai.kernel.orchestra import orchestra_confidence
+from gvai.kernel.elevation import elevation_gate
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
 
@@ -393,6 +394,18 @@ def api_kernel_orchestra():
     musicians = data.get("musicians", [])
 
     return jsonify(orchestra_confidence(musicians))
+
+
+
+@app.route("/api/kernel/elevation", methods=["POST"], endpoint="api_kernel_elevation")
+def api_kernel_elevation():
+    data = request.get_json(silent=True) or {}
+
+    return jsonify(elevation_gate(
+        musicians=data.get("musicians", []),
+        required_note=float(data.get("required_note", 0.85)),
+        timing_tolerance=float(data.get("timing_tolerance", 0.08)),
+    ))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
