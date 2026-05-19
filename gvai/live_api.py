@@ -23,6 +23,7 @@ from gvai.kernel.recovery_belief import compute_recovery_belief
 from gvai.kernel.orchestra import orchestra_confidence
 from gvai.kernel.elevation import elevation_gate
 from gvai.kernel.conductor import conductor_decision
+from gvai.kernel.awareness import awareness_state
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
 
@@ -422,5 +423,17 @@ def api_kernel_conductor():
         timing_tolerance=float(data.get("timing_tolerance", 0.08)),
     ))
 
-if __name__ == "__main__":
+
+
+@app.route("/api/kernel/awareness", methods=["POST"], endpoint="api_kernel_awareness")
+def api_kernel_awareness():
+    data = request.get_json(silent=True) or {}
+
+    return jsonify(awareness_state(
+        heartbeat=data.get("heartbeat", {}),
+        vitals=data.get("vitals", {}),
+        belief=data.get("belief", {}),
+        conductor=data.get("conductor", {}),
+    ))
+\nif __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
