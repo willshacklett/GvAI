@@ -17,6 +17,7 @@ from gvai.kernel.phase_timeline import load_timeline, reset_timeline, update_tim
 from gvai.kernel.phase_lock import detect_phase_lock
 from gvai.kernel.recovery_half_life import estimate_recovery_half_life
 from gvai.kernel.perturbation_sweep import run_perturbation_sweep
+from gvai.kernel.recovery_pride import recovery_pride_index
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
 
@@ -292,6 +293,30 @@ def api_kernel_perturbation_sweep():
         arbitration_depth=int(data.get("arbitration_depth", 0)),
         reset=bool(data.get("reset", True)),
     ))
+
+
+
+@app.route("/api/kernel/recovery/pride", methods=["GET", "POST"], endpoint="api_kernel_recovery_pride")
+def api_kernel_recovery_pride():
+
+    if request.method == "GET":
+        sweep = run_perturbation_sweep()
+        return jsonify(recovery_pride_index(sweep))
+
+    data = request.get_json(silent=True) or {}
+
+    sweep = data.get("sweep")
+
+    if not sweep:
+        sweep = run_perturbation_sweep(
+            steps=int(data.get("steps", 12)),
+            perturbation_strength=float(data.get("perturbation_strength", 0.25)),
+            recovery_rate=float(data.get("recovery_rate", 0.15)),
+            arbitration_depth=int(data.get("arbitration_depth", 0)),
+            reset=bool(data.get("reset", True)),
+        )
+
+    return jsonify(recovery_pride_index(sweep))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
