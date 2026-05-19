@@ -16,6 +16,7 @@ from gvai.kernel.protocol import build_gv_heartbeat, validate_heartbeat
 from gvai.kernel.phase_timeline import load_timeline, reset_timeline, update_timeline
 from gvai.kernel.phase_lock import detect_phase_lock
 from gvai.kernel.recovery_half_life import estimate_recovery_half_life
+from gvai.kernel.perturbation_sweep import run_perturbation_sweep
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
 
@@ -273,6 +274,24 @@ def api_kernel_phase_lock():
 @app.route("/api/kernel/recovery/half-life", methods=["GET"], endpoint="api_kernel_recovery_half_life")
 def api_kernel_recovery_half_life():
     return jsonify(estimate_recovery_half_life(load_timeline()))
+
+
+
+@app.route("/api/kernel/perturbation/sweep", methods=["GET", "POST"], endpoint="api_kernel_perturbation_sweep")
+def api_kernel_perturbation_sweep():
+
+    if request.method == "GET":
+        return jsonify(run_perturbation_sweep())
+
+    data = request.get_json(silent=True) or {}
+
+    return jsonify(run_perturbation_sweep(
+        steps=int(data.get("steps", 12)),
+        perturbation_strength=float(data.get("perturbation_strength", 0.25)),
+        recovery_rate=float(data.get("recovery_rate", 0.15)),
+        arbitration_depth=int(data.get("arbitration_depth", 0)),
+        reset=bool(data.get("reset", True)),
+    ))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
