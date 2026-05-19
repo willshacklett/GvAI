@@ -20,6 +20,7 @@ from gvai.kernel.perturbation_sweep import run_perturbation_sweep
 from gvai.kernel.recovery_pride import recovery_pride_index
 from gvai.kernel.vitals import compute_vitals
 from gvai.kernel.recovery_belief import compute_recovery_belief
+from gvai.kernel.orchestra import orchestra_confidence
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
 
@@ -381,6 +382,17 @@ def api_kernel_recovery_belief():
         )
 
     return jsonify(compute_recovery_belief(vitals))
+
+
+
+@app.route("/api/kernel/orchestra", methods=["POST"], endpoint="api_kernel_orchestra")
+def api_kernel_orchestra():
+
+    data = request.get_json(silent=True) or {}
+
+    musicians = data.get("musicians", [])
+
+    return jsonify(orchestra_confidence(musicians))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
