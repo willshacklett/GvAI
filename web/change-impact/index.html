@@ -1,0 +1,75 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>GV Change Impact Precheck</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; max-width: 900px; }
+    label { display:block; margin-top:14px; font-weight:bold; }
+    input { width:100%; padding:10px; font-size:16px; }
+    button { margin-top:20px; padding:12px 18px; font-size:16px; cursor:pointer; }
+    pre { background:#111; color:#0f0; padding:18px; overflow:auto; margin-top:20px; }
+    .card { border:1px solid #ddd; border-radius:12px; padding:20px; margin-top:20px; }
+  </style>
+</head>
+<body>
+  <h1>GV Change Impact Precheck</h1>
+  <p>Score whether an organization can safely absorb a proposed change.</p>
+
+  <div class="card">
+    <label>New Tasks</label>
+    <input id="new_tasks" type="number" value="8" step="0.1">
+
+    <label>Manager Capacity</label>
+    <input id="manager_capacity" type="number" value="3" step="0.1">
+
+    <label>Training Readiness</label>
+    <input id="training_readiness" type="number" value="0.4" step="0.1" min="0" max="1">
+
+    <label>Clarity</label>
+    <input id="clarity" type="number" value="0.5" step="0.1" min="0" max="1">
+
+    <label>Recovery Plan Strength</label>
+    <input id="recovery_plan_strength" type="number" value="0.2" step="0.1" min="0" max="1">
+
+    <label>Active Changes</label>
+    <input id="active_changes" type="number" value="5" step="0.1">
+
+    <label>Safe Change Limit</label>
+    <input id="safe_change_limit" type="number" value="2" step="0.1">
+
+    <button onclick="scoreChange()">Score Change</button>
+  </div>
+
+  <pre id="output">Waiting for score...</pre>
+
+  <script>
+    async function scoreChange() {
+      const payload = {
+        new_tasks: Number(document.getElementById("new_tasks").value),
+        manager_capacity: Number(document.getElementById("manager_capacity").value),
+        training_readiness: Number(document.getElementById("training_readiness").value),
+        clarity: Number(document.getElementById("clarity").value),
+        recovery_plan_strength: Number(document.getElementById("recovery_plan_strength").value),
+        active_changes: Number(document.getElementById("active_changes").value),
+        safe_change_limit: Number(document.getElementById("safe_change_limit").value)
+      };
+
+      const apiBase = window.GVAI_API_BASE || "http://localhost:8000";
+
+      try {
+        const res = await fetch(`${apiBase}/api/change-impact`, {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        document.getElementById("output").textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById("output").textContent = "Error: " + err.message;
+      }
+    }
+  </script>
+</body>
+</html>
