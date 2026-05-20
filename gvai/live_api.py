@@ -1,3 +1,4 @@
+from gvai.change_impact import evaluate_change_impact
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from pathlib import Path
@@ -435,6 +436,28 @@ def api_kernel_awareness():
         belief=data.get("belief", {}),
         conductor=data.get("conductor", {}),
     ))
+
+
+
+@app.route("/api/change-impact", methods=["POST"])
+def api_change_impact():
+    try:
+        payload = request.json or {}
+
+        result = evaluate_change_impact(payload)
+
+        return jsonify({
+            "status": "success",
+            "type": "gv_change_impact",
+            "result": result
+        })
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
