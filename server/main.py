@@ -9,8 +9,11 @@ from typing import Any, Dict, List, Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from carl_os import CarlRuntime
 
 app = FastAPI(title="GvAI API", version="1.4.0")
+
+carl_runtime = CarlRuntime()
 
 app.add_middleware(
     CORSMiddleware,
@@ -22,6 +25,7 @@ app.add_middleware(
 
 class ChatRequest(BaseModel):
     message: str = ""
+    user_id: Optional[str] = None
     history: Optional[List[Dict[str, Any]]] = None
     messages: Optional[List[Dict[str, Any]]] = None
     mode: Optional[str] = "simple"
@@ -665,7 +669,21 @@ def api_chat(req: ChatRequest):
             system_prompt = gv_behavior_prompt(signal, mode, enforcement_mode, escalation)
 
             llm_history = [{"role": "system", "content": system_prompt}]
-            llm_history.extend(history)
+
+            carl_user_id = str(req.user_id or "").strip()
+
+            if carl_user_id:
+                carl_context = carl_runtime.build_chat_context(
+                    user_id=carl_user_id,
+                    message=user_message,
+                    history=history,
+                )
+
+                # Carl context already includes the current user message last.
+                # generate_llm_response receives that message separately.
+                llm_history.extend(carl_context[:-1])
+            else:
+                llm_history.extend(history)
 
             llm_text = generate_llm_response(
                 user_message=user_message,
@@ -713,6 +731,19 @@ def api_chat(req: ChatRequest):
             f"Status: {signal['label']}"
         )
 
+    carl_user_id = str(req.user_id or "").strip()
+
+    if carl_user_id:
+        try:
+            carl_runtime.record_exchange(
+                user_id=carl_user_id,
+                user_message=user_message,
+                assistant_reply=reply,
+            )
+        except Exception:
+            # Carl OS memory must never break the existing chat endpoint.
+            pass
+
     append_decision_log(
         user_message=user_message,
         signal=signal,
@@ -720,7 +751,6 @@ def api_chat(req: ChatRequest):
         escalation=escalation,
         enforcement_mode=enforcement_mode,
         engine=engine,
-        reply=reply,
     )
 
     return {
