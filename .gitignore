@@ -17,3 +17,4 @@ dashboard/data/
 *.png
 __pycache__/
 *.pyc
+logs/*.jsonl
