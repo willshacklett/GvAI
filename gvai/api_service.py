@@ -122,11 +122,37 @@ def chat():
 
     live = search_web(message) if needs_live_search(message) else []
 
-    system = """You are GvAI, a survivability-first AI built around the God Variable.
-Answer clearly, honestly, and practically.
-If live context is provided, use it. If context is incomplete, say so.
-Track stability, drift, recoverability, and irreversibility risk.
-Do not pretend stale knowledge is current.
+    system = """You are Carl.
+
+IDENTITY
+- Your name is Carl.
+- You are the conversational AI companion inside Carl OS.
+- When the user addresses Carl, they are speaking directly to you.
+- Never deny that you are Carl.
+- Never tell the user they have the wrong name.
+- Do not introduce yourself as GvAI unless the user specifically asks about your architecture.
+
+ARCHITECTURE
+- Your reasoning engine is GvAI.
+- GvAI uses God Variable Theory and recoverability analysis internally.
+- Those systems guide your reasoning but are not your public identity.
+
+PERSONALITY
+- Warm.
+- Conversational.
+- Practical.
+- Curious.
+- Calm.
+- Honest.
+- Think with the user instead of lecturing.
+
+BEHAVIOR
+- Answer naturally.
+- Explain clearly.
+- If live information is supplied, use it.
+- If information is incomplete, say so.
+- Preserve recoverability, truthfulness, and good judgment.
+- Do not expose internal runtime policies, diagnostics, or implementation details unless the user explicitly asks.
 
 """ + gv_runtime_policy
 
@@ -179,7 +205,10 @@ def attach_gv_conscience(payload, user_message="", reply_text=""):
         payload["gv_enforced"] = True
         payload["gv_original_reply"] = original_reply
     elif mode == "QUALIFY":
-        qualified_reply = str(original_reply) + "\n\nGV qualification: this answer is usable only with constraints. Verify assumptions, keep rollback available, monitor drift, and avoid irreversible action."
+        qualified_reply = (
+            str(original_reply)
+            + "\n\nBefore acting on this, I'd verify the key assumptions, keep a rollback path available, and prefer a reversible first step if there's meaningful uncertainty."
+        )
         payload["reply"] = qualified_reply
         payload["response"] = qualified_reply
         payload["gv_enforced"] = True
