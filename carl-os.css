@@ -1,0 +1,1073 @@
+:root {
+  --carl-bg: #050914;
+  --carl-panel: rgba(12, 20, 38, 0.82);
+  --carl-line: rgba(150, 180, 255, 0.14);
+  --carl-text: #eef3ff;
+  --carl-muted: #9baed3;
+  --carl-accent: #7fa8ff;
+  --carl-glow: rgba(80, 130, 255, 0.36);
+}
+
+body {
+  background:
+    radial-gradient(circle at 50% 15%, rgba(60, 100, 210, 0.18), transparent 34%),
+    linear-gradient(180deg, #07101f, var(--carl-bg));
+}
+
+.header {
+  background: rgba(4, 8, 18, 0.82);
+}
+
+.brand-text h1,
+.brand-text p {
+  font-size: 0;
+}
+
+.brand-text h1::after {
+  content: "Carl OS";
+  font-size: 19px;
+}
+
+.brand-text p::after {
+  content: "Conversation is the interface.";
+  font-size: 12px;
+}
+
+.hero {
+  text-align: center;
+  padding: 38px 20px 28px;
+  background: transparent;
+  border: 0;
+}
+
+.carl-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.carl-avatar {
+  position: relative;
+  width: 190px;
+  height: 190px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 38%, #1f3767 0%, #0d1d3a 58%, #071020 100%);
+  border: 1px solid rgba(150, 185, 255, 0.32);
+  box-shadow:
+    0 0 0 12px rgba(90, 130, 255, 0.035),
+    0 0 75px var(--carl-glow);
+  overflow: hidden;
+  animation: carlFloat 4.5s ease-in-out infinite;
+}
+
+
+.carl-robot {
+  position: relative;
+  width: 136px;
+  height: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.carl-helmet {
+  position: relative;
+  z-index: 4;
+  width: 112px;
+  height: 104px;
+  padding: 10px;
+  border-radius: 48% 48% 43% 43%;
+  background:
+    linear-gradient(145deg, #f7f9ff 0%, #bec9de 43%, #687795 100%);
+  box-shadow:
+    inset 6px 6px 12px rgba(255,255,255,0.55),
+    inset -8px -10px 18px rgba(18, 31, 61, 0.4),
+    0 12px 25px rgba(0,0,0,0.35);
+}
+
+.carl-helmet::before {
+  content: "";
+  position: absolute;
+  inset: 4px 17px auto;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,0.72),
+    rgba(255,255,255,0)
+  );
+  opacity: 0.75;
+}
+
+.carl-face-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 43% 43% 39% 39%;
+  background:
+    radial-gradient(circle at 50% 35%, #10294d 0%, #061429 48%, #020711 100%);
+  border: 2px solid rgba(90, 140, 255, 0.45);
+  box-shadow:
+    inset 0 0 22px rgba(34, 111, 255, 0.24),
+    0 0 16px rgba(48, 112, 255, 0.22);
+}
+
+.carl-face-screen::after {
+  content: "";
+  position: absolute;
+  inset: 8px 12px auto;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,0.11),
+    rgba(255,255,255,0)
+  );
+  pointer-events: none;
+}
+
+.carl-eye {
+  position: absolute;
+  top: 27px;
+  z-index: 2;
+  width: 14px;
+  height: 19px;
+  border-radius: 50%;
+  background: #40a2ff;
+  box-shadow:
+    0 0 6px #2f82ff,
+    0 0 14px rgba(43, 125, 255, 0.9);
+  animation: carlBlink 5s infinite;
+}
+
+.carl-eye.left {
+  left: 22px;
+}
+
+.carl-eye.right {
+  right: 22px;
+}
+
+.carl-mouth {
+  position: absolute;
+  left: 50%;
+  bottom: 15px;
+  z-index: 2;
+  width: 28px;
+  height: 10px;
+  transform: translateX(-50%);
+  border-bottom: 3px solid #44a8ff;
+  border-radius: 0 0 18px 18px;
+  background: transparent;
+  box-shadow: 0 4px 10px rgba(43, 132, 255, 0.35);
+}
+
+.carl-headphones {
+  position: absolute;
+  top: 29px;
+  z-index: 6;
+  width: 18px;
+  height: 53px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #d8e0ed, #53627e);
+  border: 2px solid #368bff;
+  box-shadow:
+    0 0 12px rgba(42, 132, 255, 0.9),
+    inset 0 0 8px rgba(255,255,255,0.35);
+}
+
+.carl-headphones span {
+  position: absolute;
+  inset: 8px 4px;
+  border-radius: 8px;
+  background: #07172d;
+  border: 1px solid #3d9cff;
+  box-shadow: inset 0 0 9px rgba(42, 132, 255, 0.75);
+}
+
+.carl-headphones-left {
+  left: 2px;
+}
+
+.carl-headphones-right {
+  right: 2px;
+}
+
+.carl-neck {
+  position: relative;
+  z-index: 2;
+  width: 28px;
+  height: 18px;
+  margin-top: -1px;
+  border-radius: 4px 4px 10px 10px;
+  background: linear-gradient(180deg, #6f7c96, #1d2940);
+}
+
+.carl-shoulders {
+  position: relative;
+  z-index: 1;
+  width: 100px;
+  height: 35px;
+  margin-top: -4px;
+  border-radius: 50px 50px 12px 12px;
+  background:
+    linear-gradient(145deg, #e8edf6, #7887a4 55%, #283550);
+  box-shadow:
+    inset 0 7px 10px rgba(255,255,255,0.2),
+    0 9px 18px rgba(0,0,0,0.3);
+}
+
+.carl-chest-light {
+  position: absolute;
+  left: 50%;
+  top: 11px;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: #419cff;
+  box-shadow:
+    0 0 8px #419cff,
+    0 0 18px rgba(65,156,255,0.85);
+}
+
+.carl-avatar.speaking .carl-mouth {
+  animation: carlSpeak 0.28s infinite alternate;
+}
+
+.carl-avatar.thinking .carl-eye {
+  animation:
+    carlBlink 5s infinite,
+    carlEyeThink 0.95s ease-in-out infinite alternate;
+}
+
+.carl-avatar.listening .carl-headphones {
+  box-shadow:
+    0 0 18px rgba(72, 182, 255, 1),
+    inset 0 0 10px rgba(255,255,255,0.45);
+}
+
+.carl-avatar.speaking .carl-chest-light {
+  animation: carlChestPulse 0.45s ease-in-out infinite alternate;
+}
+
+.carl-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--carl-muted);
+  font-size: 13px;
+}
+
+.carl-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #72a1ff;
+  box-shadow: 0 0 14px #72a1ff;
+}
+
+.carl-greeting {
+  margin: 0;
+  color: var(--carl-text);
+  font-size: clamp(25px, 4vw, 42px);
+  line-height: 1.1;
+}
+
+.carl-subtitle {
+  margin: 0;
+  color: var(--carl-muted);
+  font-size: 15px;
+}
+
+.chat {
+  min-height: 58vh;
+  border-color: var(--carl-line);
+  background: linear-gradient(
+    180deg,
+    rgba(14, 24, 46, 0.8),
+    rgba(6, 13, 27, 0.94)
+  );
+}
+
+.msg.assistant {
+  background: linear-gradient(180deg, #13284c, #0b192f);
+}
+
+.composer {
+  background: rgba(8, 16, 31, 0.9);
+  border: 1px solid var(--carl-line);
+}
+
+.send {
+  background: linear-gradient(145deg, #315edc, #6f9cff);
+}
+
+@keyframes carlFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes carlBlink {
+  0%, 45%, 48%, 100% { transform: scaleY(1); }
+  46%, 47% { transform: scaleY(0.08); }
+}
+
+@keyframes carlSpeak {
+  from {
+    height: 7px;
+    width: 28px;
+  }
+  to {
+    height: 19px;
+    width: 22px;
+    border-radius: 50%;
+    background: rgba(46, 138, 255, 0.28);
+  }
+}
+
+@keyframes carlEyeThink {
+  from {
+    transform: translateX(-2px);
+  }
+  to {
+    transform: translateX(2px);
+  }
+}
+
+@keyframes carlChestPulse {
+  from {
+    opacity: 0.55;
+    transform: translateX(-50%) scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.2);
+  }
+}
+
+@media (max-width: 700px) {
+  .carl-avatar {
+    width: 150px;
+    height: 150px;
+  }
+
+  .carl-face {
+    transform: scale(0.8);
+  }
+
+  .top-links a {
+    display: none;
+  }
+}
+
+.carl-avatar.thinking {
+  animation:
+    carlFloat 4.5s ease-in-out infinite,
+    carlThink 1.15s ease-in-out infinite;
+}
+
+.carl-avatar.listening {
+  box-shadow:
+    0 0 0 12px rgba(88, 214, 255, 0.05),
+    0 0 90px rgba(88, 214, 255, 0.58);
+}
+
+.carl-avatar.speaking {
+  box-shadow:
+    0 0 0 12px rgba(125, 155, 255, 0.06),
+    0 0 95px rgba(100, 145, 255, 0.68);
+}
+
+@keyframes carlThink {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.25); }
+}
+
+.carl-workspace-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 0;
+  gap: 0;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  transition: grid-template-columns 0.35s ease, gap 0.35s ease;
+}
+
+.carl-workspace-shell.workspace-open {
+  grid-template-columns: minmax(420px, 0.9fr) minmax(420px, 1.1fr);
+  gap: 16px;
+}
+
+.carl-workspace-shell .chat {
+  min-width: 0;
+}
+
+.workspace-panel {
+  min-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(24px);
+  pointer-events: none;
+  border: 1px solid var(--carl-line);
+  border-radius: 20px;
+  background: linear-gradient(
+    180deg,
+    rgba(15, 27, 51, 0.96),
+    rgba(7, 15, 29, 0.98)
+  );
+  transition:
+    opacity 0.3s ease,
+    transform 0.35s ease;
+}
+
+.workspace-open .workspace-panel {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.workspace-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--carl-line);
+}
+
+.workspace-label {
+  color: var(--carl-muted);
+  font-size: 12px;
+}
+
+.workspace-header h3 {
+  margin: 4px 0 0;
+}
+
+#closeWorkspaceBtn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--carl-line);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.04);
+  color: var(--carl-text);
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.workspace-content {
+  min-height: 58vh;
+  padding: 22px;
+}
+
+.empty-workspace {
+  min-height: 48vh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  text-align: center;
+  color: var(--carl-muted);
+}
+
+.workspace-icon {
+  font-size: 42px;
+  color: var(--carl-accent);
+  text-shadow: 0 0 24px var(--carl-glow);
+}
+
+.empty-workspace h4 {
+  margin: 14px 0 6px;
+  color: var(--carl-text);
+  font-size: 22px;
+}
+
+.empty-workspace p {
+  max-width: 360px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.build-btn {
+  min-height: 46px;
+  padding: 0 18px;
+  border: 1px solid rgba(130, 170, 255, 0.5);
+  border-radius: 14px;
+  background: rgba(65, 105, 210, 0.16);
+  color: var(--carl-text);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.build-btn:hover {
+  background: rgba(65, 105, 210, 0.28);
+}
+
+@media (max-width: 900px) {
+  .carl-workspace-shell.workspace-open {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-open .chat {
+    display: none;
+  }
+}
+
+
+/* Rendered Carl portrait — overrides the CSS-built robot */
+.carl-avatar.carl-rendered {
+  position: relative !important;
+  width: 220px !important;
+  height: 220px !important;
+  padding: 0 !important;
+  display: block !important;
+  overflow: hidden !important;
+  border-radius: 50% !important;
+  background: #07142d !important;
+  border: 2px solid #347cff !important;
+  box-shadow:
+    0 0 0 8px rgba(52, 124, 255, 0.05),
+    0 0 55px rgba(52, 124, 255, 0.58) !important;
+}
+
+.carl-rendered .carl-avatar-image {
+  position: absolute;
+  width: 660px !important;
+  height: auto !important;
+  max-width: none !important;
+  left: 50%;
+  top: -24px;
+  display: block !important;
+  transform: translateX(-50%) !important;
+  transform-origin: center top;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* State feedback */
+.carl-avatar.carl-rendered.listening {
+  box-shadow:
+    0 0 0 9px rgba(61, 196, 255, 0.08),
+    0 0 75px rgba(61, 196, 255, 0.82) !important;
+}
+
+.carl-avatar.carl-rendered.thinking {
+  animation:
+    carlFloat 4.5s ease-in-out infinite,
+    carlRenderedThink 1.1s ease-in-out infinite !important;
+}
+
+.carl-avatar.carl-rendered.speaking {
+  box-shadow:
+    0 0 0 9px rgba(73, 137, 255, 0.08),
+    0 0 75px rgba(73, 137, 255, 0.82) !important;
+}
+
+.carl-avatar.carl-rendered.speaking .carl-avatar-image {
+  animation: carlRenderedSpeak 0.42s ease-in-out infinite alternate;
+}
+
+@keyframes carlRenderedThink {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.16); }
+}
+
+@keyframes carlRenderedSpeak {
+  from { transform: translateX(-50%) scale(1); }
+  to { transform: translateX(-50%) scale(1.025); }
+}
+
+@media (max-width: 700px) {
+  .carl-avatar.carl-rendered {
+    width: 180px !important;
+    height: 180px !important;
+  }
+
+  .carl-rendered .carl-avatar-image {
+    width: 540px !important;
+    top: -20px;
+  }
+}
+
+
+/* =========================================================
+   CARL LIVE FACE
+   Rendered robot body + animated facial overlay
+   ========================================================= */
+
+.carl-avatar.carl-rendered {
+  position: relative !important;
+  width: 220px !important;
+  height: 220px !important;
+  padding: 0 !important;
+  display: block !important;
+  overflow: hidden !important;
+  border-radius: 50% !important;
+  background: #06132b !important;
+  border: 2px solid #347cff !important;
+  box-shadow:
+    0 0 0 8px rgba(52, 124, 255, 0.05),
+    0 0 58px rgba(52, 124, 255, 0.6) !important;
+}
+
+.carl-rendered .carl-avatar-image {
+  position: absolute !important;
+  z-index: 1;
+  width: 660px !important;
+  height: auto !important;
+  max-width: none !important;
+  left: 50% !important;
+  top: -24px !important;
+  display: block !important;
+  transform: translateX(-50%) !important;
+  transform-origin: center top !important;
+  user-select: none;
+  pointer-events: none;
+}
+
+/*
+ * This dark panel covers the eyes and mouth baked into the PNG,
+ * then supplies the live animated face.
+ */
+.carl-live-face {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 54px;
+  width: 91px;
+  height: 70px;
+  transform: translateX(-50%);
+  overflow: hidden;
+  border-radius: 39px 39px 34px 34px;
+  background:
+    radial-gradient(circle at 50% 35%, #0b2344 0%, #030d1d 52%, #01050c 100%);
+  box-shadow:
+    inset 0 0 22px rgba(35, 112, 255, 0.26),
+    0 0 8px rgba(25, 93, 215, 0.16);
+  pointer-events: none;
+}
+
+/* Glass reflection */
+.carl-live-face::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: 5px;
+  left: 15px;
+  width: 58px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.09),
+    rgba(255, 255, 255, 0)
+  );
+}
+
+.carl-live-eye {
+  position: absolute;
+  z-index: 3;
+  top: 21px;
+  width: 16px;
+  height: 16px;
+  border: 4px solid #39a8ff;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow:
+    0 0 5px #218aff,
+    0 0 13px rgba(28, 137, 255, 0.95);
+  transform-origin: center;
+  animation: carlLiveBlink 5.4s infinite;
+}
+
+.carl-live-eye.left {
+  left: 20px;
+}
+
+.carl-live-eye.right {
+  right: 20px;
+}
+
+.carl-live-mouth {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: 13px;
+  width: 27px;
+  height: 9px;
+  transform: translateX(-50%);
+  border-bottom: 3px solid #39a8ff;
+  border-radius: 0 0 20px 20px;
+  background: transparent;
+  box-shadow: 0 5px 9px rgba(30, 133, 255, 0.38);
+}
+
+.carl-avatar-glass {
+  position: absolute;
+  z-index: 6;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid rgba(93, 157, 255, 0.48);
+  box-shadow:
+    inset 0 0 14px rgba(63, 124, 255, 0.16),
+    0 0 18px rgba(52, 124, 255, 0.3);
+  pointer-events: none;
+}
+
+/* Listening */
+.carl-avatar.carl-rendered.listening {
+  box-shadow:
+    0 0 0 9px rgba(54, 191, 255, 0.09),
+    0 0 78px rgba(54, 191, 255, 0.86) !important;
+}
+
+.carl-avatar.listening .carl-live-eye {
+  box-shadow:
+    0 0 7px #3cc7ff,
+    0 0 19px rgba(48, 197, 255, 1);
+}
+
+/* Thinking */
+.carl-avatar.carl-rendered.thinking {
+  animation:
+    carlFloat 4.5s ease-in-out infinite,
+    carlLiveThink 1.05s ease-in-out infinite !important;
+}
+
+.carl-avatar.thinking .carl-live-eye.left {
+  animation:
+    carlLiveBlink 5.4s infinite,
+    carlLookLeft 0.9s ease-in-out infinite alternate;
+}
+
+.carl-avatar.thinking .carl-live-eye.right {
+  animation:
+    carlLiveBlink 5.4s infinite,
+    carlLookRight 0.9s ease-in-out infinite alternate;
+}
+
+/* Speaking */
+.carl-avatar.carl-rendered.speaking {
+  box-shadow:
+    0 0 0 9px rgba(74, 137, 255, 0.09),
+    0 0 82px rgba(74, 137, 255, 0.87) !important;
+}
+
+.carl-avatar.speaking .carl-live-mouth {
+  animation: carlLiveSpeak 0.22s ease-in-out infinite alternate;
+}
+
+/* Gentle body movement while speaking */
+.carl-avatar.speaking .carl-avatar-image {
+  animation: carlRenderedBodySpeak 0.48s ease-in-out infinite alternate;
+}
+
+/* Blink: mostly open, briefly closed */
+@keyframes carlLiveBlink {
+  0%, 42%, 45%, 84%, 87%, 100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+
+  43%, 44%, 85%, 86% {
+    transform: scaleY(0.08);
+    opacity: 0.7;
+  }
+}
+
+@keyframes carlLiveSpeak {
+  from {
+    width: 27px;
+    height: 9px;
+    bottom: 13px;
+    border-radius: 0 0 20px 20px;
+    background: transparent;
+  }
+
+  to {
+    width: 18px;
+    height: 17px;
+    bottom: 9px;
+    border-radius: 50%;
+    border: 3px solid #39a8ff;
+    background: rgba(39, 132, 255, 0.2);
+    box-shadow:
+      0 0 5px #218aff,
+      0 0 13px rgba(28, 137, 255, 0.78);
+  }
+}
+
+@keyframes carlLiveThink {
+  0%, 100% {
+    filter: brightness(1);
+  }
+
+  50% {
+    filter: brightness(1.16);
+  }
+}
+
+@keyframes carlLookLeft {
+  from {
+    translate: 0 0;
+  }
+
+  to {
+    translate: -3px 0;
+  }
+}
+
+@keyframes carlLookRight {
+  from {
+    translate: 0 0;
+  }
+
+  to {
+    translate: 3px 0;
+  }
+}
+
+@keyframes carlRenderedBodySpeak {
+  from {
+    transform: translateX(-50%) scale(1);
+  }
+
+  to {
+    transform: translateX(-50%) scale(1.012);
+  }
+}
+
+@media (max-width: 700px) {
+  .carl-avatar.carl-rendered {
+    width: 180px !important;
+    height: 180px !important;
+  }
+
+  .carl-rendered .carl-avatar-image {
+    width: 540px !important;
+    top: -20px !important;
+  }
+
+  .carl-live-face {
+    top: 44px;
+    width: 74px;
+    height: 58px;
+    border-radius: 32px 32px 28px 28px;
+  }
+
+  .carl-live-eye {
+    top: 17px;
+    width: 12px;
+    height: 12px;
+    border-width: 3px;
+  }
+
+  .carl-live-eye.left {
+    left: 17px;
+  }
+
+  .carl-live-eye.right {
+    right: 17px;
+  }
+
+  .carl-live-mouth {
+    bottom: 10px;
+    width: 23px;
+  }
+}
+
+
+/* =========================================================
+   CARL EXPRESSION CLEANUP
+   Preserve the rendered face; animate only lids and mouth glow.
+   ========================================================= */
+
+.carl-live-face,
+.carl-live-eye,
+.carl-live-mouth {
+  display: none !important;
+}
+
+.carl-expression-layer {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: 54px;
+  width: 91px;
+  height: 70px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.carl-blink-lid {
+  position: absolute;
+  top: 22px;
+  width: 18px;
+  height: 0;
+  border-radius: 50%;
+  background: #071426;
+  box-shadow: 0 0 8px rgba(22, 104, 230, 0.25);
+  transform-origin: center;
+  animation: carlCleanBlink 5.4s infinite;
+}
+
+.carl-blink-lid.left {
+  left: 18px;
+}
+
+.carl-blink-lid.right {
+  right: 18px;
+}
+
+.carl-mouth-pulse {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  width: 26px;
+  height: 8px;
+  transform: translateX(-50%);
+  border-radius: 0 0 18px 18px;
+  background: transparent;
+  opacity: 0;
+}
+
+.carl-avatar.speaking .carl-mouth-pulse {
+  animation: carlCleanSpeak 0.24s ease-in-out infinite alternate;
+}
+
+.carl-avatar.thinking .carl-expression-layer {
+  animation: carlCleanThink 1.1s ease-in-out infinite;
+}
+
+@keyframes carlCleanBlink {
+  0%, 43%, 45%, 85%, 87%, 100% {
+    height: 0;
+    opacity: 0;
+  }
+
+  44%, 86% {
+    height: 18px;
+    opacity: 1;
+  }
+}
+
+@keyframes carlCleanSpeak {
+  from {
+    width: 24px;
+    height: 6px;
+    opacity: 0.1;
+    background: rgba(47, 146, 255, 0.12);
+    box-shadow: 0 0 5px rgba(47, 146, 255, 0.2);
+  }
+
+  to {
+    width: 18px;
+    height: 15px;
+    opacity: 0.9;
+    border-radius: 50%;
+    background: rgba(47, 146, 255, 0.25);
+    box-shadow:
+      0 0 6px #2f92ff,
+      0 0 14px rgba(47, 146, 255, 0.6);
+  }
+}
+
+@keyframes carlCleanThink {
+  0%, 100% {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  50% {
+    transform: translateX(-50%) translateY(-2px);
+  }
+}
+
+@media (max-width: 700px) {
+  .carl-expression-layer {
+    top: 44px;
+    width: 74px;
+    height: 58px;
+  }
+
+  .carl-blink-lid {
+    top: 18px;
+    width: 14px;
+  }
+
+  .carl-blink-lid.left {
+    left: 15px;
+  }
+
+  .carl-blink-lid.right {
+    right: 15px;
+  }
+
+  .carl-mouth-pulse {
+    bottom: 10px;
+    width: 22px;
+  }
+}
+
+/* Softer glass-matched blink */
+.carl-blink-lid {
+  height: 18px !important;
+  border-radius: 50% !important;
+  background:
+    radial-gradient(
+      circle at 50% 45%,
+      rgba(11, 35, 68, 0.96),
+      rgba(3, 13, 29, 0.98) 72%
+    ) !important;
+  box-shadow:
+    inset 0 0 5px rgba(47, 135, 255, 0.16),
+    0 0 3px rgba(20, 75, 160, 0.15) !important;
+  opacity: 0;
+  transform: scaleY(0);
+  transform-origin: center;
+  animation: carlGlassBlink 5.4s infinite !important;
+}
+
+@keyframes carlGlassBlink {
+  0%, 43%, 45%, 85%, 87%, 100% {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+
+  43.6%, 44.4%, 85.6%, 86.4% {
+    opacity: 0.96;
+    transform: scaleY(1);
+  }
+}
+
+.carl-avatar-live {
+  width: 220px;
+  height: 220px;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 2px solid #347cff;
+  background: #06132b;
+  box-shadow:
+    0 0 0 8px rgba(52, 124, 255, 0.05),
+    0 0 58px rgba(52, 124, 255, 0.6);
+}
+
+.carl-avatar-live iframe {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border: 0;
+  background: transparent;
+}
+
+@media (max-width: 700px) {
+  .carl-avatar-live {
+    width: 180px;
+    height: 180px;
+  }
+}

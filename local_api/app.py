@@ -1,30 +1,20 @@
 from __future__ import annotations
 
+import math
 import re
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="GvAI")
+app = FastAPI(title="GvAI Local App")
 
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://gvai.io",
-        "https://www.gvai.io",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
+# ----------------------------
+# request models
+# ----------------------------
 class ScoreRequest(BaseModel):
     text: str | None = None
     message: str | None = None
@@ -34,6 +24,9 @@ class ScoreRequest(BaseModel):
     tone: str | None = "clean"
 
 
+# ----------------------------
+# optional real engine import
+# ----------------------------
 ENGINE_AVAILABLE = False
 compute_recoverability_signal = None
 
@@ -45,6 +38,9 @@ except Exception:
     ENGINE_AVAILABLE = False
 
 
+# ----------------------------
+# helpers
+# ----------------------------
 def variance_of(values: list[float]) -> float:
     if not values:
         return 0.0
@@ -177,18 +173,92 @@ def fallback_signal(series: list[float]) -> dict[str, Any]:
     }
 
 
+def engine_signal(series: list[float]) -> dict[str, Any]:
+    if not series:
+        return fallback_signal(series)
+
+    results = []
+    variance_history = []
+    breach_step = None
+    drift_step = None
+
+    for i in range(len(series)):
+        window = series[: i + 1]
+        variance_history.append(variance_of(window))
+        state = compute_recoverability_signal(
+            node_values=window,
+            variance_history=variance_history,
+            load_values=None,
+            latency_values=None,
+        )
+
+        drift_obj = getattr(state, "drift", None)
+        row = {
+            "step": i,
+            "input_value": window[-1],
+            "variance_value": getattr(state, "variance_value", None),
+            "variance_breach": getattr(state, "variance_breach", None),
+            "drift": {
+                "slope": getattr(drift_obj, "slope", None),
+                "mean": getattr(drift_obj, "mean", None),
+                "variance": getattr(drift_obj, "variance", None),
+                "drift_confirmed": getattr(drift_obj, "drift_confirmed", None),
+            },
+            "load_skew": getattr(state, "load_skew", None),
+            "latency_skew": getattr(state, "latency_skew", None),
+            "recoverability_score": getattr(state, "recoverability_score", None),
+            "status": getattr(state, "status", None),
+            "delta_t_estimate": getattr(state, "delta_t_estimate", None),
+        }
+        if breach_step is None and row["variance_breach"]:
+            breach_step = i
+        if drift_step is None and row["drift"]["drift_confirmed"]:
+            drift_step = i
+        results.append(row)
+
+    last = results[-1]
+    score_100 = round(float(last["recoverability_score"] or 0.0) * 100.0, 2)
+    passed = bool((last["status"] or "").lower() in {"stable", "warning"} and score_100 >= 65.0)
+    fired = bool(last["variance_breach"] or last["drift"]["drift_confirmed"])
+
+    reasons = []
+    if last["variance_breach"]:
+        reasons.append("Variance breach detected.")
+    if last["drift"]["drift_confirmed"]:
+        reasons.append("Drift confirmation present.")
+    if not reasons:
+        reasons.append("Signal remains inside the stable boundary.")
+
+    return {
+        "score": score_100,
+        "passed": passed,
+        "fired": fired,
+        "lead_time": last["delta_t_estimate"],
+        "mean_step": round(sum(series) / len(series), 6),
+        "drift_step": drift_step,
+        "breach_step": breach_step,
+        "collapse_step": None,
+        "reasons": reasons,
+        "signal": last,
+        "timeline": results[-10:],
+    }
+
+
 def build_score(series: list[float]) -> dict[str, Any]:
+    if ENGINE_AVAILABLE and compute_recoverability_signal is not None:
+        try:
+            return engine_signal(series)
+        except Exception:
+            return fallback_signal(series)
     return fallback_signal(series)
 
 
+# ----------------------------
+# api routes
+# ----------------------------
 @app.get("/health")
 def health():
     return {"ok": True, "engine_available": ENGINE_AVAILABLE}
-
-
-@app.options("/{path:path}")
-def preflight(path: str):
-    return {"ok": True}
 
 
 @app.post("/score")
@@ -196,6 +266,7 @@ def score(req: ScoreRequest):
     incoming_text = req.text or req.message or req.input or req.prompt or ""
     tone = req.tone or "clean"
     series = req.series if req.series else text_to_series(incoming_text)
+
     scored = build_score(series)
 
     return {
@@ -231,4 +302,5 @@ def score(req: ScoreRequest):
     }
 
 
+# static site last
 app.mount("/", StaticFiles(directory=".", html=True), name="site")

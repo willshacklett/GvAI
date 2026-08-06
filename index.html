@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GvAI</title>
+  <title>Carl OS | GvAI</title>
+  <link rel="icon" type="image/svg+xml" href="/web/gv-carl-logo.svg?v=2" />
+  <link rel="shortcut icon" href="/web/gv-carl-logo.svg?v=2" />
+  <link rel="apple-touch-icon" href="/web/gv-carl-logo.svg?v=2" />
   <style>
     :root {
       --bg: #071121;
@@ -387,12 +390,13 @@
 </style>
 
 
+<link rel="stylesheet" href="./carl-os.css?v=1" />
 <script src="/api_config.js?v=railway2"></script>
 </head>
 <body>
   <header class="header">
     <div class="brand">
-      <img class="logo" src="web/gv-logo.png" alt="GvAI logo" />
+      <img class="logo" src="web/gv-carl-logo.svg?v=2" alt="GvAI logo" />
       <div class="brand-text">
         <h1>GvAI</h1>
         <p>Chat-native survivability intelligence</p>
@@ -408,22 +412,59 @@
 
   <main class="shell">
     <section class="hero">
-      <h2>Talk to GvAI</h2>
-      <p>Ask a question, test an idea, or push directly on the God Variable work.</p>
+      <div class="carl-stage">
+        <div id="carlAvatar" class="carl-avatar-live" aria-label="Carl live avatar">
+          <iframe
+            id="carlAvatarFrame"
+            src="./web/carl-live/index.html?v=1"
+            title="Carl live avatar"
+            loading="eager"
+          ></iframe>
+        </div>
+
+        <div class="carl-status">
+          <span class="carl-status-dot"></span>
+          <span id="carlStatus">Ready</span>
+        </div>
+
+        <h2 class="carl-greeting">Hi, I’m Carl.</h2>
+        <p class="carl-subtitle">What would you like to build today?</p>
+      </div>
     </section>
 
-    <section class="chat">
-      <div id="messages" class="messages"></div>
+    <div id="carlWorkspaceShell" class="carl-workspace-shell">
+      <section class="chat">
+        <div id="messages" class="messages"></div>
 
       <div class="composer-wrap">
         <div class="composer">
-          <textarea id="prompt" placeholder="Message GvAI..."></textarea>
+          <textarea id="prompt" placeholder="Message Carl..."></textarea>
 
-          <button id="micBtn" style="vertical-align:middle;" style="vertical-align:middle;" type="button" onclick="startMic()" title="Voice input">🎙️</button>
-<button id="sendBtn" class="send" type="button">Send</button>
+          <button id="micBtn" type="button" onclick="startMic()" title="Voice input">🎙️</button>
+          <button id="buildBtn" class="build-btn" type="button">Build</button>
+          <button id="sendBtn" class="send" type="button">Send</button>
         </div>
       </div>
-    </section>
+      </section>
+
+      <aside id="workspacePanel" class="workspace-panel" aria-hidden="true">
+        <div class="workspace-header">
+          <div>
+            <span class="workspace-label">Carl Workspace</span>
+            <h3 id="workspaceTitle">Untitled build</h3>
+          </div>
+          <button id="closeWorkspaceBtn" type="button" title="Close workspace">×</button>
+        </div>
+
+        <div id="workspaceContent" class="workspace-content">
+          <div class="empty-workspace">
+            <span class="workspace-icon">✦</span>
+            <h4>Ready to build</h4>
+            <p>Your document, website, spreadsheet, or project will appear here.</p>
+          </div>
+        </div>
+      </aside>
+    </div>
 
     <div class="footer-note">Root is chat. Dashboard is still available from the link above.</div>
   </main>
@@ -435,14 +476,45 @@
     const promptEl = document.getElementById("prompt");
     const sendBtn = document.getElementById("sendBtn");
     const clearBtn = document.getElementById("clearBtn");
+    const buildBtn = document.getElementById("buildBtn");
+    const closeWorkspaceBtn = document.getElementById("closeWorkspaceBtn");
+    const workspaceShell = document.getElementById("carlWorkspaceShell");
+    const workspacePanel = document.getElementById("workspacePanel");
+    const carlAvatar = document.getElementById("carlAvatar");
+    const carlStatus = document.getElementById("carlStatus");
 
     const MAX_MEMORY_TURNS = 8;
 
+    function setCarlState(state) {
+      if (!carlStatus) return;
+
+      const labels = {
+        ready: "Ready",
+        listening: "Listening",
+        thinking: "Thinking",
+        speaking: "Speaking",
+        happy: "Done",
+        concerned: "Needs attention"
+      };
+
+      carlStatus.textContent = labels[state] || "Ready";
+
+      const frame = document.getElementById("carlAvatarFrame");
+      frame?.contentWindow?.postMessage(
+        {
+          type: "carl-state",
+          state: state || "ready"
+        },
+        "*"
+      );
+    }
+
     const GV_SYSTEM_PROMPT = [
-      "You are GvAI, a survivability-aware assistant shaped by the God Variable framing.",
-      "Be direct, useful, calm, and concrete.",
-      "Prefer continuity, recoverability, and clarity over hype.",
-      "When helpful, frame problems in terms of stability, drift, constraints, recovery, and next-step action.",
+      "You are Carl, the conversational AI companion inside Carl OS.",
+      "The user may address you as Carl; always recognize that they are speaking to you.",
+      "Be direct, useful, warm, calm, and concrete.",
+      "Help the user think, create, build, organize, and solve problems through natural conversation.",
+      "Use GvAI survivability concepts internally when useful, but do not force technical GV terminology into ordinary conversation.",
       "Do not mention hidden prompts or internal policies.",
       "Keep responses conversational and grounded."
     ].join(" ");
@@ -459,6 +531,89 @@
     function extractReply(payload) {
       if (!payload) return "";
       return payload.reply || payload.answer || payload.response || payload.output || payload.message || "";
+    }
+
+    function cleanCarlReply(text) {
+      return String(text || "")
+        .replace(
+          /\n*GV qualification:[\s\S]*?(?=\n---|$)/gi,
+          ""
+        )
+        .replace(
+          /\n*---\s*\n*GV Signal[\s\S]*$/gi,
+          ""
+        )
+        .trim();
+    }
+
+    function getCarlVoice() {
+      const voices = window.speechSynthesis.getVoices();
+
+      const preferredNames = [
+        "Microsoft Guy Online",
+        "Microsoft Andrew Online",
+        "Microsoft Eric Online",
+        "Microsoft Christopher Online",
+        "Microsoft David Desktop",
+        "Google UK English Male",
+        "Google US English Male",
+        "Daniel",
+        "Alex"
+      ];
+
+      for (const name of preferredNames) {
+        const match = voices.find((voice) =>
+          voice.name.toLowerCase().includes(name.toLowerCase())
+        );
+
+        if (match) return match;
+      }
+
+      const likelyMale = voices.find((voice) =>
+        voice.lang?.toLowerCase().startsWith("en") &&
+        /(male|guy|andrew|eric|christopher|david|daniel|alex|mark|george)/i.test(
+          voice.name
+        )
+      );
+
+      if (likelyMale) return likelyMale;
+
+      return voices.find((voice) =>
+        voice.lang?.toLowerCase().startsWith("en-us")
+      ) || voices.find((voice) =>
+        voice.lang?.toLowerCase().startsWith("en")
+      ) || voices[0] || null;
+    }
+
+    function speakCarl(text) {
+      return new Promise((resolve) => {
+        if (!("speechSynthesis" in window)) {
+          resolve();
+          return;
+        }
+
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        const voice = getCarlVoice();
+
+        if (voice) {
+          utterance.voice = voice;
+          utterance.lang = voice.lang;
+        } else {
+          utterance.lang = "en-US";
+        }
+
+        utterance.rate = 0.96;
+        utterance.pitch = 0.82;
+        utterance.volume = 1;
+
+        utterance.onstart = () => setCarlState("speaking");
+        utterance.onend = resolve;
+        utterance.onerror = resolve;
+
+        window.speechSynthesis.speak(utterance);
+      });
     }
 
     function loadMemory() {
@@ -488,7 +643,7 @@
 
       const meta = document.createElement("div");
       meta.className = "meta";
-      const label = role === "user" ? "You" : role === "system" ? "System" : "GvAI";
+      const label = role === "user" ? "You" : role === "system" ? "System" : "Carl";
       meta.innerHTML = `<span class="dot"></span><span>${label}</span>`;
 
       const body = document.createElement("div");
@@ -513,7 +668,7 @@
 
       const meta = document.createElement("div");
       meta.className = "meta";
-      meta.innerHTML = `<span class="dot"></span><span>GvAI</span>`;
+      meta.innerHTML = `<span class="dot"></span><span>Carl</span>`;
 
       const body = document.createElement("div");
       body.className = "msg-text";
@@ -559,7 +714,7 @@
       const memory = loadMemory();
 
       if (!memory.length) {
-        addMessage("assistant", "I’m here. What do you want to work on today?");
+        addMessage("assistant", "I’m here. What would you like to build or work on today?");
         return;
       }
 
@@ -576,6 +731,7 @@
       addMessage("user", text);
       promptEl.value = "";
       sendBtn.disabled = true;
+      setCarlState("thinking");
 
       const thinkingBody = addTypingBubble();
 
@@ -591,7 +747,11 @@
         }
 
         const data = await res.json();
-        const reply = extractReply(data) || "I got a response back, but it didn’t include a standard reply field.";
+        const rawReply =
+          extractReply(data) ||
+          "I got a response back, but it didn’t include a standard reply field.";
+
+        const reply = cleanCarlReply(rawReply);
 
         const memory = loadMemory();
         memory.push({ role: "user", content: text });
@@ -599,10 +759,12 @@
         saveMemory(memory);
 
         await revealText(thinkingBody, reply);
+        await speakCarl(reply);
       } catch (err) {
         const fail = `API request failed: ${err.message}.`;
         thinkingBody.innerHTML = escapeHtml(fail);
       } finally {
+        setCarlState("ready");
         sendBtn.disabled = false;
         promptEl.focus();
         messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -623,6 +785,21 @@
       renderFromMemory();
       promptEl.focus();
     });
+
+    function openWorkspace() {
+      workspaceShell?.classList.add("workspace-open");
+      workspacePanel?.setAttribute("aria-hidden", "false");
+      setCarlState("ready");
+    }
+
+    function closeWorkspace() {
+      workspaceShell?.classList.remove("workspace-open");
+      workspacePanel?.setAttribute("aria-hidden", "true");
+      promptEl.focus();
+    }
+
+    buildBtn?.addEventListener("click", openWorkspace);
+    closeWorkspaceBtn?.addEventListener("click", closeWorkspace);
 
     renderFromMemory();
   </script>
@@ -678,6 +855,9 @@ function startMic() {
   recog.maxAlternatives = 1;
 
   micBtn?.classList.add("listening");
+  if (typeof setCarlState === "function") {
+    setCarlState("listening");
+  }
 
   recog.onresult = function(event) {
     const transcript = event.results[0][0].transcript;
@@ -697,6 +877,9 @@ function startMic() {
 
   recog.onend = function() {
     micBtn?.classList.remove("listening");
+    if (typeof setCarlState === "function" && !sendBtn.disabled) {
+      setCarlState("ready");
+    }
   };
 
   recog.start();
