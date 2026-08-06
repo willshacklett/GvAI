@@ -17,3 +17,6 @@ dashboard/data/
 *.png
 __pycache__/
 *.pyc
+
+node_modules/
+.venv/

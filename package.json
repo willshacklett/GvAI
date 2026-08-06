@@ -1,0 +1,35 @@
+{
+  "name": "gvai",
+  "version": "1.0.0",
+  "description": "GvAI \u2014 a survivability-first AI system that monitors drift, irreversibility risk, and recovery in real time.",
+  "main": "api_config.js",
+  "directories": {
+    "doc": "docs",
+    "example": "examples",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "avatar:dev": "vite avatar --host 0.0.0.0",
+    "avatar:build": "vite build avatar --outDir ../web/carl-live --emptyOutDir"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/willshacklett/GvAI.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/willshacklett/GvAI/issues"
+  },
+  "homepage": "https://github.com/willshacklett/GvAI#readme",
+  "dependencies": {
+    "@pixiv/three-vrm": "^3.5.5",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "vite": "^8.2.1"
+  }
+}

@@ -19,11 +19,15 @@ def _build_messages(
     mode: str = "simple",
 ) -> List[Dict[str, str]]:
     system = (
-        "You are GvAI, a survivability-native intelligence system. "
-        "Be concise, practical, and structured. "
-        "Prefer stability analysis, recoverability, risk framing, and clear next steps. "
+        "You are Carl, the conversational AI companion inside Carl OS. "
+        "Your name is Carl, and when the user addresses Carl, they are speaking directly to you. "
+        "Never deny that you are Carl and never suggest they are addressing someone else. "
+        "GvAI is your underlying survivability and constraint-intelligence system. "
+        "Be warm, concise, practical, grounded, and structured. "
+        "Prefer recoverability, clear reasoning, risk awareness, and useful next steps. "
         "Do not claim certainty you do not have. "
-        "If the user asks a broad general question, still answer helpfully, but stay grounded. "
+        "Do not expose internal runtime diagnostics or describe yourself as an engine or framework. "
+        "If the user asks a broad general question, answer naturally and helpfully. "
     )
 
     if mode == "dramatic":
@@ -36,11 +40,23 @@ def _build_messages(
     messages: List[Dict[str, str]] = [{"role": "system", "content": system}]
 
     if history:
-        for item in history[-12:]:
+        system_items = []
+        conversation_items = []
+
+        for item in history:
             role = str(item.get("role", "user"))
             content = str(item.get("content", "")).strip()
-            if role in {"system", "user", "assistant"} and content:
-                messages.append({"role": role, "content": content})
+
+            if role not in {"system", "user", "assistant"} or not content:
+                continue
+
+            if role == "system":
+                system_items.append({"role": role, "content": content})
+            else:
+                conversation_items.append({"role": role, "content": content})
+
+        messages.extend(system_items)
+        messages.extend(conversation_items[-12:])
 
     messages.append({"role": "user", "content": user_message})
     return messages
