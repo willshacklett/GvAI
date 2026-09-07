@@ -38,6 +38,14 @@ class OnetKnowledge:
 
 
 
+@dataclass(frozen=True)
+class OnetRelatedOccupation:
+    occupation_code: str
+    title: str
+    bright_outlook: bool = False
+
+
+
 ONET_BASE_URL = "https://api-v2.onetcenter.org"
 
 
@@ -136,6 +144,34 @@ class OnetClient:
                 description=str(item.get("description") or ""),
             )
             for item in elements
+        ]
+
+    def related_occupations(
+        self,
+        occupation_code: str,
+        *,
+        start: int = 1,
+        end: int = 50,
+    ) -> List[OnetRelatedOccupation]:
+        payload = self._get(
+            f"/online/occupations/{occupation_code}/details/related_occupations",
+            params={
+                "start": start,
+                "end": end,
+            },
+        )
+
+        occupations = payload.get("occupation") or []
+
+        return [
+            OnetRelatedOccupation(
+                occupation_code=str(item.get("code") or ""),
+                title=str(item.get("title") or ""),
+                bright_outlook=bool(
+                    (item.get("tags") or {}).get("bright_outlook", False)
+                ),
+            )
+            for item in occupations
         ]
 
     def knowledge(

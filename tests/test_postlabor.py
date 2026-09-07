@@ -1278,3 +1278,27 @@ def test_knowledge_similarity_distinguishes_profiles():
         knowledge_similarity(source, similar)
         > knowledge_similarity(source, different)
     )
+
+
+def test_candidate_pool_item_structure():
+    from gvai.postlabor.workers.candidate_pool import (
+        CandidatePoolItem,
+    )
+    from gvai.postlabor.workers.occupation_market import (
+        OccupationMarketRecord,
+    )
+
+    record = OccupationMarketRecord(
+        soc_code="13-2011",
+        title="Accountants and auditors",
+    )
+
+    item = CandidatePoolItem(
+        record=record,
+        from_onet_related=True,
+        from_market_prefilter=False,
+        bright_outlook=True,
+    )
+
+    assert item.from_onet_related is True
+    assert item.bright_outlook is True
