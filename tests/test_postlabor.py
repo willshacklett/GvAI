@@ -1076,3 +1076,87 @@ def test_activity_similarity_distinguishes_profiles():
         activity_similarity(source, similar)
         > activity_similarity(source, different)
     )
+
+
+def test_context_similarity_identical_profiles():
+    from gvai.postlabor.sources.onet import OnetWorkContext
+    from gvai.postlabor.workers.onet_context_matcher import (
+        context_similarity,
+    )
+
+    contexts = [
+        OnetWorkContext(
+            element_id="A",
+            name="A",
+            description="",
+            context=80,
+        ),
+        OnetWorkContext(
+            element_id="B",
+            name="B",
+            description="",
+            context=50,
+        ),
+    ]
+
+    assert context_similarity(
+        contexts,
+        contexts,
+    ) == 100.0
+
+
+def test_context_similarity_distinguishes_profiles():
+    from gvai.postlabor.sources.onet import OnetWorkContext
+    from gvai.postlabor.workers.onet_context_matcher import (
+        context_similarity,
+    )
+
+    source = [
+        OnetWorkContext(
+            element_id="A",
+            name="A",
+            description="",
+            context=90,
+        ),
+        OnetWorkContext(
+            element_id="B",
+            name="B",
+            description="",
+            context=10,
+        ),
+    ]
+
+    similar = [
+        OnetWorkContext(
+            element_id="A",
+            name="A",
+            description="",
+            context=85,
+        ),
+        OnetWorkContext(
+            element_id="B",
+            name="B",
+            description="",
+            context=15,
+        ),
+    ]
+
+    different = [
+        OnetWorkContext(
+            element_id="A",
+            name="A",
+            description="",
+            context=10,
+        ),
+        OnetWorkContext(
+            element_id="B",
+            name="B",
+            description="",
+            context=90,
+        ),
+    ]
+
+    assert (
+        context_similarity(source, similar)
+        > context_similarity(source, different)
+    )
