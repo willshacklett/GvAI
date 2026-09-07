@@ -255,3 +255,84 @@ def test_worker_transition_api():
         result["opportunities"][0]["occupation"]
         == "Industrial Maintenance Technician"
     )
+
+
+def test_demand_outlook_score():
+    from gvai.postlabor.workers.occupation_market import (
+        OccupationMarketRecord,
+        demand_outlook_score,
+    )
+
+    record = OccupationMarketRecord(
+        soc_code="00-0001",
+        title="Test Occupation",
+        employment_base_thousands=100.0,
+        employment_projected_thousands=110.0,
+        employment_change_percent=10.0,
+        annual_openings_thousands=10.0,
+        median_annual_wage=60000.0,
+    )
+
+    score = demand_outlook_score(record)
+
+    assert 0.0 <= score <= 100.0
+    assert score > 50.0
+
+
+def test_wage_retention_score():
+    from gvai.postlabor.workers.occupation_market import (
+        wage_retention_score,
+    )
+
+    assert wage_retention_score(
+        current_annual_wage=50000,
+        candidate_annual_wage=60000,
+    ) == 100.0
+
+    assert wage_retention_score(
+        current_annual_wage=50000,
+        candidate_annual_wage=40000,
+    ) == 80.0
+
+
+def test_retraining_burden_score():
+    from gvai.postlabor.workers.occupation_market import (
+        OccupationMarketRecord,
+        retraining_burden_score,
+    )
+
+    low = OccupationMarketRecord(
+        soc_code="A",
+        title="Low",
+        education="High school diploma or equivalent",
+        on_the_job_training="Short-term on-the-job training",
+    )
+
+    high = OccupationMarketRecord(
+        soc_code="B",
+        title="High",
+        education="Master's degree",
+        on_the_job_training="Internship/residency",
+    )
+
+    assert retraining_burden_score(low) < retraining_burden_score(high)
+
+
+def test_soc_crosswalk_fallback():
+    from gvai.postlabor.workers.soc_crosswalk import (
+        SOCCrosswalk,
+        SOCCrosswalkRecord,
+    )
+
+    crosswalk = SOCCrosswalk(
+        [
+            SOCCrosswalkRecord(
+                onet_soc_code="15-1252.00",
+                bls_soc_code="15-1252",
+            )
+        ]
+    )
+
+    assert crosswalk.best_bls_soc(
+        "15-1252.00"
+    ) == "15-1252"
