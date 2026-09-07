@@ -633,3 +633,86 @@ def test_automation_assessment_bounds():
 
     assert 0 <= result.ai_exposure_score <= 100
     assert 0 <= result.displacement_pressure <= 100
+
+
+def test_onet_characteristics_bounds():
+    from gvai.postlabor.workers.onet_characteristics import (
+        derive_characteristics,
+    )
+
+    result = derive_characteristics(
+        occupation_code="TEST",
+        title="Test Occupation",
+        physical_activity=80,
+        worksite_presence=90,
+        task_variability=75,
+        interpersonal_activity=60,
+        information_processing=55,
+        routine_activity=30,
+    )
+
+    assert 0 <= result.physical_task_resilience <= 100
+    assert 0 <= result.augmentation_potential <= 100
+
+
+def test_physical_work_increases_resilience():
+    from gvai.postlabor.workers.onet_characteristics import (
+        derive_characteristics,
+    )
+
+    physical = derive_characteristics(
+        occupation_code="A",
+        title="Physical",
+        physical_activity=95,
+        worksite_presence=95,
+        task_variability=80,
+        interpersonal_activity=50,
+        information_processing=40,
+        routine_activity=40,
+    )
+
+    desk = derive_characteristics(
+        occupation_code="B",
+        title="Desk",
+        physical_activity=10,
+        worksite_presence=20,
+        task_variability=50,
+        interpersonal_activity=50,
+        information_processing=90,
+        routine_activity=60,
+    )
+
+    assert (
+        physical.physical_task_resilience
+        > desk.physical_task_resilience
+    )
+
+
+def test_variable_information_work_supports_augmentation():
+    from gvai.postlabor.workers.onet_characteristics import (
+        derive_characteristics,
+    )
+
+    high = derive_characteristics(
+        occupation_code="A",
+        title="High Augmentation",
+        physical_activity=30,
+        worksite_presence=40,
+        task_variability=90,
+        interpersonal_activity=80,
+        information_processing=95,
+        routine_activity=20,
+    )
+
+    low = derive_characteristics(
+        occupation_code="B",
+        title="Low Augmentation",
+        physical_activity=40,
+        worksite_presence=50,
+        task_variability=20,
+        interpersonal_activity=20,
+        information_processing=20,
+        routine_activity=90,
+    )
+
+    assert high.augmentation_potential > low.augmentation_potential
