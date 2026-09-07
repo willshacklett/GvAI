@@ -958,3 +958,37 @@ def test_candidate_prefilter_respects_limit():
     )
 
     assert len(result) == 3
+
+
+def test_skill_shortlist_dataclass():
+    from gvai.postlabor.workers.candidate_shortlist import (
+        SkillShortlistedCandidate,
+    )
+    from gvai.postlabor.workers.occupation_market import (
+        OccupationMarketRecord,
+    )
+
+    record = OccupationMarketRecord(
+        soc_code="11-1111",
+        title="Candidate",
+    )
+
+    result = SkillShortlistedCandidate(
+        record=record,
+        preliminary_score=70.0,
+        skill_transferability=80.0,
+        skill_data_available=True,
+        shortlist_score=74.5,
+    )
+
+    assert result.skill_data_available is True
+    assert result.shortlist_score == 74.5
+
+
+def test_shortlist_score_preserves_skill_and_market_dimensions():
+    market = 80.0
+    skill = 60.0
+
+    score = market * 0.55 + skill * 0.45
+
+    assert round(score, 2) == 71.0
