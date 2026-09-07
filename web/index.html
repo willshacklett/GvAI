@@ -789,6 +789,216 @@ function renderProfile(profile) {
   }
 }
 
+
+function formatCompact(value) {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+
+  return new Intl.NumberFormat(
+    "en-US",
+    {
+      notation: "compact",
+      maximumFractionDigits: 1
+    }
+  ).format(value);
+}
+
+function formatMoney(value) {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+
+  return new Intl.NumberFormat(
+    "en-US",
+    {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 0
+    }
+  ).format(value);
+}
+
+async function loadRegionalData(latitude, longitude) {
+  const title =
+    document.getElementById("location-title");
+
+  const sub =
+    document.getElementById("location-sub");
+
+  title.textContent =
+    `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
+
+  sub.textContent =
+    "Loading regional intelligence...";
+
+  try {
+    const endpoint =
+      (window.GVAI_API_BASE || "") +
+      `/api/region?lat=${encodeURIComponent(latitude)}` +
+      `&lon=${encodeURIComponent(longitude)}`;
+
+    const response =
+      await fetch(endpoint);
+
+    if (!response.ok) {
+      throw new Error(
+        `Region lookup returned ${response.status}`
+      );
+    }
+
+    const data =
+      await response.json();
+
+    if (!data.supported) {
+      sub.textContent =
+        "Global regional datasets are coming next.";
+
+      return;
+    }
+
+    title.textContent =
+      data.county || "Selected region";
+
+    sub.textContent =
+      `${data.state || ""} · ${data.source || "Public data"}`;
+
+    document.getElementById(
+      "population"
+    ).textContent =
+      formatCompact(data.population);
+
+    document.getElementById(
+      "labor-force"
+    ).textContent =
+      formatCompact(data.labor_force);
+
+    const unemployment =
+      data.unemployment_rate;
+
+    document.getElementById(
+      "transition"
+    ).textContent =
+      unemployment === null ||
+      unemployment === undefined
+        ? "—"
+        : `${unemployment}% unemployment`;
+
+    selectedProfile = {
+      ...selectedProfile,
+      title:
+        `${data.county}, ${data.state}`,
+      sub:
+        data.source || "U.S. Census Bureau",
+      population:
+        formatCompact(data.population),
+      labor:
+        formatCompact(data.labor_force)
+    };
+
+    const infoPanel =
+      document.querySelector(".info-panel");
+
+    let censusBox =
+      document.getElementById(
+        "census-details"
+      );
+
+    if (!censusBox) {
+      censusBox =
+        document.createElement("div");
+
+      censusBox.id =
+        "census-details";
+
+      censusBox.className =
+        "score-card";
+
+      infoPanel.insertBefore(
+        censusBox,
+        document.querySelector(".actions")
+      );
+    }
+
+    censusBox.innerHTML = `
+      <div class="section-title" style="margin-top:0">
+        Census Regional Data
+      </div>
+
+      <div class="metric-grid" style="margin-bottom:0">
+        <div class="metric">
+          <div class="metric-label">
+            Unemployment
+          </div>
+          <div class="metric-value">
+            ${
+              unemployment === null ||
+              unemployment === undefined
+                ? "—"
+                : unemployment + "%"
+            }
+          </div>
+        </div>
+
+        <div class="metric">
+          <div class="metric-label">
+            Median age
+          </div>
+          <div class="metric-value">
+            ${
+              data.median_age === null ||
+              data.median_age === undefined
+                ? "—"
+                : data.median_age
+            }
+          </div>
+        </div>
+
+        <div class="metric">
+          <div class="metric-label">
+            Median household income
+          </div>
+          <div class="metric-value">
+            ${formatMoney(
+              data.median_household_income
+            )}
+          </div>
+        </div>
+
+        <div class="metric">
+          <div class="metric-label">
+            Median home value
+          </div>
+          <div class="metric-value">
+            ${formatMoney(
+              data.median_home_value
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div
+        style="
+          margin-top:10px;
+          font-size:11px;
+          color:var(--muted);
+        "
+      >
+        ${data.source} · ACS ${data.acs_year}
+      </div>
+    `;
+
+  } catch (error) {
+    console.error(
+      "Regional intelligence lookup failed",
+      error
+    );
+
+    sub.textContent =
+      "Regional intelligence lookup unavailable.";
+  }
+}
+
 function flyToProfile(profile) {
   viewer.camera.flyTo({
     destination:
@@ -937,23 +1147,10 @@ handler.setInputAction(
         cartographic.longitude
       );
 
-    document.getElementById(
-      "location-title"
-    ).textContent =
-      `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
-
-    document.getElementById(
-      "location-sub"
-    ).textContent =
-      "Location selected — geographic region lookup comes next.";
-
-    selectedProfile = {
-      ...selectedProfile,
-      title:
-        `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`,
-      sub:
-        "Selected geographic point"
-    };
+    loadRegionalData(
+      latitude,
+      longitude
+    );
   },
   Cesium.ScreenSpaceEventType.LEFT_CLICK
 );

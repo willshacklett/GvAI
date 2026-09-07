@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from privacy.project_registry import authoritative_project_policy
+from gvai.postlabor.region_intel import resolve_us_region
 
 app = FastAPI(title="GvAI API", version="1.4.0")
 
@@ -667,6 +668,31 @@ def health():
         "llm_ready": bool(llm_available()),
         "openai_model": os.getenv("OPENAI_MODEL", "unset"),
     }
+
+
+
+@app.get("/api/region")
+def api_region(lat: float, lon: float):
+    """
+    Resolve a clicked map coordinate into regional
+    public economic data.
+
+    Current first implementation supports U.S.
+    county-level Census data.
+    """
+    try:
+        return resolve_us_region(
+            latitude=lat,
+            longitude=lon,
+        )
+    except Exception as exc:
+        return {
+            "supported": False,
+            "latitude": lat,
+            "longitude": lon,
+            "reason": "Regional data lookup failed.",
+            "error_type": type(exc).__name__,
+        }
 
 
 @app.get("/api/chat")
