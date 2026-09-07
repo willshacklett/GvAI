@@ -1308,3 +1308,228 @@ def test_candidate_pool_item_structure():
 
     assert item.from_onet_related is True
     assert item.bright_outlook is True
+
+
+def test_transition_recommendation_structure():
+    from gvai.postlabor.workers.transition_recommender import (
+        TransitionRecommendation,
+    )
+
+    fields = TransitionRecommendation.__dataclass_fields__
+
+    assert "rank" in fields
+    assert "transition_score" in fields
+    assert "shortlist" in fields
+    assert "live" in fields
+    assert "opportunity" in fields
+    assert "path_type" in fields
+
+
+def test_transition_score_accepts_transferability_override():
+    from gvai.postlabor.workers.schema import (
+        CareerCandidate,
+    )
+    from gvai.postlabor.workers.transition import (
+        score_transition_candidate,
+    )
+
+    candidate = CareerCandidate(
+        occupation="Test occupation",
+        skill_transferability=80.0,
+        demand_outlook=60.0,
+        automation_displacement_pressure=40.0,
+        retraining_burden=20.0,
+        wage_retention=90.0,
+        geographic_opportunity=50.0,
+        confidence=0.9,
+    )
+
+    baseline = score_transition_candidate(candidate)
+
+    overridden = score_transition_candidate(
+        candidate,
+        transferability_override=40.0,
+    )
+
+    assert overridden.score < baseline.score
+    assert overridden.skill_transferability == 40.0
+
+
+def test_collective_simulation_basic():
+    from gvai.postlabor.collectives.schema import (
+        CollectiveCost,
+        CollectiveMember,
+        CollectiveModel,
+    )
+    from gvai.postlabor.collectives.simulator import (
+        simulate_collective,
+    )
+
+    model = CollectiveModel(
+        name="Test Collective",
+        members=[
+            CollectiveMember(
+                name="A",
+                member_type="artist",
+                annual_gross_revenue=1_000_000,
+            ),
+            CollectiveMember(
+                name="B",
+                member_type="artist",
+                annual_gross_revenue=1_000_000,
+            ),
+        ],
+        revenue_share_rate=0.10,
+        operating_costs=[
+            CollectiveCost(
+                name="Operations",
+                annual_cost=100_000,
+                category="operations",
+            ),
+        ],
+        reserve_rate=0.10,
+        reinvestment_rate=0.10,
+        patronage_distribution_rate=1.0,
+    )
+
+    result = simulate_collective(model)
+
+    assert result.gross_member_revenue == 2_000_000
+    assert result.collective_revenue == 200_000
+    assert result.operating_costs == 100_000
+    assert len(result.member_outcomes) == 2
+
+
+def test_collective_patronage_tracks_contribution():
+    from gvai.postlabor.collectives.schema import (
+        CollectiveMember,
+        CollectiveModel,
+    )
+    from gvai.postlabor.collectives.simulator import (
+        simulate_collective,
+    )
+
+    model = CollectiveModel(
+        name="Contribution Test",
+        members=[
+            CollectiveMember(
+                name="A",
+                member_type="artist",
+                annual_gross_revenue=2_000_000,
+            ),
+            CollectiveMember(
+                name="B",
+                member_type="artist",
+                annual_gross_revenue=1_000_000,
+            ),
+        ],
+        revenue_share_rate=0.10,
+    )
+
+    result = simulate_collective(model)
+
+    a, b = result.member_outcomes
+
+    assert a.patronage_distribution > b.patronage_distribution
+    assert round(a.economic_share, 4) == 0.6667
+    assert round(b.economic_share, 4) == 0.3333
+
+
+def test_collective_simulation_basic():
+    from gvai.postlabor.collectives.schema import (
+        CollectiveCost,
+        CollectiveMember,
+        CollectiveModel,
+    )
+    from gvai.postlabor.collectives.simulator import (
+        simulate_collective,
+    )
+
+    model = CollectiveModel(
+        name="Test Collective",
+        members=[
+            CollectiveMember(
+                name="Member A",
+                member_type="artist",
+                annual_gross_revenue=1_000_000,
+            ),
+            CollectiveMember(
+                name="Member B",
+                member_type="artist",
+                annual_gross_revenue=1_000_000,
+            ),
+        ],
+        revenue_share_rate=0.10,
+        operating_costs=[
+            CollectiveCost(
+                name="Operations",
+                annual_cost=100_000,
+                category="operations",
+            ),
+        ],
+        reserve_rate=0.10,
+        reinvestment_rate=0.10,
+        patronage_distribution_rate=1.0,
+    )
+
+    result = simulate_collective(model)
+
+    assert result.gross_member_revenue == 2_000_000
+    assert result.collective_revenue == 200_000
+    assert result.operating_costs == 100_000
+    assert len(result.member_outcomes) == 2
+
+
+def test_collective_structure_comparison():
+    from gvai.postlabor.collectives.schema import (
+        CollectiveCost,
+        CollectiveMember,
+        CollectiveModel,
+    )
+    from gvai.postlabor.collectives.comparison import (
+        compare_structures,
+    )
+
+    model = CollectiveModel(
+        name="Five Member Cooperative",
+        members=[
+            CollectiveMember(
+                name=f"Member {i}",
+                member_type="artist",
+                annual_gross_revenue=1_000_000,
+            )
+            for i in range(1, 6)
+        ],
+        revenue_share_rate=0.10,
+        operating_costs=[
+            CollectiveCost(
+                name="Operations",
+                annual_cost=355_000,
+                category="operations",
+            ),
+        ],
+        reserve_rate=0.0,
+        reinvestment_rate=0.0,
+        patronage_distribution_rate=1.0,
+    )
+
+    result = compare_structures(
+        model=model,
+        traditional_fee_rate=0.10,
+    )
+
+    assert result.total_gross_revenue == 5_000_000
+    assert result.traditional_total_fees == 500_000
+    assert result.cooperative_total_revenue == 500_000
+
+    assert result.cooperative_patronage == 145_000
+    assert result.annual_member_savings == 145_000
+
+    assert len(result.member_comparisons) == 5
+
+    first = result.member_comparisons[0]
+
+    assert first.traditional_fee == 100_000
+    assert first.patronage_return == 29_000
+    assert first.cooperative_effective_cost == 71_000
+    assert first.annual_member_savings == 29_000

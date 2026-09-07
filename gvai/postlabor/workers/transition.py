@@ -151,12 +151,23 @@ def score_current_career(
 
 def score_transition_candidate(
     candidate: CareerCandidate,
+    *,
+    transferability_override: float | None = None,
 ) -> TransitionOpportunity:
 
     retraining_resilience = 100.0 - candidate.retraining_burden
 
-    score = (
+    transferability = (
         candidate.skill_transferability
+        if transferability_override is None
+        else max(
+            0.0,
+            min(100.0, transferability_override),
+        )
+    )
+
+    score = (
+        transferability
         * TRANSITION_WEIGHTS["skill_transferability"]
         + candidate.demand_outlook
         * TRANSITION_WEIGHTS["demand_outlook"]
@@ -173,7 +184,7 @@ def score_transition_candidate(
     explanation = [
         (
             f"Skill transferability "
-            f"{candidate.skill_transferability:.1f}/100."
+            f"{transferability:.1f}/100."
         ),
         (
             f"Future demand "
@@ -202,7 +213,7 @@ def score_transition_candidate(
         occupation=candidate.occupation,
         score=round(score, 2),
         confidence=round(candidate.confidence, 4),
-        skill_transferability=candidate.skill_transferability,
+        skill_transferability=transferability,
         demand_outlook=candidate.demand_outlook,
         automation_resilience=candidate.automation_resilience,
         retraining_burden=candidate.retraining_burden,
