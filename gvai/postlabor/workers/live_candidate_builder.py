@@ -24,6 +24,7 @@ class LiveCandidateEvidence:
     source_onet_code: str
     target_onet_code: str
     skill_transferability: float
+    skill_data_available: bool
     automation_displacement_pressure: float
     automation_confidence: float
 
@@ -66,6 +67,20 @@ def build_live_candidate(
         client=client,
     )
 
+    skill_data_available = (
+        skill_match.source_skill_count > 0
+        and skill_match.target_skill_count > 0
+    )
+
+    # Missing O*NET skill evidence must not be interpreted as
+    # zero skill transferability. Use a neutral score and lower
+    # confidence instead.
+    skill_transferability = (
+        skill_match.skill_transferability
+        if skill_data_available
+        else 50.0
+    )
+
     automation = assess_occupation_automation(
         target_onet_code,
         onet_client=client,
@@ -75,7 +90,7 @@ def build_live_candidate(
         record=target_record,
         current_annual_wage=current_annual_wage,
         skill_transferability=(
-            skill_match.skill_transferability
+            skill_transferability
         ),
         automation_displacement_pressure=(
             automation.automation.displacement_pressure
@@ -83,7 +98,7 @@ def build_live_candidate(
         geographic_opportunity=geographic_opportunity,
         confidence=min(
             automation.automation.confidence,
-            0.90,
+            0.90 if skill_data_available else 0.55,
         ),
         notes=(
             "Demand, wage, and retraining inputs derived from BLS "
@@ -101,8 +116,9 @@ def build_live_candidate(
             source_onet_code=source_onet_code,
             target_onet_code=target_onet_code,
             skill_transferability=(
-                skill_match.skill_transferability
+                skill_transferability
             ),
+            skill_data_available=skill_data_available,
             automation_displacement_pressure=(
                 automation.automation.displacement_pressure
             ),

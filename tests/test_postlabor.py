@@ -889,9 +889,11 @@ def test_live_candidate_evidence_dataclass():
         source_onet_code="43-3031.00",
         target_onet_code="13-2011.00",
         skill_transferability=80.0,
+        skill_data_available=True,
         automation_displacement_pressure=60.0,
         automation_confidence=0.9,
     )
 
     assert evidence.skill_transferability == 80.0
+    assert evidence.skill_data_available is True
     assert evidence.automation_confidence == 0.9
