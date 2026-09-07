@@ -6,11 +6,14 @@ from typing import Iterable, List, Optional
 from requests import RequestException
 
 from gvai.postlabor.sources.onet import OnetClient
-from gvai.postlabor.workers.candidate_prefilter import (
-    prefilter_market_candidates,
+from gvai.postlabor.workers.candidate_pool import (
+    build_candidate_pool,
 )
 from gvai.postlabor.workers.occupation_market import (
     OccupationMarketRecord,
+    demand_outlook_score,
+    retraining_burden_score,
+    wage_retention_score,
 )
 from gvai.postlabor.workers.onet_activity_matcher import (
     compare_onet_work_activities,
@@ -18,11 +21,11 @@ from gvai.postlabor.workers.onet_activity_matcher import (
 from gvai.postlabor.workers.onet_context_matcher import (
     compare_onet_work_context,
 )
-from gvai.postlabor.workers.onet_matcher import (
-    compare_onet_occupations,
-)
 from gvai.postlabor.workers.onet_knowledge_matcher import (
     compare_onet_knowledge,
+)
+from gvai.postlabor.workers.onet_matcher import (
+    compare_onet_occupations,
 )
 from gvai.postlabor.workers.worker_assessment import (
     onet_code_from_soc,
@@ -32,6 +35,7 @@ from gvai.postlabor.workers.worker_assessment import (
 @dataclass(frozen=True)
 class SkillShortlistedCandidate:
     record: OccupationMarketRecord
+
     preliminary_score: float
 
     skill_transferability: float
@@ -43,6 +47,10 @@ class SkillShortlistedCandidate:
     activity_data_available: bool
     context_data_available: bool
     knowledge_data_available: bool
+
+    from_onet_related: bool
+    from_market_prefilter: bool
+    bright_outlook: bool
 
     career_adjacency: float
     shortlist_score: float
@@ -56,14 +64,13 @@ def career_adjacency_score(
     knowledge_similarity: float,
 ) -> float:
     """
-    Universal v0.1 occupation adjacency score.
+    Universal career adjacency v0.2.
 
-    Measures similarity using:
-    - O*NET skills
-    - O*NET work activities
-    - O*NET work context
+    30% transferable skills
+    30% work activities
+    20% work context
+    20% domain knowledge
     """
-
     score = (
         skill_transferability * 0.30
         + activity_similarity * 0.30
@@ -77,36 +84,88 @@ def career_adjacency_score(
     )
 
 
+def _market_score(
+    *,
+    record: OccupationMarketRecord,
+    current_annual_wage: Optional[float],
+) -> float:
+    """
+    Same transparent market logic used by the BLS prefilter,
+    calculated for every merged-pool occupation.
+    """
+    demand = demand_outlook_score(record)
+
+    wage = wage_retention_score(
+        current_annual_wage=current_annual_wage,
+        candidate_annual_wage=record.median_annual_wage,
+    )
+
+    retraining_resilience = (
+        100.0 - retraining_burden_score(record)
+    )
+
+    return round(
+        demand * 0.45
+        + wage * 0.30
+        + retraining_resilience * 0.25,
+        2,
+    )
+
+
 def shortlist_candidates(
     *,
     source_onet_code: str,
     records: Iterable[OccupationMarketRecord],
     current_annual_wage: Optional[float],
     client: OnetClient | None = None,
-    prefilter_limit: int = 40,
+    market_limit: int = 40,
     shortlist_limit: int = 15,
 ) -> List[SkillShortlistedCandidate]:
+    """
+    Universal staged candidate shortlist.
 
+    Candidate generation:
+      - O*NET related occupations
+      - BLS high-opportunity occupations
+
+    Candidate evaluation:
+      - skills
+      - work activities
+      - work context
+      - knowledge
+      - BLS market opportunity
+
+    Full automation/displacement analysis happens later.
+    """
     client = client or OnetClient()
 
-    source_soc_code = (
-        str(source_onet_code).strip().split(".")[0]
-    )
+    records = list(records)
 
-    prefiltered = prefilter_market_candidates(
+    pool = build_candidate_pool(
+        source_onet_code=source_onet_code,
         records=records,
-        source_soc_code=source_soc_code,
         current_annual_wage=current_annual_wage,
-        limit=prefilter_limit,
+        client=client,
+        market_limit=market_limit,
     )
 
     results: List[SkillShortlistedCandidate] = []
 
-    for item in prefiltered:
+    for pool_item in pool:
+        record = pool_item.record
+
         target_onet_code = onet_code_from_soc(
-            item.record.soc_code
+            record.soc_code
         )
 
+        market_score = _market_score(
+            record=record,
+            current_annual_wage=current_annual_wage,
+        )
+
+        # ------------------------------------------------------
+        # Skills
+        # ------------------------------------------------------
         try:
             match = compare_onet_occupations(
                 source_onet_code,
@@ -129,6 +188,9 @@ def shortlist_candidates(
             skill_data_available = False
             skill_score = 50.0
 
+        # ------------------------------------------------------
+        # Work activities
+        # ------------------------------------------------------
         try:
             match = compare_onet_work_activities(
                 source_onet_code,
@@ -151,6 +213,9 @@ def shortlist_candidates(
             activity_data_available = False
             activity_score = 50.0
 
+        # ------------------------------------------------------
+        # Work context
+        # ------------------------------------------------------
         try:
             match = compare_onet_work_context(
                 source_onet_code,
@@ -173,6 +238,9 @@ def shortlist_candidates(
             context_data_available = False
             context_score = 50.0
 
+        # ------------------------------------------------------
+        # Knowledge
+        # ------------------------------------------------------
         try:
             match = compare_onet_knowledge(
                 source_onet_code,
@@ -204,21 +272,28 @@ def shortlist_candidates(
 
         shortlist_score = (
             adjacency * 0.55
-            + item.preliminary_score * 0.45
+            + market_score * 0.45
         )
 
         results.append(
             SkillShortlistedCandidate(
-                record=item.record,
-                preliminary_score=item.preliminary_score,
+                record=record,
+                preliminary_score=market_score,
+
                 skill_transferability=round(skill_score, 2),
                 activity_similarity=round(activity_score, 2),
                 context_similarity=round(context_score, 2),
                 knowledge_similarity=round(knowledge_score, 2),
+
                 skill_data_available=skill_data_available,
                 activity_data_available=activity_data_available,
                 context_data_available=context_data_available,
                 knowledge_data_available=knowledge_data_available,
+
+                from_onet_related=pool_item.from_onet_related,
+                from_market_prefilter=pool_item.from_market_prefilter,
+                bright_outlook=pool_item.bright_outlook,
+
                 career_adjacency=adjacency,
                 shortlist_score=round(shortlist_score, 2),
             )

@@ -984,6 +984,9 @@ def test_skill_shortlist_dataclass():
         activity_data_available=True,
         context_data_available=True,
         knowledge_data_available=True,
+        from_onet_related=True,
+        from_market_prefilter=False,
+        bright_outlook=True,
         career_adjacency=73.5,
         shortlist_score=72.89,
     )
@@ -992,6 +995,9 @@ def test_skill_shortlist_dataclass():
     assert result.activity_data_available is True
     assert result.context_data_available is True
     assert result.knowledge_data_available is True
+    assert result.from_onet_related is True
+    assert result.from_market_prefilter is False
+    assert result.bright_outlook is True
     assert result.career_adjacency == 73.5
 
 
