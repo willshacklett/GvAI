@@ -127,7 +127,7 @@ def load_occupational_projections(
 
     workbook = load_workbook(
         filename=Path(path),
-        read_only=True,
+        read_only=False,
         data_only=True,
     )
 
@@ -305,7 +305,7 @@ def load_onet_bls_crosswalk(
 
     workbook = load_workbook(
         filename=Path(path),
-        read_only=True,
+        read_only=False,
         data_only=True,
     )
 
