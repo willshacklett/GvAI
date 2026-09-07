@@ -172,3 +172,86 @@ def test_skill_similarity():
     )
 
     assert skill_similarity(source, target) == 56.0
+
+
+def test_bls_series_latest():
+    from gvai.postlabor.sources.bls import (
+        BLSDatapoint,
+        BLSSeries,
+    )
+
+    series = BLSSeries(
+        series_id="TEST",
+        data=[
+            BLSDatapoint(
+                series_id="TEST",
+                year=2025,
+                period="M12",
+                value=10.0,
+            ),
+            BLSDatapoint(
+                series_id="TEST",
+                year=2026,
+                period="M01",
+                value=11.0,
+            ),
+        ],
+    )
+
+    latest = series.latest()
+
+    assert latest is not None
+    assert latest.year == 2026
+    assert latest.period == "M01"
+    assert latest.value == 11.0
+
+
+def test_worker_transition_api():
+    from flask import Flask
+    from gvai.postlabor.api import postlabor_api
+
+    app = Flask(__name__)
+    app.register_blueprint(postlabor_api)
+
+    client = app.test_client()
+
+    response = client.post(
+        "/api/postlabor/worker/transition",
+        json={
+            "occupation": "Warehouse Worker",
+            "location": "Murfreesboro, Tennessee",
+            "experience_years": 8,
+            "current_assessment": {
+                "automation_displacement_pressure": 72,
+                "augmentation_potential": 48,
+                "demand_outlook": 52,
+                "confidence": 0.70,
+            },
+            "candidates": [
+                {
+                    "occupation": "Industrial Maintenance Technician",
+                    "skill_transferability": 76,
+                    "demand_outlook": 82,
+                    "automation_displacement_pressure": 25,
+                    "retraining_burden": 48,
+                    "wage_retention": 92,
+                    "geographic_opportunity": 84,
+                    "confidence": 0.72,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+
+    payload = response.get_json()
+
+    assert payload["ok"] is True
+
+    result = payload["result"]
+
+    assert result["current_career"]["score"] == 40.4
+    assert (
+        result["opportunities"][0]["occupation"]
+        == "Industrial Maintenance Technician"
+    )
