@@ -992,3 +992,87 @@ def test_shortlist_score_preserves_skill_and_market_dimensions():
     score = market * 0.55 + skill * 0.45
 
     assert round(score, 2) == 71.0
+
+
+def test_activity_similarity_identical_profiles():
+    from gvai.postlabor.sources.onet import OnetWorkActivity
+    from gvai.postlabor.workers.onet_activity_matcher import (
+        activity_similarity,
+    )
+
+    activities = [
+        OnetWorkActivity(
+            element_id="A",
+            name="A",
+            description="",
+            importance=80,
+        ),
+        OnetWorkActivity(
+            element_id="B",
+            name="B",
+            description="",
+            importance=60,
+        ),
+    ]
+
+    assert activity_similarity(
+        activities,
+        activities,
+    ) == 100.0
+
+
+def test_activity_similarity_distinguishes_profiles():
+    from gvai.postlabor.sources.onet import OnetWorkActivity
+    from gvai.postlabor.workers.onet_activity_matcher import (
+        activity_similarity,
+    )
+
+    source = [
+        OnetWorkActivity(
+            element_id="A",
+            name="A",
+            description="",
+            importance=90,
+        ),
+        OnetWorkActivity(
+            element_id="B",
+            name="B",
+            description="",
+            importance=80,
+        ),
+    ]
+
+    similar = [
+        OnetWorkActivity(
+            element_id="A",
+            name="A",
+            description="",
+            importance=85,
+        ),
+        OnetWorkActivity(
+            element_id="B",
+            name="B",
+            description="",
+            importance=75,
+        ),
+    ]
+
+    different = [
+        OnetWorkActivity(
+            element_id="A",
+            name="A",
+            description="",
+            importance=20,
+        ),
+        OnetWorkActivity(
+            element_id="B",
+            name="B",
+            description="",
+            importance=10,
+        ),
+    ]
+
+    assert (
+        activity_similarity(source, similar)
+        > activity_similarity(source, different)
+    )
