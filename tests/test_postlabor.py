@@ -1533,3 +1533,85 @@ def test_collective_structure_comparison():
     assert first.patronage_return == 29_000
     assert first.cooperative_effective_cost == 71_000
     assert first.annual_member_savings == 29_000
+
+
+def test_collective_projection_five_years():
+    from gvai.postlabor.collectives.schema import (
+        CollectiveCost,
+        CollectiveMember,
+        CollectiveModel,
+    )
+    from gvai.postlabor.collectives.projection import (
+        project_collective,
+    )
+
+    model = CollectiveModel(
+        name="Projection Test",
+        members=[
+            CollectiveMember(
+                name=f"Member {i}",
+                member_type="artist",
+                annual_gross_revenue=1_000_000,
+            )
+            for i in range(1, 6)
+        ],
+        revenue_share_rate=0.10,
+        operating_costs=[
+            CollectiveCost(
+                name="Operations",
+                annual_cost=355_000,
+                category="operations",
+            ),
+        ],
+        reserve_rate=0.10,
+        reinvestment_rate=0.10,
+        patronage_distribution_rate=1.0,
+    )
+
+    result = project_collective(
+        model=model,
+        traditional_fee_rate=0.10,
+        years=5,
+    )
+
+    assert result.years == 5
+    assert len(result.annual_results) == 5
+
+    assert result.total_traditional_fees == 2_500_000
+
+    assert result.total_reserves == 72_500
+    assert result.total_reinvestment == 72_500
+
+    assert result.total_collective_capital == 145_000
+
+
+def test_collective_projection_revenue_growth():
+    from gvai.postlabor.collectives.schema import (
+        CollectiveMember,
+        CollectiveModel,
+    )
+    from gvai.postlabor.collectives.projection import (
+        project_collective,
+    )
+
+    model = CollectiveModel(
+        name="Growth Test",
+        members=[
+            CollectiveMember(
+                name="Member A",
+                member_type="artist",
+                annual_gross_revenue=1_000_000,
+            )
+        ],
+        revenue_share_rate=0.10,
+    )
+
+    result = project_collective(
+        model=model,
+        traditional_fee_rate=0.10,
+        years=2,
+        revenue_growth_rate=0.10,
+    )
+
+    assert result.annual_results[0].gross_member_revenue == 1_000_000
+    assert result.annual_results[1].gross_member_revenue == 1_100_000
