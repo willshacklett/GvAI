@@ -869,3 +869,29 @@ def test_worker_occupation_resolution_keeps_ambiguity():
 
     assert len(result.candidates) >= 2
     assert result.resolved is False
+
+
+def test_live_candidate_soc_to_onet_code():
+    from gvai.postlabor.workers.live_candidate_builder import (
+        soc_to_onet_code,
+    )
+
+    assert soc_to_onet_code("47-2111") == "47-2111.00"
+    assert soc_to_onet_code("13-2011.00") == "13-2011.00"
+
+
+def test_live_candidate_evidence_dataclass():
+    from gvai.postlabor.workers.live_candidate_builder import (
+        LiveCandidateEvidence,
+    )
+
+    evidence = LiveCandidateEvidence(
+        source_onet_code="43-3031.00",
+        target_onet_code="13-2011.00",
+        skill_transferability=80.0,
+        automation_displacement_pressure=60.0,
+        automation_confidence=0.9,
+    )
+
+    assert evidence.skill_transferability == 80.0
+    assert evidence.automation_confidence == 0.9
