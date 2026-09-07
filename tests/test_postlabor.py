@@ -824,3 +824,16 @@ def test_onet_signal_mapper_ignores_missing_elements():
 
     assert result.physical_activity == 80.0
     assert result.coverage < 1.0
+
+
+def test_base_soc_code():
+    from gvai.postlabor.workers.occupation_automation import base_soc_code
+
+    assert base_soc_code("37-2021.00") == "37-2021"
+    assert base_soc_code("13-2011") == "13-2011"
+
+
+def test_base_soc_code_strips_whitespace():
+    from gvai.postlabor.workers.occupation_automation import base_soc_code
+
+    assert base_soc_code(" 15-1252.00 ") == "15-1252"
