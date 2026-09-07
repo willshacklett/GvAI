@@ -456,3 +456,84 @@ def test_market_recommender_uses_bls_fields():
     assert candidate.demand_outlook > 50
     assert candidate.wage_retention == 100
     assert candidate.skill_transferability == 78
+
+
+def test_occupation_resolver_alias():
+    from gvai.postlabor.workers.occupation_market import (
+        OccupationMarketRecord,
+    )
+    from gvai.postlabor.workers.occupation_resolver import (
+        resolve_occupation,
+    )
+
+    records = [
+        OccupationMarketRecord(
+            soc_code="53-7065",
+            title="Stockers and order fillers",
+        ),
+        OccupationMarketRecord(
+            soc_code="53-7062",
+            title="Laborers and freight, stock, and material movers, hand",
+        ),
+        OccupationMarketRecord(
+            soc_code="49-9071",
+            title="Maintenance and repair workers, general",
+        ),
+    ]
+
+    results = resolve_occupation(
+        records,
+        "warehouse worker",
+    )
+
+    assert results
+    assert results[0].soc_code == "53-7065"
+    assert results[0].match_type == "alias"
+    assert results[0].confidence >= 0.90
+
+
+def test_occupation_resolver_exact_title():
+    from gvai.postlabor.workers.occupation_market import (
+        OccupationMarketRecord,
+    )
+    from gvai.postlabor.workers.occupation_resolver import (
+        resolve_occupation,
+    )
+
+    records = [
+        OccupationMarketRecord(
+            soc_code="49-9012",
+            title="Control and valve installers and repairers, except mechanical door",
+        ),
+        OccupationMarketRecord(
+            soc_code="49-9071",
+            title="Maintenance and repair workers, general",
+        ),
+    ]
+
+    results = resolve_occupation(
+        records,
+        "Maintenance and repair workers, general",
+    )
+
+    assert results
+    assert results[0].soc_code == "49-9071"
+    assert results[0].confidence == 1.0
+
+
+def test_onet_skill_match_structure():
+    from gvai.postlabor.workers.onet_matcher import OnetSkillMatch
+
+    match = OnetSkillMatch(
+        source_code="37-2021.00",
+        source_title="Pest Control Workers",
+        target_code="49-9071.00",
+        target_title="Maintenance and Repair Workers, General",
+        skill_transferability=72.5,
+        source_skill_count=35,
+        target_skill_count=35,
+    )
+
+    assert match.skill_transferability == 72.5
+    assert match.source_skill_count == 35
+    assert match.target_title == "Maintenance and Repair Workers, General"
