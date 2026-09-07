@@ -7,6 +7,7 @@ from datetime import datetime
 
 from openai import OpenAI
 from gvai.middleware.memory_gate import GVMemoryGate
+from privacy.egress import authorize_external_model
 
 LOG_FILE = "gvai/logs/gv_log.jsonl"
 
@@ -53,6 +54,29 @@ def extract_signal(text: str):
 
 
 def call_llm(prompt: str):
+    private_mode = os.getenv(
+        "GVAI_PRIVATE_BUILD_MODE",
+        "0",
+    ).lower() in {"1", "true", "yes", "on"}
+
+    payload = {
+        "model": "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": "Be clear, concise, and helpful."},
+            {"role": "user", "content": prompt},
+        ],
+    }
+
+    authorize_external_model(
+        json.dumps(payload, ensure_ascii=False),
+        provider="openai",
+        data_class=(
+            os.getenv("GVAI_DATA_CLASS")
+            or ("private" if private_mode else "public")
+        ),
+        private_build_mode=private_mode,
+    )
+
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[

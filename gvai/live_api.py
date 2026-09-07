@@ -2,6 +2,10 @@ from gvai.change_impact import evaluate_change_impact
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from pathlib import Path
+import json
+import os
+
+from privacy.egress import authorize_external_model
 
 from gvai.grounding import grounding_packet, search_knowledge, rebuild_index
 from gvai.web_search import search_web
@@ -88,6 +92,33 @@ def chat():
     try:
         from openai import OpenAI
         client = OpenAI()
+
+        model_payload = {
+            "model": "gpt-4o-mini",
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": msg},
+            ],
+        }
+
+        private_mode = os.getenv(
+            "GVAI_PRIVATE_BUILD_MODE",
+            "0",
+        ).lower() in {"1", "true", "yes", "on"}
+
+        authorize_external_model(
+            json.dumps(
+                model_payload,
+                ensure_ascii=False,
+            ),
+            provider="openai",
+            data_class=(
+                os.getenv("GVAI_DATA_CLASS")
+                or ("private" if private_mode else "public")
+            ),
+            private_build_mode=private_mode,
+        )
+
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -97,6 +128,15 @@ def chat():
             temperature=0.35,
         )
         answer = resp.choices[0].message.content
+    except PermissionError as e:
+        return jsonify({
+            "ok": False,
+            "blocked": True,
+            "reason": "privacy_policy",
+            "error": "GVAI blocked external model transmission.",
+            "details": str(e),
+            "input": msg,
+        }), 403
     except Exception as e:
         answer = f"[MODEL ERROR] {e}"
 

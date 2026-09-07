@@ -1,0 +1,17 @@
+{
+  "version": "0.1",
+  "name": "GVAI Private Build Mode",
+  "scope": "all_users_all_projects",
+  "default_data_class": "private",
+
+  "rules": {
+    "local_processing": "allow",
+    "world_information_ingress": "allow",
+    "private_information_egress": "deny",
+    "private_external_model_calls": "deny",
+    "private_external_writes": "deny",
+    "explicit_sharing_requires_consent": true
+  },
+
+  "principle": "GVAI may learn from the world without exposing the user's private world to it."
+}

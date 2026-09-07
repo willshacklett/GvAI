@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from gvai.real_gv import evaluate_real_gv
 from gvai.agent import generate_action, generate_question
+from privacy.egress import authorize_external_model
 
 app = FastAPI(title="GvAI Gateway", version="0.3.0")
 
@@ -83,6 +84,21 @@ def call_openai_compatible(message: str, model: Optional[str], system: Optional[
         "messages": messages,
         "temperature": 0.2,
     }
+
+    private_mode = os.getenv(
+        "GVAI_PRIVATE_BUILD_MODE",
+        "0",
+    ).lower() in {"1", "true", "yes", "on"}
+
+    authorize_external_model(
+        str(payload),
+        provider="openai-compatible",
+        data_class=(
+            os.getenv("GVAI_DATA_CLASS")
+            or ("private" if private_mode else "public")
+        ),
+        private_build_mode=private_mode,
+    )
 
     r = requests.post(
         f"{base_url.rstrip('/')}/chat/completions",

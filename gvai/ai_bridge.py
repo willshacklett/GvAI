@@ -1,9 +1,54 @@
 from __future__ import annotations
 
+import json
 import os
 from typing import Any, Dict, List
 
 import requests
+
+from privacy.egress import authorize_external_model
+
+
+def _authorize_ai_egress(payload: Dict[str, Any], provider: str) -> None:
+    """
+    Final GVAI privacy checkpoint immediately before an external
+    model transmission.
+
+    Current compatibility behavior:
+      * Standard GVAI mode -> external AI allowed.
+      * Private Build Mode -> external AI denied.
+      * Explicitly shared + consent -> may leave.
+
+    Later the data classification will come from the authenticated
+    user/project/request rather than the environment.
+    """
+
+    private_mode = os.getenv(
+        "GVAI_PRIVATE_BUILD_MODE",
+        "0"
+    ).strip().lower() in {"1", "true", "yes", "on"}
+
+    # Preserve existing GVAI behavior outside Private Build Mode.
+    #
+    # In Private Build Mode the privacy router itself still fails
+    # closed, including for PUBLIC content, unless the user explicitly
+    # shares it with consent.
+    data_class = os.getenv(
+        "GVAI_DATA_CLASS",
+        "private" if private_mode else "public"
+    )
+
+    authorize_external_model(
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+        ),
+        provider=provider,
+        data_class=data_class,
+        private_build_mode=private_mode,
+    )
+
 
 
 def _normalize_messages(system_prompt: str | None, messages: List[Dict[str, str]] | None, message: str | None) -> List[Dict[str, str]]:
@@ -36,6 +81,8 @@ def chat_openai(message: str | None = None, *, messages: List[Dict[str, str]] | 
         "messages": _normalize_messages(system_prompt, messages, message),
     }
 
+    _authorize_ai_egress(payload, "openai")
+
     res = requests.post(
         "https://api.openai.com/v1/chat/completions",
         headers={
@@ -61,6 +108,8 @@ def chat_xai(message: str | None = None, *, messages: List[Dict[str, str]] | Non
         "model": model,
         "messages": _normalize_messages(system_prompt, messages, message),
     }
+
+    _authorize_ai_egress(payload, "xai")
 
     res = requests.post(
         "https://api.x.ai/v1/chat/completions",
@@ -98,6 +147,8 @@ def chat_anthropic(message: str | None = None, *, messages: List[Dict[str, str]]
     }
     if system_prompt:
         payload["system"] = system_prompt
+
+    _authorize_ai_egress(payload, "anthropic")
 
     res = requests.post(
         "https://api.anthropic.com/v1/messages",

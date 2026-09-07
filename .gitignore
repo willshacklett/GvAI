@@ -20,3 +20,6 @@ __pycache__/
 
 node_modules/
 .venv/
+
+# GVAI runtime privacy audit logs
+privacy/*.jsonl

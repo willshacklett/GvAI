@@ -8,6 +8,8 @@ try:
 except Exception:
     OpenAI = None
 
+from privacy.egress import authorize_external_model
+
 
 def llm_available() -> bool:
     return bool(os.getenv("OPENAI_API_KEY")) and OpenAI is not None
@@ -74,6 +76,24 @@ def generate_llm_response(
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     messages = _build_messages(user_message=user_message, history=history, mode=mode)
+
+    private_mode = os.getenv(
+        "GVAI_PRIVATE_BUILD_MODE",
+        "0",
+    ).lower() in {"1", "true", "yes", "on"}
+
+    authorize_external_model(
+        str({
+            "model": model,
+            "messages": messages,
+        }),
+        provider="openai",
+        data_class=(
+            os.getenv("GVAI_DATA_CLASS")
+            or ("private" if private_mode else "public")
+        ),
+        private_build_mode=private_mode,
+    )
 
     try:
         # Works with the common chat-completions style SDK.
