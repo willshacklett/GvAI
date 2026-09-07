@@ -10,6 +10,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from privacy.egress import context_from_env
+
 app = FastAPI(title="GvAI API", version="1.4.0")
 
 app.add_middleware(
@@ -37,6 +39,31 @@ except Exception:
     def llm_available() -> bool:
         return False
 
+
+
+def server_privacy_context():
+    """
+    Build the authoritative server-side privacy context for this
+    request path.
+
+    For now policy still comes from trusted server configuration.
+    A later layer will resolve it from authenticated project storage.
+    """
+
+    private_mode = os.getenv(
+        "GVAI_PRIVATE_BUILD_MODE",
+        "0",
+    ).strip().lower() in {"1", "true", "yes", "on"}
+
+    return context_from_env(
+        user_id=os.getenv("GVAI_USER_ID") or "anonymous",
+        project_id=os.getenv("GVAI_PROJECT_ID") or "default",
+        data_class=(
+            os.getenv("GVAI_DATA_CLASS")
+            or ("private" if private_mode else "public")
+        ),
+        private_build_mode=private_mode,
+    )
 
 
 def normalize_history_messages(items: Optional[List[Dict[str, Any]]]) -> List[Dict[str, str]]:
@@ -673,6 +700,9 @@ def api_chat(req: ChatRequest):
 
     llm_text = None
     llm_error = None
+    privacy_blocked = False
+
+    privacy_context = server_privacy_context()
 
     if generate_llm_response is not None and llm_available():
         try:
@@ -685,7 +715,11 @@ def api_chat(req: ChatRequest):
                 user_message=user_message,
                 history=llm_history,
                 mode=mode,
+                privacy_context=privacy_context,
             )
+        except PermissionError as e:
+            privacy_blocked = True
+            llm_error = f"{type(e).__name__}: {e}"
         except Exception as e:
             llm_error = f"{type(e).__name__}: {e}"
 
@@ -695,7 +729,13 @@ def api_chat(req: ChatRequest):
         "rollback", "containment", "edge case", "adversarial", "failure mode", "staged", "pilot", "scope", "guardrail"
     ])
 
-    if enforcement_mode == "gate" and escalation.get("high_risk") and not has_validation_language:
+    if privacy_blocked:
+        engine = "privacy-block"
+        reply = (
+            "GVAI kept this request inside the project's privacy boundary. "
+            "No private content was transmitted to an external model."
+        )
+    elif enforcement_mode == "gate" and escalation.get("high_risk") and not has_validation_language:
         engine = "constraint-gate"
         reply = (
             "Constraint gate: not yet.\n\n"
@@ -760,6 +800,8 @@ def api_chat(req: ChatRequest):
             "llm_ready": bool(llm_available()),
             "openai_model": os.getenv("OPENAI_MODEL", "unset"),
             "llm_error": llm_error,
+            "privacy_blocked": privacy_blocked,
+            "privacy_project_id": privacy_context.project_id,
             "gv_band": gv_band(signal),
         },
     }

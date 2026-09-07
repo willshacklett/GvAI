@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from gvai.real_gv import evaluate_real_gv
 from gvai.agent import generate_action, generate_question
-from privacy.egress import authorize_external_model
+from privacy.egress import authorize_external_model, context_from_env
 
 app = FastAPI(title="GvAI Gateway", version="0.3.0")
 
@@ -58,7 +58,12 @@ def gv_governance_layer() -> Dict[str, Any]:
 # -----------------------
 # Provider calls
 # -----------------------
-def call_openai_compatible(message: str, model: Optional[str], system: Optional[str]) -> str:
+def call_openai_compatible(
+    message: str,
+    model: Optional[str],
+    system: Optional[str],
+    privacy_context=None,
+) -> str:
     base_url = os.getenv("OPENAI_COMPAT_BASE_URL")
     api_key = os.getenv("OPENAI_COMPAT_API_KEY")
     default_model = os.getenv("OPENAI_COMPAT_MODEL", "gpt-4o-mini")
@@ -85,20 +90,32 @@ def call_openai_compatible(message: str, model: Optional[str], system: Optional[
         "temperature": 0.2,
     }
 
-    private_mode = os.getenv(
-        "GVAI_PRIVATE_BUILD_MODE",
-        "0",
-    ).lower() in {"1", "true", "yes", "on"}
+    if privacy_context is not None:
+        authorize_external_model(
+            str(payload),
+            provider="openai-compatible",
+            user_id=privacy_context.user_id,
+            project_id=privacy_context.project_id,
+            data_class=privacy_context.data_class.value,
+            private_build_mode=privacy_context.private_build_mode,
+            consent_token=privacy_context.consent_token,
+        )
+    else:
+        # Compatibility fallback for callers not yet migrated.
+        private_mode = os.getenv(
+            "GVAI_PRIVATE_BUILD_MODE",
+            "0",
+        ).lower() in {"1", "true", "yes", "on"}
 
-    authorize_external_model(
-        str(payload),
-        provider="openai-compatible",
-        data_class=(
-            os.getenv("GVAI_DATA_CLASS")
-            or ("private" if private_mode else "public")
-        ),
-        private_build_mode=private_mode,
-    )
+        authorize_external_model(
+            str(payload),
+            provider="openai-compatible",
+            data_class=(
+                os.getenv("GVAI_DATA_CLASS")
+                or ("private" if private_mode else "public")
+            ),
+            private_build_mode=private_mode,
+        )
 
     r = requests.post(
         f"{base_url.rstrip('/')}/chat/completions",
@@ -118,11 +135,34 @@ def call_openai_compatible(message: str, model: Optional[str], system: Optional[
         raise HTTPException(status_code=502, detail=f"Unexpected provider response: {data}")
 
 
+def gateway_privacy_context():
+    private_mode = os.getenv(
+        "GVAI_PRIVATE_BUILD_MODE",
+        "0",
+    ).strip().lower() in {"1", "true", "yes", "on"}
+
+    return context_from_env(
+        user_id=os.getenv("GVAI_USER_ID") or "anonymous",
+        project_id=os.getenv("GVAI_PROJECT_ID") or "default",
+        data_class=(
+            os.getenv("GVAI_DATA_CLASS")
+            or ("private" if private_mode else "public")
+        ),
+        private_build_mode=private_mode,
+    )
+
+
 def run_provider(req: ChatRequest, governed_message: str, governed_system: Optional[str]) -> str:
     provider = req.provider.lower()
+    privacy_context = gateway_privacy_context()
 
     if provider in ("openai", "openai_compatible", "compat"):
-        return call_openai_compatible(governed_message, req.model, governed_system)
+        return call_openai_compatible(
+            governed_message,
+            req.model,
+            governed_system,
+            privacy_context=privacy_context,
+        )
 
     raise HTTPException(status_code=400, detail=f"Unsupported provider: {req.provider}")
 

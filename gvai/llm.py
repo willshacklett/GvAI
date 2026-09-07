@@ -68,6 +68,7 @@ def generate_llm_response(
     user_message: str,
     history: Optional[List[Dict[str, Any]]] = None,
     mode: str = "simple",
+    privacy_context=None,
 ) -> Optional[str]:
     if not llm_available():
         return None
@@ -77,23 +78,39 @@ def generate_llm_response(
 
     messages = _build_messages(user_message=user_message, history=history, mode=mode)
 
-    private_mode = os.getenv(
-        "GVAI_PRIVATE_BUILD_MODE",
-        "0",
-    ).lower() in {"1", "true", "yes", "on"}
+    if privacy_context is not None:
+        authorize_external_model(
+            str({
+                "model": model,
+                "messages": messages,
+            }),
+            provider="openai",
+            user_id=privacy_context.user_id,
+            project_id=privacy_context.project_id,
+            data_class=privacy_context.data_class.value,
+            private_build_mode=privacy_context.private_build_mode,
+            consent_token=privacy_context.consent_token,
+        )
+    else:
+        # Compatibility fallback for callers not yet migrated to
+        # request-scoped privacy context.
+        private_mode = os.getenv(
+            "GVAI_PRIVATE_BUILD_MODE",
+            "0",
+        ).lower() in {"1", "true", "yes", "on"}
 
-    authorize_external_model(
-        str({
-            "model": model,
-            "messages": messages,
-        }),
-        provider="openai",
-        data_class=(
-            os.getenv("GVAI_DATA_CLASS")
-            or ("private" if private_mode else "public")
-        ),
-        private_build_mode=private_mode,
-    )
+        authorize_external_model(
+            str({
+                "model": model,
+                "messages": messages,
+            }),
+            provider="openai",
+            data_class=(
+                os.getenv("GVAI_DATA_CLASS")
+                or ("private" if private_mode else "public")
+            ),
+            private_build_mode=private_mode,
+        )
 
     try:
         # Works with the common chat-completions style SDK.
