@@ -21,6 +21,9 @@ from gvai.postlabor.workers.onet_context_matcher import (
 from gvai.postlabor.workers.onet_matcher import (
     compare_onet_occupations,
 )
+from gvai.postlabor.workers.onet_knowledge_matcher import (
+    compare_onet_knowledge,
+)
 from gvai.postlabor.workers.worker_assessment import (
     onet_code_from_soc,
 )
@@ -34,10 +37,12 @@ class SkillShortlistedCandidate:
     skill_transferability: float
     activity_similarity: float
     context_similarity: float
+    knowledge_similarity: float
 
     skill_data_available: bool
     activity_data_available: bool
     context_data_available: bool
+    knowledge_data_available: bool
 
     career_adjacency: float
     shortlist_score: float
@@ -48,6 +53,7 @@ def career_adjacency_score(
     skill_transferability: float,
     activity_similarity: float,
     context_similarity: float,
+    knowledge_similarity: float,
 ) -> float:
     """
     Universal v0.1 occupation adjacency score.
@@ -59,9 +65,10 @@ def career_adjacency_score(
     """
 
     score = (
-        skill_transferability * 0.35
-        + activity_similarity * 0.35
-        + context_similarity * 0.30
+        skill_transferability * 0.30
+        + activity_similarity * 0.30
+        + context_similarity * 0.20
+        + knowledge_similarity * 0.20
     )
 
     return round(
@@ -166,10 +173,33 @@ def shortlist_candidates(
             context_data_available = False
             context_score = 50.0
 
+        try:
+            match = compare_onet_knowledge(
+                source_onet_code,
+                target_onet_code,
+                client=client,
+            )
+
+            knowledge_data_available = (
+                match.source_knowledge_count > 0
+                and match.target_knowledge_count > 0
+            )
+
+            knowledge_score = (
+                match.knowledge_similarity
+                if knowledge_data_available
+                else 50.0
+            )
+
+        except (LookupError, ValueError, RequestException):
+            knowledge_data_available = False
+            knowledge_score = 50.0
+
         adjacency = career_adjacency_score(
             skill_transferability=skill_score,
             activity_similarity=activity_score,
             context_similarity=context_score,
+            knowledge_similarity=knowledge_score,
         )
 
         shortlist_score = (
@@ -184,9 +214,11 @@ def shortlist_candidates(
                 skill_transferability=round(skill_score, 2),
                 activity_similarity=round(activity_score, 2),
                 context_similarity=round(context_score, 2),
+                knowledge_similarity=round(knowledge_score, 2),
                 skill_data_available=skill_data_available,
                 activity_data_available=activity_data_available,
                 context_data_available=context_data_available,
+                knowledge_data_available=knowledge_data_available,
                 career_adjacency=adjacency,
                 shortlist_score=round(shortlist_score, 2),
             )

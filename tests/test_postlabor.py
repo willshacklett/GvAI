@@ -979,17 +979,20 @@ def test_skill_shortlist_dataclass():
         skill_transferability=80.0,
         activity_similarity=75.0,
         context_similarity=70.0,
+        knowledge_similarity=65.0,
         skill_data_available=True,
         activity_data_available=True,
         context_data_available=True,
-        career_adjacency=75.25,
+        knowledge_data_available=True,
+        career_adjacency=73.5,
         shortlist_score=72.89,
     )
 
     assert result.skill_data_available is True
     assert result.activity_data_available is True
     assert result.context_data_available is True
-    assert result.career_adjacency == 75.25
+    assert result.knowledge_data_available is True
+    assert result.career_adjacency == 73.5
 
 
 
@@ -1170,9 +1173,10 @@ def test_career_adjacency_score():
         skill_transferability=80,
         activity_similarity=70,
         context_similarity=60,
+        knowledge_similarity=50,
     )
 
-    assert score == 70.5
+    assert score == 67.0
 
 
 def test_career_adjacency_bounds():
@@ -1184,12 +1188,14 @@ def test_career_adjacency_bounds():
         skill_transferability=100,
         activity_similarity=100,
         context_similarity=100,
+        knowledge_similarity=100,
     ) == 100.0
 
     assert career_adjacency_score(
         skill_transferability=0,
         activity_similarity=0,
         context_similarity=0,
+        knowledge_similarity=0,
     ) == 0.0
 
 
