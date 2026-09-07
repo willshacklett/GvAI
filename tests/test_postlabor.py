@@ -537,3 +537,99 @@ def test_onet_skill_match_structure():
     assert match.skill_transferability == 72.5
     assert match.source_skill_count == 35
     assert match.target_title == "Maintenance and Repair Workers, General"
+
+
+def test_ai_exposure_category_score():
+    from gvai.postlabor.workers.automation_exposure import (
+        AIExposureRecord,
+        ai_exposure_score,
+    )
+
+    low = AIExposureRecord(
+        soc_code="A",
+        title="Low",
+        category="Low",
+    )
+
+    very_high = AIExposureRecord(
+        soc_code="B",
+        title="Very High",
+        category="Very high",
+    )
+
+    assert ai_exposure_score(low) < ai_exposure_score(very_high)
+
+
+def test_ai_exposure_with_percentiles():
+    from gvai.postlabor.workers.automation_exposure import (
+        AIExposureRecord,
+        ai_exposure_score,
+    )
+
+    record = AIExposureRecord(
+        soc_code="A",
+        title="Test",
+        category="High",
+        theoretical_percentile=80,
+        observed_percentile=70,
+    )
+
+    score = ai_exposure_score(record)
+
+    assert 0 <= score <= 100
+    assert score > 60
+
+
+def test_displacement_separate_from_exposure():
+    from gvai.postlabor.workers.automation_exposure import (
+        AIExposureRecord,
+        assess_automation,
+    )
+
+    exposure = AIExposureRecord(
+        soc_code="A",
+        title="Test Occupation",
+        category="Very high",
+    )
+
+    growing = assess_automation(
+        exposure=exposure,
+        employment_change_percent=15,
+        physical_task_resilience=80,
+        augmentation_potential=80,
+    )
+
+    declining = assess_automation(
+        exposure=exposure,
+        employment_change_percent=-15,
+        physical_task_resilience=20,
+        augmentation_potential=20,
+    )
+
+    assert (
+        growing.displacement_pressure
+        < declining.displacement_pressure
+    )
+
+
+def test_automation_assessment_bounds():
+    from gvai.postlabor.workers.automation_exposure import (
+        AIExposureRecord,
+        assess_automation,
+    )
+
+    exposure = AIExposureRecord(
+        soc_code="A",
+        title="Test",
+        category="Moderate",
+    )
+
+    result = assess_automation(
+        exposure=exposure,
+        employment_change_percent=0,
+        physical_task_resilience=50,
+        augmentation_potential=50,
+    )
+
+    assert 0 <= result.ai_exposure_score <= 100
+    assert 0 <= result.displacement_pressure <= 100
