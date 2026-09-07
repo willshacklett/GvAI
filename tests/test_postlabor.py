@@ -837,3 +837,35 @@ def test_base_soc_code_strips_whitespace():
     from gvai.postlabor.workers.occupation_automation import base_soc_code
 
     assert base_soc_code(" 15-1252.00 ") == "15-1252"
+
+
+def test_onet_code_from_soc():
+    from gvai.postlabor.workers.worker_assessment import (
+        onet_code_from_soc,
+    )
+
+    assert onet_code_from_soc("37-2021") == "37-2021.00"
+    assert onet_code_from_soc("15-1252.00") == "15-1252.00"
+
+
+def test_worker_occupation_resolution_alias():
+    from gvai.postlabor.workers.worker_assessment import (
+        resolve_worker_occupation,
+    )
+
+    result = resolve_worker_occupation("pest tech")
+
+    assert result.candidates
+    assert result.candidates[0].soc_code == "37-2021"
+    assert result.candidates[0].confidence >= 0.90
+
+
+def test_worker_occupation_resolution_keeps_ambiguity():
+    from gvai.postlabor.workers.worker_assessment import (
+        resolve_worker_occupation,
+    )
+
+    result = resolve_worker_occupation("warehouse worker")
+
+    assert len(result.candidates) >= 2
+    assert result.resolved is False
