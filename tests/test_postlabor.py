@@ -336,3 +336,38 @@ def test_soc_crosswalk_fallback():
     assert crosswalk.best_bls_soc(
         "15-1252.00"
     ) == "15-1252"
+
+
+def test_build_candidate_from_market():
+    from gvai.postlabor.workers.candidate_builder import (
+        build_candidate_from_market,
+    )
+    from gvai.postlabor.workers.occupation_market import (
+        OccupationMarketRecord,
+    )
+
+    record = OccupationMarketRecord(
+        soc_code="49-9041",
+        title="Industrial Machinery Mechanics",
+        employment_base_thousands=400.0,
+        employment_projected_thousands=450.0,
+        employment_change_percent=12.5,
+        annual_openings_thousands=40.0,
+        median_annual_wage=65000.0,
+        education="High school diploma or equivalent",
+        on_the_job_training="Long-term on-the-job training",
+    )
+
+    candidate = build_candidate_from_market(
+        record=record,
+        current_annual_wage=50000.0,
+        skill_transferability=78.0,
+        automation_displacement_pressure=25.0,
+        geographic_opportunity=80.0,
+        confidence=0.8,
+    )
+
+    assert candidate.occupation == "Industrial Machinery Mechanics"
+    assert candidate.demand_outlook > 50.0
+    assert candidate.wage_retention == 100.0
+    assert 0.0 <= candidate.retraining_burden <= 100.0
