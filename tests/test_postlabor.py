@@ -897,3 +897,64 @@ def test_live_candidate_evidence_dataclass():
     assert evidence.skill_transferability == 80.0
     assert evidence.skill_data_available is True
     assert evidence.automation_confidence == 0.9
+
+
+def test_candidate_prefilter_excludes_current_occupation():
+    from gvai.postlabor.workers.candidate_prefilter import (
+        prefilter_market_candidates,
+    )
+    from gvai.postlabor.workers.occupation_market import (
+        OccupationMarketRecord,
+    )
+
+    records = [
+        OccupationMarketRecord(
+            soc_code="11-1111",
+            title="Current",
+            employment_change_percent=5,
+            median_annual_wage=50000,
+        ),
+        OccupationMarketRecord(
+            soc_code="22-2222",
+            title="Candidate",
+            employment_change_percent=10,
+            median_annual_wage=60000,
+        ),
+    ]
+
+    result = prefilter_market_candidates(
+        records=records,
+        source_soc_code="11-1111",
+        current_annual_wage=50000,
+    )
+
+    assert len(result) == 1
+    assert result[0].record.soc_code == "22-2222"
+
+
+def test_candidate_prefilter_respects_limit():
+    from gvai.postlabor.workers.candidate_prefilter import (
+        prefilter_market_candidates,
+    )
+    from gvai.postlabor.workers.occupation_market import (
+        OccupationMarketRecord,
+    )
+
+    records = [
+        OccupationMarketRecord(
+            soc_code=f"10-{index:04d}",
+            title=f"Occupation {index}",
+            employment_change_percent=float(index),
+            median_annual_wage=50000,
+        )
+        for index in range(1, 10)
+    ]
+
+    result = prefilter_market_candidates(
+        records=records,
+        source_soc_code="99-9999",
+        current_annual_wage=50000,
+        limit=3,
+    )
+
+    assert len(result) == 3

@@ -46,6 +46,7 @@ class OnetClient:
     ) -> None:
         self.api_key = api_key or os.getenv("ONET_API_KEY")
         self.timeout = timeout
+        self._response_cache = {}
 
         if not self.api_key:
             raise RuntimeError(
@@ -53,18 +54,33 @@ class OnetClient:
             )
 
     def _get(self, path: str, params: Optional[dict] = None) -> dict:
+        params = params or {}
+
+        cache_key = (
+            path,
+            tuple(sorted(params.items())),
+        )
+
+        cached = self._response_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         response = requests.get(
             f"{ONET_BASE_URL}{path}",
             headers={
                 "X-API-Key": self.api_key,
                 "Accept": "application/json",
             },
-            params=params or {},
+            params=params,
             timeout=self.timeout,
         )
 
         response.raise_for_status()
-        return response.json()
+        payload = response.json()
+
+        self._response_cache[cache_key] = payload
+
+        return payload
 
     def occupation(self, occupation_code: str) -> OccupationRecord:
         payload = self._get(
