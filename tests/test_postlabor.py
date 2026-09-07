@@ -716,3 +716,111 @@ def test_variable_information_work_supports_augmentation():
     )
 
     assert high.augmentation_potential > low.augmentation_potential
+
+
+def test_onet_signal_mapper_bounds():
+    from gvai.postlabor.sources.onet import (
+        OnetWorkActivity,
+        OnetWorkContext,
+    )
+    from gvai.postlabor.workers.onet_signals import build_onet_signals
+
+    activities = [
+        OnetWorkActivity(
+            element_id="4.A.3.a.1",
+            name="Physical",
+            description="",
+            importance=90,
+        ),
+        OnetWorkActivity(
+            element_id="4.A.2.b.1",
+            name="Problem solving",
+            description="",
+            importance=80,
+        ),
+        OnetWorkActivity(
+            element_id="4.A.2.a.4",
+            name="Analyzing",
+            description="",
+            importance=70,
+        ),
+    ]
+
+    contexts = [
+        OnetWorkContext(
+            element_id="4.C.2.d.1.d",
+            name="Walking",
+            description="",
+            context=85,
+        ),
+        OnetWorkContext(
+            element_id="4.C.3.b.7",
+            name="Repeating tasks",
+            description="",
+            context=30,
+        ),
+    ]
+
+    result = build_onet_signals(activities, contexts)
+
+    assert 0 <= result.physical_activity <= 100
+    assert 0 <= result.worksite_presence <= 100
+    assert 0 <= result.task_variability <= 100
+    assert 0 <= result.interpersonal_activity <= 100
+    assert 0 <= result.information_processing <= 100
+    assert 0 <= result.routine_activity <= 100
+    assert 0 <= result.coverage <= 1
+
+
+def test_onet_signal_mapper_inverts_repetition_for_variability():
+    from gvai.postlabor.sources.onet import OnetWorkContext
+    from gvai.postlabor.workers.onet_signals import build_onet_signals
+
+    low_repetition = build_onet_signals(
+        [],
+        [
+            OnetWorkContext(
+                element_id="4.C.3.b.7",
+                name="Repeating Same Tasks",
+                description="",
+                context=20,
+            )
+        ],
+    )
+
+    high_repetition = build_onet_signals(
+        [],
+        [
+            OnetWorkContext(
+                element_id="4.C.3.b.7",
+                name="Repeating Same Tasks",
+                description="",
+                context=90,
+            )
+        ],
+    )
+
+    assert (
+        low_repetition.task_variability
+        > high_repetition.task_variability
+    )
+
+
+def test_onet_signal_mapper_ignores_missing_elements():
+    from gvai.postlabor.sources.onet import OnetWorkActivity
+    from gvai.postlabor.workers.onet_signals import build_onet_signals
+
+    result = build_onet_signals(
+        [
+            OnetWorkActivity(
+                element_id="4.A.3.a.1",
+                name="Physical",
+                description="",
+                importance=80,
+            )
+        ],
+        [],
+    )
+
+    assert result.physical_activity == 80.0
+    assert result.coverage < 1.0
