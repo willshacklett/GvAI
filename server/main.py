@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from privacy.egress import context_from_env
+from privacy.project_registry import authoritative_project_policy
 
 app = FastAPI(title="GvAI API", version="1.4.0")
 
@@ -43,27 +43,30 @@ except Exception:
 
 def server_privacy_context():
     """
-    Build the authoritative server-side privacy context for this
-    request path.
+    Resolve privacy from authoritative server-side project state.
 
-    For now policy still comes from trusted server configuration.
-    A later layer will resolve it from authenticated project storage.
+    The request does not get to choose its privacy mode.
+    Unknown projects fail closed through the registry.
     """
 
-    private_mode = os.getenv(
-        "GVAI_PRIVATE_BUILD_MODE",
-        "0",
-    ).strip().lower() in {"1", "true", "yes", "on"}
+    user_id = os.getenv("GVAI_USER_ID") or "anonymous"
+    project_id = os.getenv("GVAI_PROJECT_ID") or "default"
 
-    return context_from_env(
-        user_id=os.getenv("GVAI_USER_ID") or "anonymous",
-        project_id=os.getenv("GVAI_PROJECT_ID") or "default",
-        data_class=(
-            os.getenv("GVAI_DATA_CLASS")
-            or ("private" if private_mode else "public")
-        ),
-        private_build_mode=private_mode,
+    policy = authoritative_project_policy(
+        user_id=user_id,
+        project_id=project_id,
     )
+
+    data_class = (
+        os.getenv("GVAI_DATA_CLASS")
+        or (
+            "private"
+            if policy.mode.value == "private"
+            else "public"
+        )
+    )
+
+    return policy.context_for(data_class)
 
 
 def normalize_history_messages(items: Optional[List[Dict[str, Any]]]) -> List[Dict[str, str]]:
