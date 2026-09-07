@@ -389,6 +389,10 @@
     }
   </style>
 
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/cesium@1.133.0/Build/Cesium/Widgets/widgets.css"
+  />
   <script src="/api_config.js?v=railway1"></script>
 </head>
 
@@ -562,189 +566,85 @@
 </div>
 
 <script type="module">
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.185.0/build/three.module.js";
+import * as Cesium from "https://cdn.jsdelivr.net/npm/cesium@1.133.0/+esm";
 
-const canvas = document.getElementById("globe");
+window.CESIUM_BASE_URL =
+  "https://cdn.jsdelivr.net/npm/cesium@1.133.0/Build/Cesium/";
 
-const renderer = new THREE.WebGLRenderer({
-  canvas,
-  antialias: true,
-  alpha: true
+const globeShell = document.getElementById("globe-shell");
+
+globeShell.innerHTML = `
+  <div
+    id="cesiumContainer"
+    style="position:absolute;inset:0;"
+  ></div>
+`;
+
+const viewer = new Cesium.Viewer(
+  "cesiumContainer",
+  {
+    animation: false,
+    timeline: false,
+    baseLayerPicker: false,
+    homeButton: false,
+    sceneModePicker: false,
+    navigationHelpButton: false,
+    fullscreenButton: false,
+    infoBox: false,
+    selectionIndicator: false,
+    geocoder: false,
+    requestRenderMode: true
+  }
+);
+
+viewer.scene.globe.enableLighting = true;
+viewer.scene.skyAtmosphere.show = true;
+viewer.scene.fog.enabled = true;
+
+viewer.camera.setView({
+  destination: Cesium.Cartesian3.fromDegrees(
+    -86.39,
+    35.85,
+    14500000
+  )
 });
 
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const GOOGLE_KEY =
+  window.GVAI_GOOGLE_MAPS_API_KEY ||
+  "";
 
-const scene = new THREE.Scene();
+if (GOOGLE_KEY) {
+  try {
+    viewer.imageryLayers.removeAll();
+    viewer.scene.globe.show = false;
 
-const camera = new THREE.PerspectiveCamera(
-  42,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  100
-);
+    const tileset =
+      await Cesium.Cesium3DTileset.fromUrl(
+        "https://tile.googleapis.com/v1/3dtiles/root.json?key=" +
+        encodeURIComponent(GOOGLE_KEY),
+        {
+          showCreditsOnScreen: true
+        }
+      );
 
-camera.position.set(0, 0, 3.1);
+    viewer.scene.primitives.add(tileset);
+  } catch (error) {
+    console.error(
+      "Google Photorealistic 3D Tiles failed; using Cesium globe.",
+      error
+    );
 
-const globeGroup = new THREE.Group();
-scene.add(globeGroup);
-
-const sphereGeometry = new THREE.SphereGeometry(
-  1,
-  128,
-  128
-);
-
-const sphereMaterial = new THREE.MeshStandardMaterial({
-  color: 0x123d5b,
-  roughness: 0.78,
-  metalness: 0.04
-});
-
-const earth = new THREE.Mesh(
-  sphereGeometry,
-  sphereMaterial
-);
-
-globeGroup.add(earth);
-
-const gridMaterial = new THREE.MeshBasicMaterial({
-  color: 0x4ba5c7,
-  wireframe: true,
-  transparent: true,
-  opacity: 0.16
-});
-
-const gridSphere = new THREE.Mesh(
-  new THREE.SphereGeometry(1.006, 48, 32),
-  gridMaterial
-);
-
-globeGroup.add(gridSphere);
-
-const atmosphere = new THREE.Mesh(
-  new THREE.SphereGeometry(1.045, 64, 64),
-  new THREE.MeshBasicMaterial({
-    color: 0x55bce7,
-    transparent: true,
-    opacity: 0.08,
-    side: THREE.BackSide
-  })
-);
-
-globeGroup.add(atmosphere);
-
-const ambient = new THREE.AmbientLight(
-  0xffffff,
-  1.1
-);
-
-scene.add(ambient);
-
-const keyLight = new THREE.DirectionalLight(
-  0xa7dfff,
-  2.2
-);
-
-keyLight.position.set(4, 2, 4);
-
-scene.add(keyLight);
-
-const fillLight = new THREE.DirectionalLight(
-  0x4d75ff,
-  0.9
-);
-
-fillLight.position.set(-3, -2, -2);
-
-scene.add(fillLight);
-
-const starGeometry = new THREE.BufferGeometry();
-const starCount = 1300;
-const starPositions = new Float32Array(starCount * 3);
-
-for (let i = 0; i < starCount; i++) {
-  const radius = 8 + Math.random() * 9;
-  const theta = Math.random() * Math.PI * 2;
-  const phi = Math.acos(2 * Math.random() - 1);
-
-  starPositions[i * 3] =
-    radius * Math.sin(phi) * Math.cos(theta);
-
-  starPositions[i * 3 + 1] =
-    radius * Math.sin(phi) * Math.sin(theta);
-
-  starPositions[i * 3 + 2] =
-    radius * Math.cos(phi);
+    viewer.scene.globe.show = true;
+  }
 }
 
-starGeometry.setAttribute(
-  "position",
-  new THREE.BufferAttribute(starPositions, 3)
-);
-
-const stars = new THREE.Points(
-  starGeometry,
-  new THREE.PointsMaterial({
-    color: 0xb7d8ef,
-    size: 0.018,
-    transparent: true,
-    opacity: 0.62
-  })
-);
-
-scene.add(stars);
-
-let dragging = false;
-let previousX = 0;
-let previousY = 0;
-let targetRotationX = 0.15;
-let targetRotationY = -0.35;
-let zoom = 3.1;
-
-canvas.addEventListener("pointerdown", event => {
-  dragging = true;
-  previousX = event.clientX;
-  previousY = event.clientY;
-  canvas.setPointerCapture(event.pointerId);
-});
-
-canvas.addEventListener("pointermove", event => {
-  if (!dragging) return;
-
-  const dx = event.clientX - previousX;
-  const dy = event.clientY - previousY;
-
-  targetRotationY += dx * 0.006;
-  targetRotationX += dy * 0.006;
-
-  targetRotationX = Math.max(
-    -1.2,
-    Math.min(1.2, targetRotationX)
-  );
-
-  previousX = event.clientX;
-  previousY = event.clientY;
-});
-
-canvas.addEventListener("pointerup", () => {
-  dragging = false;
-});
-
-canvas.addEventListener("wheel", event => {
-  event.preventDefault();
-
-  zoom += event.deltaY * 0.002;
-
-  zoom = Math.max(
-    1.45,
-    Math.min(5.5, zoom)
-  );
-}, { passive: false });
-
-const regionProfiles = [
+const profiles = [
   {
     title: "Rutherford County",
     sub: "Tennessee, United States",
+    lat: 35.8456,
+    lon: -86.3903,
+    height: 160000,
     score: 72,
     population: "380K",
     labor: "205K",
@@ -758,6 +658,9 @@ const regionProfiles = [
   {
     title: "Detroit Metro",
     sub: "Michigan, United States",
+    lat: 42.3314,
+    lon: -83.0458,
+    height: 260000,
     score: 61,
     population: "4.3M",
     labor: "2.1M",
@@ -771,6 +674,9 @@ const regionProfiles = [
   {
     title: "Tokyo",
     sub: "Japan",
+    lat: 35.6762,
+    lon: 139.6503,
+    height: 310000,
     score: 78,
     population: "14M",
     labor: "7.5M",
@@ -784,6 +690,9 @@ const regionProfiles = [
   {
     title: "Shenzhen",
     sub: "Guangdong, China",
+    lat: 22.5431,
+    lon: 114.0579,
+    height: 270000,
     score: 69,
     population: "17.7M",
     labor: "9.2M",
@@ -796,232 +705,323 @@ const regionProfiles = [
   }
 ];
 
-let profileIndex = 0;
+let selectedProfile = profiles[0];
+let activeLayer = "stability";
+
+function updateBar(id, value) {
+  document.getElementById(
+    `${id}-label`
+  ).textContent = `${value}%`;
+
+  document.getElementById(
+    `${id}-bar`
+  ).style.width = `${value}%`;
+}
 
 function renderProfile(profile) {
-  document.getElementById("location-title").textContent =
-    profile.title;
+  selectedProfile = profile;
 
-  document.getElementById("location-sub").textContent =
-    profile.sub;
+  document.getElementById(
+    "location-title"
+  ).textContent = profile.title;
 
-  document.getElementById("stability-score").textContent =
-    profile.score;
+  document.getElementById(
+    "location-sub"
+  ).textContent = profile.sub;
 
-  document.getElementById("population").textContent =
-    profile.population;
+  document.getElementById(
+    "stability-score"
+  ).textContent = profile.score;
 
-  document.getElementById("labor-force").textContent =
-    profile.labor;
+  document.getElementById(
+    "population"
+  ).textContent = profile.population;
 
-  document.getElementById("automation").textContent =
-    profile.automation;
+  document.getElementById(
+    "labor-force"
+  ).textContent = profile.labor;
 
-  document.getElementById("transition").textContent =
-    profile.transition;
+  document.getElementById(
+    "automation"
+  ).textContent = profile.automation;
 
-  updateBar("job-risk", profile.job);
-  updateBar("housing", profile.housing);
-  updateBar("industry", profile.industry);
-  updateBar("resilience", profile.resilience);
+  document.getElementById(
+    "transition"
+  ).textContent = profile.transition;
+
+  updateBar(
+    "job-risk",
+    profile.job
+  );
+
+  updateBar(
+    "housing",
+    profile.housing
+  );
+
+  updateBar(
+    "industry",
+    profile.industry
+  );
+
+  updateBar(
+    "resilience",
+    profile.resilience
+  );
 
   const badge =
-    document.getElementById("risk-badge");
+    document.getElementById(
+      "risk-badge"
+    );
 
   if (profile.score >= 75) {
     badge.textContent = "STABLE";
-    badge.style.color = "var(--good)";
+    badge.style.color =
+      "var(--good)";
   } else if (profile.score >= 65) {
     badge.textContent = "WATCH";
-    badge.style.color = "var(--watch)";
+    badge.style.color =
+      "var(--watch)";
   } else {
     badge.textContent = "ELEVATED";
-    badge.style.color = "var(--risk)";
+    badge.style.color =
+      "var(--risk)";
   }
 }
 
-function updateBar(id, value) {
-  document.getElementById(`${id}-label`).textContent =
-    `${value}%`;
+function flyToProfile(profile) {
+  viewer.camera.flyTo({
+    destination:
+      Cesium.Cartesian3.fromDegrees(
+        profile.lon,
+        profile.lat,
+        profile.height
+      ),
+    orientation: {
+      heading: 0,
+      pitch:
+        Cesium.Math.toRadians(-55),
+      roll: 0
+    },
+    duration: 2.1
+  });
 
-  document.getElementById(`${id}-bar`).style.width =
-    `${value}%`;
+  renderProfile(profile);
 }
-
-canvas.addEventListener("click", () => {
-  if (dragging) return;
-
-  profileIndex =
-    (profileIndex + 1) % regionProfiles.length;
-
-  renderProfile(regionProfiles[profileIndex]);
-});
 
 document
   .getElementById("search-btn")
-  .addEventListener("click", () => {
-    const query =
-      document.getElementById("location-search")
-        .value
-        .trim();
+  .addEventListener(
+    "click",
+    () => {
+      const query =
+        document
+          .getElementById(
+            "location-search"
+          )
+          .value
+          .trim()
+          .toLowerCase();
 
-    if (!query) return;
+      if (!query) return;
 
-    const match =
-      regionProfiles.find(profile =>
-        (
-          profile.title +
-          " " +
-          profile.sub
-        )
-          .toLowerCase()
-          .includes(query.toLowerCase())
-      );
-
-    if (match) {
-      renderProfile(match);
-      return;
-    }
-
-    document.getElementById("location-title").textContent =
-      query;
-
-    document.getElementById("location-sub").textContent =
-      "Live geographic lookup coming next";
-  });
-
-document
-  .getElementById("location-search")
-  .addEventListener("keydown", event => {
-    if (event.key === "Enter") {
-      document
-        .getElementById("search-btn")
-        .click();
-    }
-  });
-
-document
-  .querySelectorAll(".layer-btn")
-  .forEach(button => {
-    button.addEventListener("click", () => {
-      document
-        .querySelectorAll(".layer-btn")
-        .forEach(item =>
-          item.classList.remove("active")
+      const match =
+        profiles.find(
+          profile =>
+            (
+              profile.title +
+              " " +
+              profile.sub
+            )
+              .toLowerCase()
+              .includes(query)
         );
 
-      button.classList.add("active");
+      if (match) {
+        flyToProfile(match);
+        return;
+      }
 
-      const layer =
-        button.dataset.layer;
+      document.getElementById(
+        "location-title"
+      ).textContent =
+        document
+          .getElementById(
+            "location-search"
+          )
+          .value
+          .trim();
 
-      const colors = {
-        stability: 0x123d5b,
-        automation: 0x56304e,
-        employment: 0x214f47,
-        housing: 0x5a4730,
-        industry: 0x43355e,
-        aging: 0x4a5558
-      };
-
-      earth.material.color.setHex(
-        colors[layer] || colors.stability
-      );
-    });
-  });
-
-document
-  .getElementById("ask-btn")
-  .addEventListener("click", async () => {
-    const region =
-      document.getElementById("location-title")
-        .textContent;
-
-    const prompt =
-      `Give me a Post-Labor Capitalism analysis for ${region}. ` +
-      `Focus on automation exposure, employment, resilience, ` +
-      `local economic impact, and transition risks.`;
-
-    try {
-      const response = await fetch(
-        (window.GVAI_API_BASE || "") + "/api/chat",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            message: prompt
-          })
-        }
-      );
-
-      const data = await response.json();
-
-      alert(
-        data.response ||
-        data.reply ||
-        "GVAI returned no response."
-      );
-    } catch (error) {
-      alert(
-        "GVAI analysis is unavailable right now."
-      );
+      document.getElementById(
+        "location-sub"
+      ).textContent =
+        "Live place search is the next data connection.";
     }
-  });
+  );
 
 document
-  .getElementById("simulate-btn")
-  .addEventListener("click", () => {
-    const region =
-      document.getElementById("location-title")
-        .textContent;
+  .getElementById(
+    "location-search"
+  )
+  .addEventListener(
+    "keydown",
+    event => {
+      if (event.key === "Enter") {
+        document
+          .getElementById(
+            "search-btn"
+          )
+          .click();
+      }
+    }
+  );
 
-    alert(
-      `Automation simulator for ${region} is the next module.`
+document
+  .querySelectorAll(
+    ".layer-btn"
+  )
+  .forEach(button => {
+    button.addEventListener(
+      "click",
+      () => {
+        document
+          .querySelectorAll(
+            ".layer-btn"
+          )
+          .forEach(item =>
+            item.classList.remove(
+              "active"
+            )
+          );
+
+        button.classList.add(
+          "active"
+        );
+
+        activeLayer =
+          button.dataset.layer;
+
+        viewer.scene.requestRender();
+      }
     );
   });
 
-function resize() {
-  const width = window.innerWidth;
-  const height = window.innerHeight;
+const handler =
+  new Cesium.ScreenSpaceEventHandler(
+    viewer.scene.canvas
+  );
 
-  renderer.setSize(width, height, false);
+handler.setInputAction(
+  movement => {
+    const cartesian =
+      viewer.camera.pickEllipsoid(
+        movement.position,
+        viewer.scene.globe.ellipsoid
+      );
 
-  camera.aspect = width / height;
-  camera.updateProjectionMatrix();
-}
+    if (!cartesian) {
+      return;
+    }
 
-window.addEventListener("resize", resize);
+    const cartographic =
+      Cesium.Cartographic
+        .fromCartesian(cartesian);
 
-resize();
+    const latitude =
+      Cesium.Math.toDegrees(
+        cartographic.latitude
+      );
 
-function animate() {
-  requestAnimationFrame(animate);
+    const longitude =
+      Cesium.Math.toDegrees(
+        cartographic.longitude
+      );
 
-  globeGroup.rotation.x +=
-    (targetRotationX - globeGroup.rotation.x) *
-    0.08;
+    document.getElementById(
+      "location-title"
+    ).textContent =
+      `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
 
-  globeGroup.rotation.y +=
-    (targetRotationY - globeGroup.rotation.y) *
-    0.08;
+    document.getElementById(
+      "location-sub"
+    ).textContent =
+      "Location selected — geographic region lookup comes next.";
 
-  if (!dragging) {
-    targetRotationY += 0.0007;
-  }
+    selectedProfile = {
+      ...selectedProfile,
+      title:
+        `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`,
+      sub:
+        "Selected geographic point"
+    };
+  },
+  Cesium.ScreenSpaceEventType.LEFT_CLICK
+);
 
-  camera.position.z +=
-    (zoom - camera.position.z) *
-    0.08;
+document
+  .getElementById("ask-btn")
+  .addEventListener(
+    "click",
+    async () => {
+      const region =
+        document.getElementById(
+          "location-title"
+        ).textContent;
 
-  stars.rotation.y += 0.00005;
+      const prompt =
+        `Give me a Post-Labor Capitalism analysis for ${region}. ` +
+        `Focus on automation exposure, employment, resilience, ` +
+        `local economic impact, and transition risks.`;
 
-  renderer.render(scene, camera);
-}
+      try {
+        const response =
+          await fetch(
+            (window.GVAI_API_BASE || "") +
+            "/api/chat",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
+              body: JSON.stringify({
+                message: prompt
+              })
+            }
+          );
 
-renderProfile(regionProfiles[0]);
-animate();
+        const data =
+          await response.json();
+
+        alert(
+          data.response ||
+          data.reply ||
+          "GVAI returned no response."
+        );
+      } catch (error) {
+        alert(
+          "GVAI analysis is unavailable right now."
+        );
+      }
+    }
+  );
+
+document
+  .getElementById(
+    "simulate-btn"
+  )
+  .addEventListener(
+    "click",
+    () => {
+      alert(
+        `Automation simulator for ${selectedProfile.title} is the next module.`
+      );
+    }
+  );
+
+flyToProfile(
+  profiles[0]
+);
 </script>
 
 </body>
