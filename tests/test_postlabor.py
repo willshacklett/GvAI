@@ -371,3 +371,88 @@ def test_build_candidate_from_market():
     assert candidate.demand_outlook > 50.0
     assert candidate.wage_retention == 100.0
     assert 0.0 <= candidate.retraining_burden <= 100.0
+
+
+def test_occupation_search():
+    from gvai.postlabor.workers.occupation_market import (
+        OccupationMarketRecord,
+    )
+    from gvai.postlabor.workers.occupation_search import (
+        find_by_soc,
+        search_occupations,
+    )
+
+    records = [
+        OccupationMarketRecord(
+            soc_code="49-9041",
+            title="Industrial Machinery Mechanics",
+        ),
+        OccupationMarketRecord(
+            soc_code="49-9071",
+            title="Maintenance and Repair Workers, General",
+        ),
+        OccupationMarketRecord(
+            soc_code="11-2021",
+            title="Marketing Managers",
+        ),
+    ]
+
+    results = search_occupations(
+        records,
+        "industrial machinery",
+    )
+
+    assert results
+    assert results[0].soc_code == "49-9041"
+
+    found = find_by_soc(
+        records,
+        "49-9071",
+    )
+
+    assert found is not None
+    assert found.title == "Maintenance and Repair Workers, General"
+
+
+def test_market_recommender_uses_bls_fields():
+    from gvai.postlabor.workers.market_recommender import (
+        CandidateInputs,
+        build_market_candidates,
+    )
+    from gvai.postlabor.workers.occupation_market import (
+        OccupationMarketRecord,
+    )
+
+    record = OccupationMarketRecord(
+        soc_code="49-9041",
+        title="Industrial Machinery Mechanics",
+        employment_base_thousands=400,
+        employment_projected_thousands=450,
+        employment_change_percent=12.5,
+        annual_openings_thousands=40,
+        median_annual_wage=65000,
+        education="High school diploma or equivalent",
+        on_the_job_training="Long-term on-the-job training",
+    )
+
+    candidates = build_market_candidates(
+        candidate_records=[record],
+        current_annual_wage=50000,
+        inputs_by_soc={
+            "49-9041": CandidateInputs(
+                skill_transferability=78,
+                automation_displacement_pressure=25,
+                geographic_opportunity=80,
+                confidence=0.8,
+            )
+        },
+    )
+
+    assert len(candidates) == 1
+
+    candidate = candidates[0]
+
+    assert candidate.occupation == "Industrial Machinery Mechanics"
+    assert candidate.demand_outlook > 50
+    assert candidate.wage_retention == 100
+    assert candidate.skill_transferability == 78
