@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from typing import List, Optional
 
 import requests
@@ -9,6 +10,23 @@ from gvai.postlabor.workers.occupation_data import (
     OccupationRecord,
     OccupationSkill,
 )
+
+
+@dataclass(frozen=True)
+class OnetWorkActivity:
+    element_id: str
+    name: str
+    description: str
+    importance: float
+
+
+@dataclass(frozen=True)
+class OnetWorkContext:
+    element_id: str
+    name: str
+    description: str
+    context: float
+
 
 
 ONET_BASE_URL = "https://api-v2.onetcenter.org"
@@ -91,6 +109,55 @@ class OnetClient:
                     else None
                 ),
                 description=str(item.get("description") or ""),
+            )
+            for item in elements
+        ]
+
+    def work_activities(
+        self,
+        occupation_code: str,
+    ) -> List[OnetWorkActivity]:
+        payload = self._get(
+            f"/online/occupations/{occupation_code}/details/work_activities",
+            params={
+                "start": 1,
+                "end": 100,
+                "sort": "importance",
+            },
+        )
+
+        elements = payload.get("element") or []
+
+        return [
+            OnetWorkActivity(
+                element_id=str(item.get("id") or ""),
+                name=str(item.get("name") or ""),
+                description=str(item.get("description") or ""),
+                importance=float(item.get("importance") or 0.0),
+            )
+            for item in elements
+        ]
+
+    def work_context(
+        self,
+        occupation_code: str,
+    ) -> List[OnetWorkContext]:
+        payload = self._get(
+            f"/online/occupations/{occupation_code}/details/work_context",
+            params={
+                "start": 1,
+                "end": 100,
+            },
+        )
+
+        elements = payload.get("element") or []
+
+        return [
+            OnetWorkContext(
+                element_id=str(item.get("id") or ""),
+                name=str(item.get("name") or ""),
+                description=str(item.get("description") or ""),
+                context=float(item.get("context") or 0.0),
             )
             for item in elements
         ]
