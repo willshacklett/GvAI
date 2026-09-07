@@ -29,6 +29,15 @@ class OnetWorkContext:
 
 
 
+@dataclass(frozen=True)
+class OnetKnowledge:
+    element_id: str
+    name: str
+    description: str
+    importance: float
+
+
+
 ONET_BASE_URL = "https://api-v2.onetcenter.org"
 
 
@@ -125,6 +134,31 @@ class OnetClient:
                     else None
                 ),
                 description=str(item.get("description") or ""),
+            )
+            for item in elements
+        ]
+
+    def knowledge(
+        self,
+        occupation_code: str,
+    ) -> List[OnetKnowledge]:
+        payload = self._get(
+            f"/online/occupations/{occupation_code}/details/knowledge",
+            params={
+                "start": 1,
+                "end": 100,
+                "sort": "importance",
+            },
+        )
+
+        elements = payload.get("element") or []
+
+        return [
+            OnetKnowledge(
+                element_id=str(item.get("id") or ""),
+                name=str(item.get("name") or ""),
+                description=str(item.get("description") or ""),
+                importance=float(item.get("importance") or 0.0),
             )
             for item in elements
         ]

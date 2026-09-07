@@ -977,21 +977,20 @@ def test_skill_shortlist_dataclass():
         record=record,
         preliminary_score=70.0,
         skill_transferability=80.0,
+        activity_similarity=75.0,
+        context_similarity=70.0,
         skill_data_available=True,
-        shortlist_score=74.5,
+        activity_data_available=True,
+        context_data_available=True,
+        career_adjacency=75.25,
+        shortlist_score=72.89,
     )
 
     assert result.skill_data_available is True
-    assert result.shortlist_score == 74.5
+    assert result.activity_data_available is True
+    assert result.context_data_available is True
+    assert result.career_adjacency == 75.25
 
-
-def test_shortlist_score_preserves_skill_and_market_dimensions():
-    market = 80.0
-    skill = 60.0
-
-    score = market * 0.55 + skill * 0.45
-
-    assert round(score, 2) == 71.0
 
 
 def test_activity_similarity_identical_profiles():
@@ -1159,4 +1158,117 @@ def test_context_similarity_distinguishes_profiles():
     assert (
         context_similarity(source, similar)
         > context_similarity(source, different)
+    )
+
+
+def test_career_adjacency_score():
+    from gvai.postlabor.workers.candidate_shortlist import (
+        career_adjacency_score,
+    )
+
+    score = career_adjacency_score(
+        skill_transferability=80,
+        activity_similarity=70,
+        context_similarity=60,
+    )
+
+    assert score == 70.5
+
+
+def test_career_adjacency_bounds():
+    from gvai.postlabor.workers.candidate_shortlist import (
+        career_adjacency_score,
+    )
+
+    assert career_adjacency_score(
+        skill_transferability=100,
+        activity_similarity=100,
+        context_similarity=100,
+    ) == 100.0
+
+    assert career_adjacency_score(
+        skill_transferability=0,
+        activity_similarity=0,
+        context_similarity=0,
+    ) == 0.0
+
+
+def test_knowledge_similarity_identical_profiles():
+    from gvai.postlabor.sources.onet import OnetKnowledge
+    from gvai.postlabor.workers.onet_knowledge_matcher import (
+        knowledge_similarity,
+    )
+
+    items = [
+        OnetKnowledge(
+            element_id="A",
+            name="A",
+            description="",
+            importance=80,
+        ),
+        OnetKnowledge(
+            element_id="B",
+            name="B",
+            description="",
+            importance=60,
+        ),
+    ]
+
+    assert knowledge_similarity(items, items) == 100.0
+
+
+def test_knowledge_similarity_distinguishes_profiles():
+    from gvai.postlabor.sources.onet import OnetKnowledge
+    from gvai.postlabor.workers.onet_knowledge_matcher import (
+        knowledge_similarity,
+    )
+
+    source = [
+        OnetKnowledge(
+            element_id="A",
+            name="A",
+            description="",
+            importance=90,
+        ),
+        OnetKnowledge(
+            element_id="B",
+            name="B",
+            description="",
+            importance=80,
+        ),
+    ]
+
+    similar = [
+        OnetKnowledge(
+            element_id="A",
+            name="A",
+            description="",
+            importance=85,
+        ),
+        OnetKnowledge(
+            element_id="B",
+            name="B",
+            description="",
+            importance=75,
+        ),
+    ]
+
+    different = [
+        OnetKnowledge(
+            element_id="A",
+            name="A",
+            description="",
+            importance=10,
+        ),
+        OnetKnowledge(
+            element_id="B",
+            name="B",
+            description="",
+            importance=20,
+        ),
+    ]
+
+    assert (
+        knowledge_similarity(source, similar)
+        > knowledge_similarity(source, different)
     )
