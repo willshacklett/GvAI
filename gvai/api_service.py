@@ -13,6 +13,7 @@ from gvai.adaptive_control import update_adaptive_control, get_adaptive_control_
 from gvai.postlabor.region_intel import resolve_us_region
 
 app = Flask(__name__)
+# Railway deployment marker: live geographic search enabled.
 
 register_conscience_routes(app)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
