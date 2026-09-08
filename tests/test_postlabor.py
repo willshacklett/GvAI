@@ -1615,3 +1615,70 @@ def test_collective_projection_revenue_growth():
 
     assert result.annual_results[0].gross_member_revenue == 1_000_000
     assert result.annual_results[1].gross_member_revenue == 1_100_000
+
+
+def test_county_occupation_profile(monkeypatch):
+    from gvai.postlabor.region_intel import (
+        build_county_occupation_profile,
+    )
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [
+                [
+                    "NAME",
+                    "S2401_C01_001E",
+                    "S2401_C01_002E",
+                    "S2401_C01_018E",
+                    "S2401_C01_026E",
+                    "S2401_C01_029E",
+                    "S2401_C01_033E",
+                    "state",
+                    "county",
+                ],
+                [
+                    "Test County, Test State",
+                    "1000",
+                    "400",
+                    "200",
+                    "150",
+                    "100",
+                    "150",
+                    "47",
+                    "149",
+                ],
+            ]
+
+    monkeypatch.setattr(
+        "gvai.postlabor.region_intel.requests.get",
+        lambda *args, **kwargs: FakeResponse(),
+    )
+
+    result = build_county_occupation_profile(
+        state_fips="47",
+        county_fips="149",
+        census_api_key="test-key",
+    )
+
+    assert result["data_available"] is True
+    assert result["civilian_employed_16_plus"] == 1000.0
+    assert len(result["groups"]) == 5
+
+    top = result["groups"][0]
+
+    assert top["group_id"] == (
+        "management_business_science_arts"
+    )
+    assert top["employed"] == 400.0
+    assert top["share_percent"] == 40.0
+
+    total_share = sum(
+        item["share_percent"]
+        for item in result["groups"]
+        if item["share_percent"] is not None
+    )
+
+    assert total_share == 100.0

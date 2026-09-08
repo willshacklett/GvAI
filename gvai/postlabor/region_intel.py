@@ -176,6 +176,13 @@ def resolve_us_region(
             1,
         )
 
+    occupation_profile = build_county_occupation_profile(
+        state_fips=state_fips,
+        county_fips=county_fips,
+        acs_year=acs_year,
+        census_api_key=census_api_key,
+    )
+
     return {
         "supported": True,
         "data_available": True,
@@ -193,5 +200,144 @@ def resolve_us_region(
         "median_household_income": median_income,
         "median_home_value": median_home_value,
         "median_age": median_age,
+        "occupation_profile": occupation_profile,
         "source": "U.S. Census Bureau ACS 5-year",
+    }
+
+
+ACS_OCCUPATION_GROUPS = {
+    "management_business_science_arts": {
+        "label": "Management, business, science, and arts",
+        "variable": "S2401_C01_002E",
+    },
+    "service": {
+        "label": "Service",
+        "variable": "S2401_C01_018E",
+    },
+    "sales_office": {
+        "label": "Sales and office",
+        "variable": "S2401_C01_026E",
+    },
+    "natural_resources_construction_maintenance": {
+        "label": "Natural resources, construction, and maintenance",
+        "variable": "S2401_C01_029E",
+    },
+    "production_transportation_material_moving": {
+        "label": "Production, transportation, and material moving",
+        "variable": "S2401_C01_033E",
+    },
+}
+
+
+def build_county_occupation_profile(
+    *,
+    state_fips: str,
+    county_fips: str,
+    acs_year: int = 2024,
+    census_api_key: str | None = None,
+) -> Dict[str, Any]:
+    """
+    Retrieve broad county occupation groups from ACS subject table S2401.
+
+    This is the geographic bridge between county-level labor composition
+    and GVAI's national occupation-demand / automation models.
+    """
+
+    key = (
+        census_api_key
+        or os.getenv("CENSUS_API_KEY")
+        or ""
+    ).strip()
+
+    if not key:
+        return {
+            "data_available": False,
+            "reason": "CENSUS_API_KEY is not configured.",
+            "source": "U.S. Census Bureau ACS S2401",
+        }
+
+    total_variable = "S2401_C01_001E"
+
+    variables = [
+        "NAME",
+        total_variable,
+        *[
+            item["variable"]
+            for item in ACS_OCCUPATION_GROUPS.values()
+        ],
+    ]
+
+    response = requests.get(
+        f"{ACS_BASE}/{acs_year}/acs/acs5/subject",
+        params={
+            "get": ",".join(variables),
+            "for": f"county:{county_fips}",
+            "in": f"state:{state_fips}",
+            "key": key,
+        },
+        timeout=12,
+        headers={
+            "User-Agent": "GVAI/1.0",
+            "Accept": "application/json",
+        },
+    )
+
+    response.raise_for_status()
+
+    rows = response.json()
+
+    if len(rows) < 2:
+        return {
+            "data_available": False,
+            "source": "U.S. Census Bureau ACS S2401",
+        }
+
+    data = dict(zip(rows[0], rows[1]))
+
+    employed_total = _number(
+        data.get(total_variable)
+    )
+
+    groups = []
+
+    for group_id, definition in ACS_OCCUPATION_GROUPS.items():
+        employed = _number(
+            data.get(definition["variable"])
+        )
+
+        share_percent = None
+
+        if (
+            employed_total
+            and employed is not None
+        ):
+            share_percent = round(
+                employed / employed_total * 100,
+                1,
+            )
+
+        groups.append(
+            {
+                "group_id": group_id,
+                "label": definition["label"],
+                "employed": employed,
+                "share_percent": share_percent,
+            }
+        )
+
+    groups.sort(
+        key=lambda item: (
+            item["employed"]
+            if item["employed"] is not None
+            else -1
+        ),
+        reverse=True,
+    )
+
+    return {
+        "data_available": True,
+        "acs_year": acs_year,
+        "civilian_employed_16_plus": employed_total,
+        "groups": groups,
+        "source": "U.S. Census Bureau ACS S2401",
     }
