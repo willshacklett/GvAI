@@ -10,6 +10,7 @@ from gvai.model_router import call_model, active_provider, available_providers
 from gvai.arbitrator import arbitrate_responses
 from gvai.gv_mode import gv_mode_prompt
 from gvai.adaptive_control import update_adaptive_control, get_adaptive_control_state
+from gvai.postlabor.region_intel import resolve_us_region
 
 app = Flask(__name__)
 
@@ -43,6 +44,33 @@ def search_web(query: str):
 @app.get("/api/health")
 def health():
     return jsonify({"ok": True, "service": "gvai-api", "runtime": "railway"})
+
+
+@app.get("/api/region")
+def api_region():
+    try:
+        latitude = float(request.args.get("lat"))
+        longitude = float(request.args.get("lon"))
+    except (TypeError, ValueError):
+        return jsonify({
+            "supported": False,
+            "reason": "Valid lat and lon query parameters are required."
+        }), 400
+
+    try:
+        result = resolve_us_region(
+            latitude=latitude,
+            longitude=longitude,
+        )
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({
+            "supported": False,
+            "latitude": latitude,
+            "longitude": longitude,
+            "reason": "Regional data lookup failed.",
+            "error_type": type(exc).__name__,
+        }), 500
 
 def build_gv_runtime_policy(user_message=""):
     """
