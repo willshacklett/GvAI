@@ -44,7 +44,7 @@ def resolve_us_region(
             "vintage": "Current_Current",
             "format": "json",
         },
-        timeout=12,
+        timeout=30,
     )
     geo_response.raise_for_status()
 
@@ -120,7 +120,7 @@ def resolve_us_region(
     acs_response = requests.get(
         f"{ACS_BASE}/{acs_year}/acs/acs5",
         params=params,
-        timeout=12,
+        timeout=30,
         headers={
             "User-Agent": "GVAI/1.0",
             "Accept": "application/json",
@@ -275,7 +275,7 @@ def build_county_occupation_profile(
             "in": f"state:{state_fips}",
             "key": key,
         },
-        timeout=12,
+        timeout=30,
         headers={
             "User-Agent": "GVAI/1.0",
             "Accept": "application/json",
