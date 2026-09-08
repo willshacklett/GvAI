@@ -1015,6 +1015,69 @@ async function loadRegionalData(latitude, longitude) {
         </div>
       </div>
 
+      ${
+        data.occupation_profile &&
+        data.occupation_profile.data_available
+          ? `
+      <div
+        style="
+          margin-top:14px;
+          padding:14px;
+          border:1px solid var(--border);
+          border-radius:12px;
+          background:rgba(255,255,255,0.03);
+        "
+      >
+        <div
+          style="
+            font-size:11px;
+            text-transform:uppercase;
+            letter-spacing:.08em;
+            color:var(--muted);
+            margin-bottom:10px;
+          "
+        >
+          Local Workforce Mix
+        </div>
+
+        ${data.occupation_profile.groups
+          .map(group => `
+            <div
+              style="
+                display:flex;
+                justify-content:space-between;
+                gap:12px;
+                margin:7px 0;
+                font-size:12px;
+              "
+            >
+              <span>${group.label}</span>
+              <strong>
+                ${
+                  group.share_percent === null ||
+                  group.share_percent === undefined
+                    ? "—"
+                    : group.share_percent + "%"
+                }
+              </strong>
+            </div>
+          `)
+          .join("")}
+
+        <div
+          style="
+            margin-top:10px;
+            font-size:10px;
+            color:var(--muted);
+          "
+        >
+          ${data.occupation_profile.source}
+        </div>
+      </div>
+      `
+          : ""
+      }
+
       <div
         style="
           margin-top:14px;
