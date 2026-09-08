@@ -70,6 +70,7 @@ def api_region():
             "longitude": longitude,
             "reason": "Regional data lookup failed.",
             "error_type": type(exc).__name__,
+            "error": str(exc),
         }), 500
 
 def build_gv_runtime_policy(user_message=""):
