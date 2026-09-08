@@ -1263,15 +1263,17 @@ document
   .getElementById("search-btn")
   .addEventListener(
     "click",
-    () => {
+    async () => {
+      const input =
+        document.getElementById(
+          "location-search"
+        );
+
+      const rawQuery =
+        input.value.trim();
+
       const query =
-        document
-          .getElementById(
-            "location-search"
-          )
-          .value
-          .trim()
-          .toLowerCase();
+        rawQuery.toLowerCase();
 
       if (!query) return;
 
@@ -1289,23 +1291,110 @@ document
 
       if (match) {
         flyToProfile(match);
+        loadRegionalData(
+          match.lat,
+          match.lon
+        );
         return;
       }
 
-      document.getElementById(
-        "location-title"
-      ).textContent =
-        document
-          .getElementById(
-            "location-search"
-          )
-          .value
-          .trim();
+      const button =
+        document.getElementById(
+          "search-btn"
+        );
 
-      document.getElementById(
-        "location-sub"
-      ).textContent =
-        "Live place search is the next data connection.";
+      const title =
+        document.getElementById(
+          "location-title"
+        );
+
+      const sub =
+        document.getElementById(
+          "location-sub"
+        );
+
+      button.disabled = true;
+      button.textContent = "Locating...";
+
+      title.textContent = rawQuery;
+      sub.textContent =
+        "Finding location...";
+
+      try {
+        const endpoint =
+          (window.GVAI_API_BASE || "") +
+          `/api/geocode?q=${encodeURIComponent(rawQuery)}`;
+
+        const response =
+          await fetch(endpoint);
+
+        const data =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !data.ok
+        ) {
+          throw new Error(
+            data.reason ||
+            "Location not found."
+          );
+        }
+
+        const latitude =
+          Number(data.latitude);
+
+        const longitude =
+          Number(data.longitude);
+
+        title.textContent =
+          data.city ||
+          data.county ||
+          data.state ||
+          rawQuery;
+
+        sub.textContent =
+          data.label ||
+          "Loading regional intelligence...";
+
+        viewer.camera.flyTo({
+          destination:
+            Cesium.Cartesian3.fromDegrees(
+              longitude,
+              latitude,
+              180000
+            ),
+          orientation: {
+            heading: 0,
+            pitch:
+              Cesium.Math.toRadians(-60),
+            roll: 0
+          },
+          duration: 2.0
+        });
+
+        await loadRegionalData(
+          latitude,
+          longitude
+        );
+
+      } catch (error) {
+        console.error(
+          "Place search failed",
+          error
+        );
+
+        title.textContent =
+          "Location not found";
+
+        sub.textContent =
+          error.message ||
+          "Try a ZIP code, city, county, state, or country.";
+
+      } finally {
+        button.disabled = false;
+        button.textContent = "Explore";
+      }
     }
   );
 

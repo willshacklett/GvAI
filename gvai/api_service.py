@@ -46,6 +46,74 @@ def health():
     return jsonify({"ok": True, "service": "gvai-api", "runtime": "railway"})
 
 
+@app.get("/api/geocode")
+def api_geocode():
+    query = (request.args.get("q") or "").strip()
+
+    if not query:
+        return jsonify({
+            "ok": False,
+            "reason": "A location search query is required."
+        }), 400
+
+    try:
+        response = requests.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={
+                "q": query,
+                "format": "jsonv2",
+                "limit": 1,
+                "addressdetails": 1,
+            },
+            headers={
+                "User-Agent": "GVAI/1.0 (https://gvai.io)",
+                "Referer": "https://gvai.io/",
+            },
+            timeout=15,
+        )
+        response.raise_for_status()
+
+        results = response.json()
+
+        if not results:
+            return jsonify({
+                "ok": False,
+                "query": query,
+                "reason": "Location not found."
+            }), 404
+
+        result = results[0]
+        address = result.get("address") or {}
+
+        return jsonify({
+            "ok": True,
+            "query": query,
+            "label": result.get("display_name") or query,
+            "latitude": float(result["lat"]),
+            "longitude": float(result["lon"]),
+            "place_type": result.get("type"),
+            "country": address.get("country"),
+            "country_code": address.get("country_code"),
+            "state": address.get("state"),
+            "county": address.get("county"),
+            "city": (
+                address.get("city")
+                or address.get("town")
+                or address.get("village")
+                or address.get("municipality")
+            ),
+            "postcode": address.get("postcode"),
+        })
+
+    except requests.RequestException as exc:
+        return jsonify({
+            "ok": False,
+            "query": query,
+            "reason": "Place search is temporarily unavailable.",
+            "error_type": type(exc).__name__,
+        }), 502
+
+
 @app.get("/api/region")
 def api_region():
     try:
