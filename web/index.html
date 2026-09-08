@@ -86,21 +86,68 @@
     }
 
     .brand {
-      min-width: 280px;
+      min-width: 330px;
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      padding: 11px 14px 11px 11px;
+      background: rgba(5, 15, 26, 0.76);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 12px 34px rgba(0,0,0,0.24);
+    }
+
+    .brand-logo {
+      width: 48px;
+      height: 48px;
+      flex: 0 0 48px;
+      display: block;
+      filter: drop-shadow(0 0 12px rgba(92, 140, 255, 0.22));
+    }
+
+    .brand-copy {
+      min-width: 0;
     }
 
     .brand-title {
       font-size: 22px;
-      font-weight: 800;
+      font-weight: 850;
+      line-height: 1;
       letter-spacing: 0.04em;
     }
 
     .brand-sub {
-      margin-top: 3px;
-      font-size: 12px;
+      margin-top: 5px;
+      font-size: 10px;
       color: var(--muted);
-      letter-spacing: 0.08em;
+      letter-spacing: 0.10em;
       text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .brand-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 7px;
+      padding: 4px 7px;
+      border-radius: 999px;
+      background: rgba(101, 211, 255, 0.08);
+      border: 1px solid rgba(101, 211, 255, 0.18);
+      color: var(--accent);
+      font-size: 9px;
+      font-weight: 750;
+      letter-spacing: 0.10em;
+    }
+
+    .brand-status::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px rgba(101, 211, 255, 0.8);
     }
 
     .search-wrap {
@@ -306,15 +353,16 @@
     .legend {
       position: absolute;
       left: 20px;
-      top: 98px;
+      bottom: 76px;
       z-index: 10;
-      background: rgba(5, 15, 26, 0.70);
+      background: rgba(5, 15, 26, 0.72);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 10px 12px;
-      font-size: 11px;
+      padding: 9px 11px;
+      font-size: 10px;
       color: var(--muted);
-      backdrop-filter: blur(10px);
+      backdrop-filter: blur(12px);
+      opacity: 0.82;
     }
 
     .legend-row {
@@ -408,8 +456,16 @@
 
   <div class="topbar">
     <div class="brand">
-      <div class="brand-title">GVAI</div>
-      <div class="brand-sub">Post-Labor Capitalism Intelligence</div>
+      <img
+        class="brand-logo"
+        src="/gv-carl-logo.svg"
+        alt="GVAI"
+      />
+      <div class="brand-copy">
+        <div class="brand-title">GVAI</div>
+        <div class="brand-sub">Post-Labor Capitalism Intelligence</div>
+        <div class="brand-status">GLOBAL OUTLOOK</div>
+      </div>
     </div>
 
     <div class="search-wrap">
