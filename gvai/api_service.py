@@ -58,10 +58,14 @@ def api_geocode():
         }), 400
 
     try:
+        geocode_query = query
+        if query.isdigit() and len(query) == 5:
+            geocode_query = f"{query}, USA"
+
         response = requests.get(
             "https://nominatim.openstreetmap.org/search",
             params={
-                "q": query,
+                "q": geocode_query,
                 "format": "jsonv2",
                 "limit": 1,
                 "addressdetails": 1,
