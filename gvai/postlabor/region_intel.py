@@ -137,8 +137,17 @@ def resolve_us_region(
     ).lower()
 
     if "json" not in content_type:
+        body_preview = (
+            acs_response.text[:300]
+            .replace("\n", " ")
+            .replace("\r", " ")
+        )
+
         raise RuntimeError(
-            "Census ACS API returned a non-JSON response."
+            "Census ACS API returned a non-JSON response: "
+            f"status={acs_response.status_code}, "
+            f"content_type={content_type}, "
+            f"body={body_preview}"
         )
 
     rows = acs_response.json()
