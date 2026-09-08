@@ -583,6 +583,12 @@ globeShell.innerHTML = `
 const viewer = new Cesium.Viewer(
   "cesiumContainer",
   {
+    baseLayer:
+      Cesium.ImageryLayer.fromProviderAsync(
+        Cesium.ArcGisMapServerImageryProvider.fromUrl(
+          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer"
+        )
+      ),
     animation: false,
     timeline: false,
     baseLayerPicker: false,
@@ -593,7 +599,7 @@ const viewer = new Cesium.Viewer(
     infoBox: false,
     selectionIndicator: false,
     geocoder: false,
-    requestRenderMode: true
+    requestRenderMode: false
   }
 );
 
@@ -601,13 +607,8 @@ viewer.scene.globe.enableLighting = true;
 viewer.scene.skyAtmosphere.show = true;
 viewer.scene.fog.enabled = true;
 
-viewer.camera.setView({
-  destination: Cesium.Cartesian3.fromDegrees(
-    -86.39,
-    35.85,
-    14500000
-  )
-});
+// Start with Cesium's natural whole-Earth view.
+viewer.camera.flyHome(0);
 
 const GOOGLE_KEY =
   window.GVAI_GOOGLE_MAPS_API_KEY ||
@@ -1359,7 +1360,9 @@ document
     }
   );
 
-flyToProfile(
+// Show the default regional panel without moving the camera.
+// The globe should open at the whole-Earth view.
+renderProfile(
   profiles[0]
 );
 </script>
