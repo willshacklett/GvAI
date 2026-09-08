@@ -706,17 +706,46 @@ const profiles = [
   }
 ];
 
-let selectedProfile = profiles[0];
+const globalProfile = {
+  title: "Global Labor Outlook",
+  sub: "Select or search a region to inspect local conditions",
+  score: null,
+  population: "—",
+  labor: "—",
+  automation: "—",
+  transition: "—",
+  job: null,
+  housing: null,
+  industry: null,
+  resilience: null,
+  isGlobal: true
+};
+
+let selectedProfile = globalProfile;
 let activeLayer = "stability";
 
 function updateBar(id, value) {
-  document.getElementById(
-    `${id}-label`
-  ).textContent = `${value}%`;
+  const label =
+    document.getElementById(
+      `${id}-label`
+    );
 
-  document.getElementById(
-    `${id}-bar`
-  ).style.width = `${value}%`;
+  const bar =
+    document.getElementById(
+      `${id}-bar`
+    );
+
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    label.textContent = "—";
+    bar.style.width = "0%";
+    return;
+  }
+
+  label.textContent = `${value}%`;
+  bar.style.width = `${value}%`;
 }
 
 function renderProfile(profile) {
@@ -732,7 +761,11 @@ function renderProfile(profile) {
 
   document.getElementById(
     "stability-score"
-  ).textContent = profile.score;
+  ).textContent =
+    profile.score === null ||
+    profile.score === undefined
+      ? "—"
+      : profile.score;
 
   document.getElementById(
     "population"
@@ -775,7 +808,11 @@ function renderProfile(profile) {
       "risk-badge"
     );
 
-  if (profile.score >= 75) {
+  if (profile.isGlobal) {
+    badge.textContent = "GLOBAL";
+    badge.style.color =
+      "var(--accent)";
+  } else if (profile.score >= 75) {
     badge.textContent = "STABLE";
     badge.style.color =
       "var(--good)";
@@ -1363,7 +1400,7 @@ document
 // Show the default regional panel without moving the camera.
 // The globe should open at the whole-Earth view.
 renderProfile(
-  profiles[0]
+  globalProfile
 );
 </script>
 
