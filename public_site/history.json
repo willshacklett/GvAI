@@ -2810,5 +2810,16 @@
     "timestamp_utc": "2026-09-08T21:12:19.883528+00:00",
     "sha": "0e890f9",
     "source": "github-actions"
+  },
+  {
+    "seq": 256,
+    "godscore": 5,
+    "status": "collapse",
+    "mean_step": 20,
+    "collapse_step": 31,
+    "lead_time": 11,
+    "timestamp_utc": "2026-09-08T21:19:29.660340+00:00",
+    "sha": "2bd8fe9",
+    "source": "github-actions"
   }
 ]
