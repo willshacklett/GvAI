@@ -819,6 +819,44 @@ function formatMoney(value) {
   ).format(value);
 }
 
+
+function classifyLaborAvailability(data) {
+  const unemployment = data.unemployment_rate;
+  const medianAge = data.median_age;
+
+  if (
+    unemployment === null ||
+    unemployment === undefined
+  ) {
+    return {
+      label: "Unknown",
+      detail: "Not enough labor-market data"
+    };
+  }
+
+  if (unemployment < 3.5) {
+    return {
+      label: "Tight",
+      detail:
+        "Low unemployment suggests fewer immediately available workers"
+    };
+  }
+
+  if (unemployment <= 5.5) {
+    return {
+      label: "Balanced",
+      detail:
+        "Labor availability appears relatively balanced"
+    };
+  }
+
+  return {
+    label: "Available",
+    detail:
+      "Higher unemployment suggests a larger immediately available labor pool"
+  };
+}
+
 async function loadRegionalData(latitude, longitude) {
   const title =
     document.getElementById("location-title");
@@ -876,13 +914,13 @@ async function loadRegionalData(latitude, longitude) {
     const unemployment =
       data.unemployment_rate;
 
+    const laborAvailability =
+      classifyLaborAvailability(data);
+
     document.getElementById(
       "transition"
     ).textContent =
-      unemployment === null ||
-      unemployment === undefined
-        ? "—"
-        : `${unemployment}% unemployment`;
+      laborAvailability.label;
 
     selectedProfile = {
       ...selectedProfile,
@@ -974,6 +1012,48 @@ async function loadRegionalData(latitude, longitude) {
               data.median_home_value
             )}
           </div>
+        </div>
+      </div>
+
+      <div
+        style="
+          margin-top:14px;
+          padding:14px;
+          border:1px solid var(--border);
+          border-radius:12px;
+          background:rgba(255,255,255,0.03);
+        "
+      >
+        <div
+          style="
+            font-size:11px;
+            text-transform:uppercase;
+            letter-spacing:.08em;
+            color:var(--muted);
+            margin-bottom:5px;
+          "
+        >
+          Human Labor Availability
+        </div>
+
+        <div
+          style="
+            font-size:22px;
+            font-weight:700;
+            margin-bottom:4px;
+          "
+        >
+          ${laborAvailability.label}
+        </div>
+
+        <div
+          style="
+            font-size:12px;
+            color:var(--muted);
+            line-height:1.45;
+          "
+        >
+          ${laborAvailability.detail}
         </div>
       </div>
 
