@@ -958,7 +958,176 @@ function classifyLaborAvailability(data) {
 
 
 
-let selectedCountyPrimitive = null;
+
+let countyOverlayCanvas = null;
+let countyOverlayContext = null;
+let selectedCountyPositions = [];
+let countyOverlayPostRender = null;
+
+function ensureCountyOverlay() {
+  if (countyOverlayCanvas) {
+    return;
+  }
+
+  const container =
+    document.getElementById("cesiumContainer");
+
+  countyOverlayCanvas =
+    document.createElement("canvas");
+
+  countyOverlayCanvas.id =
+    "county-boundary-overlay";
+
+  countyOverlayCanvas.style.position =
+    "absolute";
+
+  countyOverlayCanvas.style.inset =
+    "0";
+
+  countyOverlayCanvas.style.width =
+    "100%";
+
+  countyOverlayCanvas.style.height =
+    "100%";
+
+  countyOverlayCanvas.style.pointerEvents =
+    "none";
+
+  countyOverlayCanvas.style.zIndex =
+    "5";
+
+  container.appendChild(
+    countyOverlayCanvas
+  );
+
+  countyOverlayContext =
+    countyOverlayCanvas.getContext("2d");
+
+  countyOverlayPostRender = () => {
+    drawSelectedCountyOverlay();
+  };
+
+  viewer.scene.postRender.addEventListener(
+    countyOverlayPostRender
+  );
+}
+
+function drawSelectedCountyOverlay() {
+  if (
+    !countyOverlayCanvas ||
+    !countyOverlayContext
+  ) {
+    return;
+  }
+
+  const rect =
+    countyOverlayCanvas
+      .getBoundingClientRect();
+
+  const dpr =
+    window.devicePixelRatio || 1;
+
+  const targetWidth =
+    Math.round(rect.width * dpr);
+
+  const targetHeight =
+    Math.round(rect.height * dpr);
+
+  if (
+    countyOverlayCanvas.width !== targetWidth ||
+    countyOverlayCanvas.height !== targetHeight
+  ) {
+    countyOverlayCanvas.width =
+      targetWidth;
+
+    countyOverlayCanvas.height =
+      targetHeight;
+  }
+
+  const ctx =
+    countyOverlayContext;
+
+  ctx.setTransform(
+    dpr,
+    0,
+    0,
+    dpr,
+    0,
+    0
+  );
+
+  ctx.clearRect(
+    0,
+    0,
+    rect.width,
+    rect.height
+  );
+
+  if (
+    selectedCountyPositions.length < 2
+  ) {
+    return;
+  }
+
+  ctx.beginPath();
+
+  let drawing = false;
+
+  for (
+    const position
+    of selectedCountyPositions
+  ) {
+    const windowPosition =
+      Cesium.SceneTransforms
+        .worldToWindowCoordinates(
+          viewer.scene,
+          position
+        );
+
+    if (
+      !windowPosition ||
+      !Number.isFinite(windowPosition.x) ||
+      !Number.isFinite(windowPosition.y)
+    ) {
+      drawing = false;
+      continue;
+    }
+
+    if (!drawing) {
+      ctx.moveTo(
+        windowPosition.x,
+        windowPosition.y
+      );
+
+      drawing = true;
+    } else {
+      ctx.lineTo(
+        windowPosition.x,
+        windowPosition.y
+      );
+    }
+  }
+
+  ctx.strokeStyle =
+    "#00e5ff";
+
+  ctx.lineWidth =
+    4;
+
+  ctx.shadowColor =
+    "#00e5ff";
+
+  ctx.shadowBlur =
+    8;
+
+  ctx.lineJoin =
+    "round";
+
+  ctx.lineCap =
+    "round";
+
+  ctx.stroke();
+}
 
 async function highlightSelectedCounty(
   stateFips,
@@ -969,13 +1138,9 @@ async function highlightSelectedCounty(
       return;
     }
 
-    if (selectedCountyPrimitive) {
-      viewer.entities.remove(
-        selectedCountyPrimitive
-      );
+    ensureCountyOverlay();
 
-      selectedCountyPrimitive = null;
-    }
+    selectedCountyPositions = [];
 
     const geoid =
       String(stateFips).padStart(2, "0") +
@@ -991,7 +1156,8 @@ async function highlightSelectedCounty(
       "&outSR=4326" +
       "&f=geojson";
 
-    const response = await fetch(countyUrl);
+    const response =
+      await fetch(countyUrl);
 
     if (!response.ok) {
       throw new Error(
@@ -999,7 +1165,8 @@ async function highlightSelectedCounty(
       );
     }
 
-    const geojson = await response.json();
+    const geojson =
+      await response.json();
 
     if (
       !geojson.features ||
@@ -1026,39 +1193,24 @@ async function highlightSelectedCounty(
       );
     }
 
-    const ring = polygons[0][0];
+    const ring =
+      polygons[0][0];
 
-    const positions = ring.map(
-      coordinate =>
-        Cesium.Cartesian3.fromDegrees(
-          coordinate[0],
-          coordinate[1],
-          1500
-        )
-    );
+    selectedCountyPositions =
+      ring.map(
+        coordinate =>
+          Cesium.Cartesian3.fromDegrees(
+            coordinate[0],
+            coordinate[1],
+            0
+          )
+      );
 
-    selectedCountyPrimitive =
-      viewer.entities.add({
-        name: `County ${geoid}`,
-        polyline: {
-          positions,
-          width: 6,
-          material:
-            Cesium.Color.fromCssColorString(
-              "#00e5ff"
-            ),
-          depthFailMaterial:
-            Cesium.Color.fromCssColorString(
-              "#00e5ff"
-            ),
-          arcType:
-            Cesium.ArcType.GEODESIC
-        }
-      });
+    drawSelectedCountyOverlay();
 
     console.log(
-      `Elevated county boundary loaded: ${geoid}`,
-      positions.length,
+      `County screen overlay loaded: ${geoid}`,
+      selectedCountyPositions.length,
       "points"
     );
 
