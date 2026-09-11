@@ -679,41 +679,94 @@ try {
     "&outSR=4326" +
     "&f=geojson";
 
-  const stateBoundaries =
-    await Cesium.GeoJsonDataSource.load(
-      stateBoundaryUrl,
-      {
-        stroke:
-          Cesium.Color.fromCssColorString(
-            "#79cfff"
-          ).withAlpha(0.55),
-        fill:
-          Cesium.Color.TRANSPARENT,
-        strokeWidth: 1.2,
-        clampToGround: true
-      }
+  const response =
+    await fetch(stateBoundaryUrl);
+
+  const geojson =
+    await response.json();
+
+  const stateBoundarySource =
+    new Cesium.CustomDataSource(
+      "US State Boundaries"
     );
 
-  viewer.dataSources.add(
-    stateBoundaries
-  );
+  function addBoundaryRing(
+    coordinates,
+    name
+  ) {
+    const positions =
+      coordinates.map(
+        coordinate =>
+          Cesium.Cartesian3.fromDegrees(
+            coordinate[0],
+            coordinate[1]
+          )
+      );
+
+    stateBoundarySource.entities.add({
+      name,
+      polyline: {
+        positions,
+        width: 1.5,
+        material:
+          Cesium.Color.fromCssColorString(
+            "#79cfff"
+          ).withAlpha(0.72),
+        clampToGround: true
+      }
+    });
+  }
 
   for (
-    const entity
-    of stateBoundaries.entities.values
+    const feature
+    of geojson.features || []
   ) {
-    if (entity.polygon) {
-      entity.polygon.material =
-        Cesium.Color.TRANSPARENT;
+    const geometry =
+      feature.geometry;
 
-      entity.polygon.outline = true;
+    if (!geometry) continue;
 
-      entity.polygon.outlineColor =
-        Cesium.Color.fromCssColorString(
-          "#79cfff"
-        ).withAlpha(0.55);
+    const name =
+      feature.properties?.NAME ||
+      "State boundary";
+
+    if (
+      geometry.type === "Polygon"
+    ) {
+      for (
+        const ring
+        of geometry.coordinates
+      ) {
+        addBoundaryRing(
+          ring,
+          name
+        );
+      }
+    }
+
+    if (
+      geometry.type === "MultiPolygon"
+    ) {
+      for (
+        const polygon
+        of geometry.coordinates
+      ) {
+        for (
+          const ring
+          of polygon
+        ) {
+          addBoundaryRing(
+            ring,
+            name
+          );
+        }
+      }
     }
   }
+
+  await viewer.dataSources.add(
+    stateBoundarySource
+  );
 
 } catch (error) {
   console.error(
@@ -721,6 +774,7 @@ try {
     error
   );
 }
+
 
 const GOOGLE_KEY =
   window.GVAI_GOOGLE_MAPS_API_KEY ||
