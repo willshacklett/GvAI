@@ -1681,6 +1681,30 @@ document
 
       if (!query) return;
 
+      // Explicit national aliases must take precedence over
+      // fuzzy local profile matching.
+      const nationalAliases =
+        new Set([
+          "us",
+          "u.s.",
+          "usa",
+          "u.s.a.",
+          "united states",
+          "united states of america"
+        ]);
+
+      if (nationalAliases.has(query)) {
+        await loadRegionalData(
+          null,
+          null,
+          {
+            scope: "country"
+          }
+        );
+
+        return;
+      }
+
       const match =
         profiles.find(
           profile =>
