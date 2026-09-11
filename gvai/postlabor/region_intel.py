@@ -177,6 +177,18 @@ def resolve_us_region(
     median_home_value = _number(data.get("B25077_001E"))
     median_age = _number(data.get("B01002_001E"))
 
+    home_value_to_income_ratio = None
+
+    if (
+        median_home_value is not None
+        and median_income is not None
+        and median_income > 0
+    ):
+        home_value_to_income_ratio = round(
+            median_home_value / median_income,
+            2,
+        )
+
     unemployment_rate = None
 
     if labor_force and unemployed is not None:
@@ -208,6 +220,7 @@ def resolve_us_region(
         "unemployment_rate": unemployment_rate,
         "median_household_income": median_income,
         "median_home_value": median_home_value,
+        "home_value_to_income_ratio": home_value_to_income_ratio,
         "median_age": median_age,
         "occupation_profile": occupation_profile,
         "source": "U.S. Census Bureau ACS 5-year",
