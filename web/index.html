@@ -1251,9 +1251,16 @@ async function loadSelectedCountyBoundary(
   }
 }
 
-async function loadRegionalData(latitude, longitude) {
+async function loadRegionalData(
+  latitude,
+  longitude,
+  options = {}
+) {
   const requestId =
     ++activeRegionRequestId;
+
+  const scope =
+    options.scope || "county";
 
   const title =
     document.getElementById("location-title");
@@ -1261,17 +1268,33 @@ async function loadRegionalData(latitude, longitude) {
   const sub =
     document.getElementById("location-sub");
 
-  title.textContent =
-    `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
+  if (scope === "country") {
+    title.textContent =
+      "United States";
 
-  sub.textContent =
-    "Loading regional intelligence...";
+    sub.textContent =
+      "Loading national intelligence...";
+  } else {
+    title.textContent =
+      `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
+
+    sub.textContent =
+      "Loading regional intelligence...";
+  }
 
   try {
-    const endpoint =
-      (window.GVAI_API_BASE || "") +
-      `/api/region?lat=${encodeURIComponent(latitude)}` +
-      `&lon=${encodeURIComponent(longitude)}`;
+    let endpoint;
+
+    if (scope === "country") {
+      endpoint =
+        (window.GVAI_API_BASE || "") +
+        "/api/region?scope=country";
+    } else {
+      endpoint =
+        (window.GVAI_API_BASE || "") +
+        `/api/region?lat=${encodeURIComponent(latitude)}` +
+        `&lon=${encodeURIComponent(longitude)}`;
+    }
 
     const response =
       await fetch(endpoint);
@@ -1303,18 +1326,60 @@ async function loadRegionalData(latitude, longitude) {
     }
 
     title.textContent =
-      data.county || "Selected region";
+      data.county ||
+      data.state ||
+      data.country ||
+      data.name ||
+      "Selected region";
+
+    const geographyLabel =
+      data.county
+        ? data.state
+        : data.state
+          ? "United States"
+          : "";
 
     sub.textContent =
-      `${data.state || ""} · ${data.source || "Public data"}`;
+      geographyLabel
+        ? `${geographyLabel} · ${data.source || "Public data"}`
+        : data.source || "Public data";
 
-    // Load boundary data independently.
-    // Boundary failure must never block regional intelligence.
-    void loadSelectedCountyBoundary(
-      data.state_fips,
-      data.county_fips,
-      requestId
-    );
+    if (
+      scope === "country"
+    ) {
+      // Remove any previously selected county.
+      if (selectedCountyDataSource) {
+        viewer.dataSources.remove(
+          selectedCountyDataSource,
+          true
+        );
+
+        selectedCountyDataSource = null;
+      }
+
+      selectedCountyGeoJson = null;
+      selectedCountyGeoid = null;
+
+      // National analytical view.
+      viewer.camera.flyTo({
+        destination:
+          Cesium.Rectangle.fromDegrees(
+            -125.0,
+            24.0,
+            -66.5,
+            49.5
+          ),
+        duration: 2.0
+      });
+    } else {
+      // Load county boundary independently.
+      // Boundary failure must never block regional intelligence.
+      void loadSelectedCountyBoundary(
+        data.state_fips,
+        data.county_fips,
+        requestId
+      );
+    }
 
     document.getElementById(
       "population"
@@ -1340,7 +1405,12 @@ async function loadRegionalData(latitude, longitude) {
     selectedProfile = {
       ...selectedProfile,
       title:
-        `${data.county}, ${data.state}`,
+        data.county
+          ? `${data.county}, ${data.state}`
+          : data.state ||
+            data.country ||
+            data.name ||
+            "Selected region",
       sub:
         data.source || "U.S. Census Bureau",
       population:
@@ -1682,6 +1752,25 @@ document
 
         const longitude =
           Number(data.longitude);
+
+        const isUnitedStates =
+          data.country_code === "us" &&
+          !data.state &&
+          !data.county &&
+          !data.city &&
+          !data.postcode;
+
+        if (isUnitedStates) {
+          await loadRegionalData(
+            null,
+            null,
+            {
+              scope: "country"
+            }
+          );
+
+          return;
+        }
 
         title.textContent =
           data.city ||
