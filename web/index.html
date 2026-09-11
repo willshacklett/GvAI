@@ -954,6 +954,95 @@ function classifyLaborAvailability(data) {
   };
 }
 
+
+let selectedCountySource = null;
+
+async function highlightSelectedCounty(
+  stateFips,
+  countyFips
+) {
+  try {
+    if (
+      !stateFips ||
+      !countyFips
+    ) {
+      return;
+    }
+
+    if (selectedCountySource) {
+      viewer.dataSources.remove(
+        selectedCountySource,
+        true
+      );
+
+      selectedCountySource = null;
+    }
+
+    const geoid =
+      String(stateFips).padStart(2, "0") +
+      String(countyFips).padStart(3, "0");
+
+    const countyUrl =
+      "https://tigerweb.geo.census.gov/arcgis/rest/services/" +
+      "TIGERweb/State_County/MapServer/7/query" +
+      "?where=" +
+      encodeURIComponent(
+        `GEOID='${geoid}'`
+      ) +
+      "&outFields=NAME,GEOID" +
+      "&outSR=4326" +
+      "&f=geojson";
+
+    const source =
+      await Cesium.GeoJsonDataSource.load(
+        countyUrl,
+        {
+          stroke:
+            Cesium.Color.fromCssColorString(
+              "#59d6ff"
+            ),
+          fill:
+            Cesium.Color.fromCssColorString(
+              "#59d6ff"
+            ).withAlpha(0.08),
+          strokeWidth: 4,
+          clampToGround: false
+        }
+      );
+
+    for (
+      const entity
+      of source.entities.values
+    ) {
+      if (entity.polygon) {
+        entity.polygon.height = 250;
+        entity.polygon.outline = true;
+        entity.polygon.outlineColor =
+          Cesium.Color.fromCssColorString(
+            "#59d6ff"
+          );
+        entity.polygon.material =
+          Cesium.Color.fromCssColorString(
+            "#59d6ff"
+          ).withAlpha(0.08);
+      }
+    }
+
+    viewer.dataSources.add(
+      source
+    );
+
+    selectedCountySource =
+      source;
+
+  } catch (error) {
+    console.error(
+      "County highlight failed",
+      error
+    );
+  }
+}
+
 async function loadRegionalData(latitude, longitude) {
   const title =
     document.getElementById("location-title");
@@ -997,6 +1086,13 @@ async function loadRegionalData(latitude, longitude) {
 
     sub.textContent =
       `${data.state || ""} · ${data.source || "Public data"}`;
+
+    // Load the selected county boundary independently.
+    // A boundary failure must never block regional intelligence.
+    void highlightSelectedCounty(
+      data.state_fips,
+      data.county_fips
+    );
 
     document.getElementById(
       "population"
