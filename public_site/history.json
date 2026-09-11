@@ -3129,5 +3129,16 @@
     "timestamp_utc": "2026-09-11T19:19:26.135123+00:00",
     "sha": "81cd908",
     "source": "github-actions"
+  },
+  {
+    "seq": 285,
+    "godscore": 5,
+    "status": "collapse",
+    "mean_step": 20,
+    "collapse_step": 31,
+    "lead_time": 11,
+    "timestamp_utc": "2026-09-11T19:29:14.331546+00:00",
+    "sha": "e0cc808",
+    "source": "github-actions"
   }
 ]
