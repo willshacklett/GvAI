@@ -969,9 +969,6 @@ function ensureCountyOverlay() {
     return;
   }
 
-  const container =
-    document.getElementById("cesiumContainer");
-
   countyOverlayCanvas =
     document.createElement("canvas");
 
@@ -979,24 +976,15 @@ function ensureCountyOverlay() {
     "county-boundary-overlay";
 
   countyOverlayCanvas.style.position =
-    "absolute";
-
-  countyOverlayCanvas.style.inset =
-    "0";
-
-  countyOverlayCanvas.style.width =
-    "100%";
-
-  countyOverlayCanvas.style.height =
-    "100%";
+    "fixed";
 
   countyOverlayCanvas.style.pointerEvents =
     "none";
 
   countyOverlayCanvas.style.zIndex =
-    "5";
+    "9999";
 
-  container.appendChild(
+  document.body.appendChild(
     countyOverlayCanvas
   );
 
@@ -1004,6 +992,26 @@ function ensureCountyOverlay() {
     countyOverlayCanvas.getContext("2d");
 
   countyOverlayPostRender = () => {
+    const container =
+      document.getElementById(
+        "cesiumContainer"
+      );
+
+    const rect =
+      container.getBoundingClientRect();
+
+    countyOverlayCanvas.style.left =
+      `${rect.left}px`;
+
+    countyOverlayCanvas.style.top =
+      `${rect.top}px`;
+
+    countyOverlayCanvas.style.width =
+      `${rect.width}px`;
+
+    countyOverlayCanvas.style.height =
+      `${rect.height}px`;
+
     drawSelectedCountyOverlay();
   };
 
