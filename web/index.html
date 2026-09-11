@@ -393,6 +393,91 @@
       pointer-events: none;
     }
 
+    .occupation-card {
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--panel-soft);
+    }
+
+    .occupation-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .occupation-name {
+      font-size: 16px;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .occupation-code {
+      margin-top: 3px;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+
+    .stex-score {
+      font-size: 28px;
+      font-weight: 850;
+      color: var(--accent);
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .stex-label {
+      margin-top: 4px;
+      font-size: 10px;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    .occupation-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+      margin-top: 10px;
+    }
+
+    .occupation-meta-item {
+      padding: 8px;
+      border-radius: 9px;
+      background: rgba(255,255,255,0.035);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .occupation-meta-label {
+      color: var(--muted);
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .occupation-meta-value {
+      margin-top: 3px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .stex-note {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .stex-status {
+      margin-top: 9px;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+
     @media (max-width: 900px) {
       .brand-sub {
         display: none;
@@ -586,6 +671,48 @@
         <div id="resilience-bar" class="bar-fill" style="width:0%"></div>
       </div>
     </div>
+
+    <div class="section-title">Occupation exposure pilot</div>
+
+    <div class="occupation-card">
+      <div class="occupation-head">
+        <div>
+          <div id="stex-occupation-name" class="occupation-name">
+            Pest Control Workers
+          </div>
+          <div id="stex-occupation-code" class="occupation-code">
+            O*NET-SOC 37-2021.00
+          </div>
+        </div>
+
+        <div>
+          <div id="stex-score" class="stex-score">—</div>
+          <div class="stex-label">STEX v0.1</div>
+        </div>
+      </div>
+
+      <div class="occupation-meta">
+        <div class="occupation-meta-item">
+          <div class="occupation-meta-label">Rated tasks</div>
+          <div id="stex-rated" class="occupation-meta-value">—</div>
+        </div>
+
+        <div class="occupation-meta-item">
+          <div class="occupation-meta-label">Source vintage</div>
+          <div id="stex-source-year" class="occupation-meta-value">—</div>
+        </div>
+      </div>
+
+      <div id="stex-note" class="stex-note">
+        Structural task exposure under the GVAI STEX methodology.
+        This is not a probability of job loss.
+      </div>
+
+      <div id="stex-status" class="stex-status">
+        Loading audited occupation profile…
+      </div>
+    </div>
+
 
     <div class="actions">
       <button id="ask-btn" class="primary">
@@ -3080,6 +3207,92 @@ document
       }
     }
   );
+
+async function loadOccupationSTEX(
+  code = "37-2021.00"
+) {
+  const statusEl =
+    document.getElementById("stex-status");
+
+  try {
+    statusEl.textContent =
+      "Loading audited occupation profile…";
+
+    const endpoint =
+      (window.GVAI_API_BASE || "") +
+      `/api/stex/occupation?code=${encodeURIComponent(code)}`;
+
+    const response = await fetch(endpoint);
+
+    if (!response.ok) {
+      throw new Error(
+        `STEX request failed with ${response.status}`
+      );
+    }
+
+    const data = await response.json();
+    const profile = data.profile || {};
+
+    document.getElementById(
+      "stex-occupation-name"
+    ).textContent =
+      profile.occupation_title || "Unknown occupation";
+
+    document.getElementById(
+      "stex-occupation-code"
+    ).textContent =
+      profile.occupation_code
+        ? `O*NET-SOC ${profile.occupation_code}`
+        : "O*NET-SOC —";
+
+    document.getElementById(
+      "stex-score"
+    ).textContent =
+      Number.isFinite(profile.structural_exposure)
+        ? profile.structural_exposure.toFixed(1)
+        : "—";
+
+    document.getElementById(
+      "stex-rated"
+    ).textContent =
+      Number.isFinite(profile.rated_task_count)
+        ? `${profile.rated_task_count} rated`
+        : "—";
+
+    document.getElementById(
+      "stex-source-year"
+    ).textContent =
+      profile.source?.tasks_year
+        ? `O*NET ${profile.source.tasks_year}`
+        : "—";
+
+    document.getElementById(
+      "stex-note"
+    ).textContent =
+      profile.interpretation ||
+      (
+        "Structural task exposure under the GVAI STEX methodology. " +
+        "This is not a probability of job loss."
+      );
+
+    statusEl.textContent =
+      `${profile.rubric_version || "STEX"} • audited profile`;
+
+  } catch (error) {
+    console.error("STEX load failed:", error);
+
+    document.getElementById(
+      "stex-score"
+    ).textContent = "—";
+
+    statusEl.textContent =
+      "Occupation exposure temporarily unavailable.";
+  }
+}
+
+loadOccupationSTEX();
+
+
 
 document
   .getElementById(
