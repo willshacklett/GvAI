@@ -1001,228 +1001,18 @@ function classifyLaborAvailability(data) {
 
 
 
-let countyOverlayCanvas = null;
-let countyOverlayContext = null;
-let selectedCountyPositions = [];
-let countyOverlayPostRender = null;
 
-function ensureCountyOverlay() {
-  if (countyOverlayCanvas) {
-    return;
-  }
+let selectedCountyGeoJson = null;
+let selectedCountyGeoid = null;
 
-  countyOverlayCanvas =
-    document.createElement("canvas");
-
-  countyOverlayCanvas.id =
-    "county-boundary-overlay";
-
-  countyOverlayCanvas.style.position =
-    "fixed";
-
-  countyOverlayCanvas.style.pointerEvents =
-    "none";
-
-  countyOverlayCanvas.style.zIndex =
-    "9999";
-
-  document.body.appendChild(
-    countyOverlayCanvas
-  );
-
-  countyOverlayContext =
-    countyOverlayCanvas.getContext("2d");
-
-  countyOverlayPostRender = () => {
-    const container =
-      document.getElementById(
-        "cesiumContainer"
-      );
-
-    const rect =
-      container.getBoundingClientRect();
-
-    countyOverlayCanvas.style.left =
-      `${rect.left}px`;
-
-    countyOverlayCanvas.style.top =
-      `${rect.top}px`;
-
-    countyOverlayCanvas.style.width =
-      `${rect.width}px`;
-
-    countyOverlayCanvas.style.height =
-      `${rect.height}px`;
-
-    drawSelectedCountyOverlay();
-  };
-
-  viewer.scene.postRender.addEventListener(
-    countyOverlayPostRender
-  );
-}
-
-function drawSelectedCountyOverlay() {
-  if (
-    !countyOverlayCanvas ||
-    !countyOverlayContext
-  ) {
-    return;
-  }
-
-  const rect =
-    countyOverlayCanvas
-      .getBoundingClientRect();
-
-  const dpr =
-    window.devicePixelRatio || 1;
-
-  const targetWidth =
-    Math.round(rect.width * dpr);
-
-  const targetHeight =
-    Math.round(rect.height * dpr);
-
-  if (
-    countyOverlayCanvas.width !== targetWidth ||
-    countyOverlayCanvas.height !== targetHeight
-  ) {
-    countyOverlayCanvas.width =
-      targetWidth;
-
-    countyOverlayCanvas.height =
-      targetHeight;
-  }
-
-  const ctx =
-    countyOverlayContext;
-
-  ctx.setTransform(
-    dpr,
-    0,
-    0,
-    dpr,
-    0,
-    0
-  );
-
-  ctx.clearRect(
-    0,
-    0,
-    rect.width,
-    rect.height
-  );
-
-  if (
-    selectedCountyPositions.length < 2
-  ) {
-    return;
-  }
-
-  ctx.beginPath();
-
-  let drawing = false;
-
-  for (
-    const position
-    of selectedCountyPositions
-  ) {
-    const canvas =
-      viewer.scene.canvas;
-
-    const viewProjection =
-      Cesium.Matrix4.multiply(
-        viewer.camera.frustum.projectionMatrix,
-        viewer.camera.viewMatrix,
-        new Cesium.Matrix4()
-      );
-
-    const clip =
-      Cesium.Matrix4.multiplyByVector(
-        viewProjection,
-        new Cesium.Cartesian4(
-          position.x,
-          position.y,
-          position.z,
-          1
-        ),
-        new Cesium.Cartesian4()
-      );
-
-    if (
-      !Number.isFinite(clip.x) ||
-      !Number.isFinite(clip.y) ||
-      !Number.isFinite(clip.w) ||
-      clip.w <= 0
-    ) {
-      drawing = false;
-      continue;
-    }
-
-    const ndcX = clip.x / clip.w;
-    const ndcY = clip.y / clip.w;
-
-    const windowPosition = {
-      x: (ndcX + 1) * 0.5 * canvas.clientWidth,
-      y: (1 - ndcY) * 0.5 * canvas.clientHeight
-    };
-
-    if (
-      !Number.isFinite(windowPosition.x) ||
-      !Number.isFinite(windowPosition.y)
-    ) {
-      drawing = false;
-      continue;
-    }
-
-    if (!drawing) {
-      ctx.moveTo(
-        windowPosition.x,
-        windowPosition.y
-      );
-
-      drawing = true;
-    } else {
-      ctx.lineTo(
-        windowPosition.x,
-        windowPosition.y
-      );
-    }
-  }
-
-  ctx.strokeStyle =
-    "#00e5ff";
-
-  ctx.lineWidth =
-    4;
-
-  ctx.shadowColor =
-    "#00e5ff";
-
-  ctx.shadowBlur =
-    8;
-
-  ctx.lineJoin =
-    "round";
-
-  ctx.lineCap =
-    "round";
-
-  ctx.stroke();
-}
-
-async function highlightSelectedCounty(
+async function loadSelectedCountyBoundary(
   stateFips,
   countyFips
 ) {
   try {
     if (!stateFips || !countyFips) {
-      return;
+      return null;
     }
-
-    ensureCountyOverlay();
-
-    selectedCountyPositions = [];
 
     const geoid =
       String(stateFips).padStart(2, "0") +
@@ -1232,7 +1022,9 @@ async function highlightSelectedCounty(
       "https://tigerweb.geo.census.gov/arcgis/rest/services/" +
       "TIGERweb/State_County/MapServer/7/query" +
       "?where=" +
-      encodeURIComponent(`GEOID='${geoid}'`) +
+      encodeURIComponent(
+        `GEOID='${geoid}'`
+      ) +
       "&outFields=NAME,GEOID" +
       "&returnGeometry=true" +
       "&outSR=4326" +
@@ -1259,102 +1051,60 @@ async function highlightSelectedCounty(
       );
     }
 
+    selectedCountyGeoJson =
+      geojson;
+
+    selectedCountyGeoid =
+      geoid;
+
+    // Temporary diagnostic access.
+    window.gvaiCountyGeoJson =
+      selectedCountyGeoJson;
+
+    window.gvaiCountyGeoid =
+      selectedCountyGeoid;
+
     const geometry =
       geojson.features[0].geometry;
 
-    const polygons =
-      geometry.type === "Polygon"
-        ? [geometry.coordinates]
-        : geometry.type === "MultiPolygon"
-          ? geometry.coordinates
-          : [];
+    let pointCount = 0;
 
-    if (!polygons.length) {
-      throw new Error(
-        "County geometry contained no polygons."
-      );
-    }
-
-    const ring =
-      polygons[0][0];
-
-    selectedCountyPositions =
-      ring.map(
-        coordinate =>
-          Cesium.Cartesian3.fromDegrees(
-            coordinate[0],
-            coordinate[1],
+    if (geometry?.type === "Polygon") {
+      pointCount =
+        geometry.coordinates
+          .reduce(
+            (total, ring) =>
+              total + ring.length,
             0
-          )
-      );
-
-    // Temporary diagnostics for the selected county overlay.
-    window.gvaiCountyPositions =
-      selectedCountyPositions;
-
-    window.gvaiDrawCountyOverlay =
-      drawSelectedCountyOverlay;
-
-    drawSelectedCountyOverlay();
-
-    // Cesium-native county boundary test.
-    // Runs only after regional/county data is already available.
-    if (window.gvaiCountyGroundPrimitive) {
-      viewer.scene.groundPrimitives.remove(
-        window.gvaiCountyGroundPrimitive
-      );
-
-      window.gvaiCountyGroundPrimitive = null;
+          );
+    } else if (
+      geometry?.type === "MultiPolygon"
+    ) {
+      pointCount =
+        geometry.coordinates
+          .flat()
+          .reduce(
+            (total, ring) =>
+              total + ring.length,
+            0
+          );
     }
 
-    const groundGeometry =
-      new Cesium.GroundPolylineGeometry({
-        positions:
-          selectedCountyPositions,
-        width: 6
-      });
-
-    window.gvaiCountyGroundPrimitive =
-      viewer.scene.groundPrimitives.add(
-        new Cesium.GroundPolylinePrimitive({
-          geometryInstances:
-            new Cesium.GeometryInstance({
-              geometry:
-                groundGeometry,
-              attributes: {
-                color:
-                  Cesium.ColorGeometryInstanceAttribute
-                    .fromColor(
-                      Cesium.Color.fromCssColorString(
-                        "#00e5ff"
-                      )
-                    )
-              }
-            }),
-          appearance:
-            new Cesium.PolylineColorAppearance(),
-          classificationType:
-            Cesium.ClassificationType.CESIUM_3D_TILE
-        })
-      );
-
     console.log(
-      `County ground primitive loaded: ${geoid}`,
-      selectedCountyPositions.length,
+      `County boundary data loaded: ${geoid}`,
+      pointCount,
       "points"
     );
 
-    console.log(
-      `County screen overlay loaded: ${geoid}`,
-      selectedCountyPositions.length,
-      "points"
-    );
+    return geojson;
 
   } catch (error) {
     console.error(
-      "County highlight failed",
+      "County boundary data failed",
       error
     );
+
+    return null;
   }
 }
 
@@ -1402,9 +1152,9 @@ async function loadRegionalData(latitude, longitude) {
     sub.textContent =
       `${data.state || ""} · ${data.source || "Public data"}`;
 
-    // Load the selected county boundary independently.
-    // A boundary failure must never block regional intelligence.
-    void highlightSelectedCounty(
+    // Load boundary data independently.
+    // Boundary failure must never block regional intelligence.
+    void loadSelectedCountyBoundary(
       data.state_fips,
       data.county_fips
     );
