@@ -1005,6 +1005,11 @@ function classifyLaborAvailability(data) {
 let selectedCountyGeoJson = null;
 let selectedCountyGeoid = null;
 let selectedCountyDataSource = null;
+
+let selectedCountryGeoJson = null;
+let selectedCountryIso3 = null;
+let selectedCountryDataSource = null;
+
 let activeRegionRequestId = 0;
 
 async function loadSelectedCountyBoundary(
@@ -1251,6 +1256,241 @@ async function loadSelectedCountyBoundary(
   }
 }
 
+
+async function clearSelectedCountryBoundary() {
+  if (selectedCountryDataSource) {
+    viewer.dataSources.remove(
+      selectedCountryDataSource,
+      true
+    );
+
+    selectedCountryDataSource = null;
+  }
+
+  selectedCountryGeoJson = null;
+  selectedCountryIso3 = null;
+}
+
+async function loadSelectedCountryBoundary(
+  iso3,
+  requestId
+) {
+  if (!iso3) return null;
+
+  const normalizedIso3 =
+    String(iso3)
+      .trim()
+      .toUpperCase();
+
+  try {
+    const metadataEndpoint =
+      `https://www.geoboundaries.org/api/current/gbOpen/` +
+      `${encodeURIComponent(normalizedIso3)}/ADM0/`;
+
+    const metadataResponse =
+      await fetch(metadataEndpoint);
+
+    if (!metadataResponse.ok) {
+      throw new Error(
+        `Country boundary metadata returned ${metadataResponse.status}`
+      );
+    }
+
+    const metadata =
+      await metadataResponse.json();
+
+    if (
+      requestId !== activeRegionRequestId
+    ) {
+      console.log(
+        `Ignored stale country boundary metadata: ${normalizedIso3}`
+      );
+
+      return null;
+    }
+
+    const geoJsonUrl =
+      metadata.simplifiedGeometryGeoJSON ||
+      metadata.gjDownloadURL;
+
+    if (!geoJsonUrl) {
+      throw new Error(
+        "Country boundary metadata did not include a GeoJSON URL."
+      );
+    }
+
+    const geoJsonResponse =
+      await fetch(geoJsonUrl);
+
+    if (!geoJsonResponse.ok) {
+      throw new Error(
+        `Country boundary GeoJSON returned ${geoJsonResponse.status}`
+      );
+    }
+
+    const geojson =
+      await geoJsonResponse.json();
+
+    if (
+      requestId !== activeRegionRequestId
+    ) {
+      console.log(
+        `Ignored stale country boundary: ${normalizedIso3}`
+      );
+
+      return null;
+    }
+
+    await clearSelectedCountryBoundary();
+
+    selectedCountryGeoJson =
+      geojson;
+
+    selectedCountryIso3 =
+      normalizedIso3;
+
+    selectedCountryDataSource =
+      await Cesium.GeoJsonDataSource.load(
+        geojson,
+        {
+          clampToGround: true,
+          fill:
+            Cesium.Color
+              .fromCssColorString("#00e5ff")
+              .withAlpha(0.08),
+          stroke:
+            Cesium.Color.TRANSPARENT,
+          strokeWidth: 0
+        }
+      );
+
+    viewer.dataSources.add(
+      selectedCountryDataSource
+    );
+
+    for (
+      const entity of
+      selectedCountryDataSource.entities.values
+    ) {
+      if (entity.polygon) {
+        entity.polygon.outline = false;
+      }
+    }
+
+    const addOuterRing =
+      coordinates => {
+        if (
+          !Array.isArray(coordinates) ||
+          coordinates.length < 2
+        ) {
+          return;
+        }
+
+        const degrees = [];
+
+        for (const point of coordinates) {
+          if (
+            Array.isArray(point) &&
+            point.length >= 2
+          ) {
+            degrees.push(
+              Number(point[0]),
+              Number(point[1])
+            );
+          }
+        }
+
+        if (degrees.length < 4) {
+          return;
+        }
+
+        selectedCountryDataSource.entities.add({
+          polyline: {
+            positions:
+              Cesium.Cartesian3.fromDegreesArray(
+                degrees
+              ),
+            width: 3,
+            clampToGround: false,
+            material:
+              Cesium.Color.fromCssColorString(
+                "#00e5ff"
+              )
+          }
+        });
+      };
+
+    const addGeometry =
+      geometry => {
+        if (!geometry) return;
+
+        if (
+          geometry.type === "Polygon"
+        ) {
+          const outerRing =
+            geometry.coordinates?.[0];
+
+          addOuterRing(
+            outerRing
+          );
+        }
+
+        if (
+          geometry.type === "MultiPolygon"
+        ) {
+          for (
+            const polygon of
+            geometry.coordinates || []
+          ) {
+            const outerRing =
+              polygon?.[0];
+
+            addOuterRing(
+              outerRing
+            );
+          }
+        }
+      };
+
+    if (
+      geojson.type === "FeatureCollection"
+    ) {
+      for (
+        const feature of
+        geojson.features || []
+      ) {
+        addGeometry(
+          feature.geometry
+        );
+      }
+    } else if (
+      geojson.type === "Feature"
+    ) {
+      addGeometry(
+        geojson.geometry
+      );
+    } else {
+      addGeometry(
+        geojson
+      );
+    }
+
+    console.log(
+      `Country boundary rendered: ${normalizedIso3}`
+    );
+
+    return geojson;
+
+  } catch (error) {
+    console.error(
+      "Country boundary data failed",
+      error
+    );
+
+    return null;
+  }
+}
+
 async function loadRegionalData(
   latitude,
   longitude,
@@ -1360,6 +1600,13 @@ async function loadRegionalData(
       selectedCountyGeoJson = null;
       selectedCountyGeoid = null;
 
+      // Load the selected national boundary independently.
+      // Boundary failure must never block national intelligence.
+      void loadSelectedCountryBoundary(
+        options.countryIso3 || "USA",
+        requestId
+      );
+
       // National analytical view.
       viewer.camera.flyTo({
         destination:
@@ -1372,6 +1619,9 @@ async function loadRegionalData(
         duration: 2.0
       });
     } else {
+      // Remove any previously selected country boundary.
+      await clearSelectedCountryBoundary();
+
       // Load county boundary independently.
       // Boundary failure must never block regional intelligence.
       void loadSelectedCountyBoundary(
@@ -1698,7 +1948,8 @@ document
           null,
           null,
           {
-            scope: "country"
+            scope: "country",
+            countryIso3: "USA"
           }
         );
 
