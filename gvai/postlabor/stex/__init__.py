@@ -7,3 +7,7 @@ __all__ = [
     "STEX_RUBRIC_VERSION",
     "calculate_task_exposure",
 ]
+
+from .records import TaskRatingRecord
+
+__all__.append("TaskRatingRecord")
