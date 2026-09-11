@@ -1124,9 +1124,22 @@ async function loadSelectedCountyBoundary(
       selectedCountyDataSource
     );
 
-    // Polygon outlines are not supported when clamped
-    // to terrain, so draw the county border as its own
-    // ground-clamped polyline.
+    // Cesium does not support polygon entity outlines
+    // when the polygon is clamped to terrain.
+    // The boundary is drawn separately below.
+    for (
+      const entity
+      of selectedCountyDataSource.entities.values
+    ) {
+      if (entity.polygon) {
+        entity.polygon.outline = false;
+      }
+    }
+
+    // Draw the actual county boundary separately.
+    // IMPORTANT: do not ground-clamp this polyline.
+    // In Cesium 1.133 the county line was invisible
+    // when clampToGround was enabled.
     const boundaryRings = [];
 
     if (geometry?.type === "Polygon") {
@@ -1172,8 +1185,8 @@ async function loadSelectedCountyBoundary(
             Cesium.Cartesian3.fromDegreesArray(
               degrees
             ),
-          width: 5,
-          clampToGround: true,
+          width: 4,
+          clampToGround: false,
           material:
             Cesium.Color.fromCssColorString(
               "#00e5ff"
@@ -1186,6 +1199,32 @@ async function loadSelectedCountyBoundary(
       `County boundary rendered: ${geoid}`,
       boundaryRings.length,
       "ring(s)"
+    );
+
+    // Automatically frame the selected county.
+    // Cesium calculates the county's bounding sphere
+    // from the datasource, so this works for any county.
+    await viewer.flyTo(
+      selectedCountyDataSource,
+      {
+        duration: 1.8,
+        offset:
+          new Cesium.HeadingPitchRange(
+            0,
+            Cesium.Math.toRadians(-90),
+            0
+          )
+      }
+    );
+
+    // Back out slightly so the full county and some
+    // surrounding regional context remain visible.
+    viewer.camera.zoomOut(
+      viewer.camera.positionCartographic.height * 0.18
+    );
+
+    console.log(
+      `County camera framed: ${geoid}`
     );
 
     return geojson;
