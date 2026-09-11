@@ -11,3 +11,15 @@ __all__ = [
 from .records import TaskRatingRecord
 
 __all__.append("TaskRatingRecord")
+
+from .aggregate import (
+    OccupationSTEXResult,
+    aggregate_occupation_stex,
+)
+
+__all__.extend(
+    [
+        "OccupationSTEXResult",
+        "aggregate_occupation_stex",
+    ]
+)
