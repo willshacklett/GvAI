@@ -13,6 +13,14 @@ from gvai.postlabor.workers.occupation_data import (
 
 
 @dataclass(frozen=True)
+class OnetTask:
+    task_id: str
+    title: str
+    importance: float
+    category: str
+
+
+@dataclass(frozen=True)
 class OnetWorkActivity:
     element_id: str
     name: str
@@ -197,6 +205,33 @@ class OnetClient:
                 importance=float(item.get("importance") or 0.0),
             )
             for item in elements
+        ]
+
+    def tasks(
+        self,
+        occupation_code: str,
+        *,
+        start: int = 1,
+        end: int = 100,
+    ) -> List[OnetTask]:
+        payload = self._get(
+            f"/online/occupations/{occupation_code}/details/tasks",
+            params={
+                "start": start,
+                "end": end,
+            },
+        )
+
+        tasks = payload.get("task") or []
+
+        return [
+            OnetTask(
+                task_id=str(item.get("id") or ""),
+                title=str(item.get("title") or ""),
+                importance=float(item.get("importance") or 0.0),
+                category=str(item.get("category") or ""),
+            )
+            for item in tasks
         ]
 
     def work_activities(
