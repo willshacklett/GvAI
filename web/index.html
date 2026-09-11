@@ -957,6 +957,7 @@ function classifyLaborAvailability(data) {
 
 
 
+
 let selectedCountyPrimitive = null;
 
 async function highlightSelectedCounty(
@@ -964,15 +965,12 @@ async function highlightSelectedCounty(
   countyFips
 ) {
   try {
-    if (
-      !stateFips ||
-      !countyFips
-    ) {
+    if (!stateFips || !countyFips) {
       return;
     }
 
     if (selectedCountyPrimitive) {
-      viewer.scene.groundPrimitives.remove(
+      viewer.entities.remove(
         selectedCountyPrimitive
       );
 
@@ -987,16 +985,13 @@ async function highlightSelectedCounty(
       "https://tigerweb.geo.census.gov/arcgis/rest/services/" +
       "TIGERweb/State_County/MapServer/7/query" +
       "?where=" +
-      encodeURIComponent(
-        `GEOID='${geoid}'`
-      ) +
+      encodeURIComponent(`GEOID='${geoid}'`) +
       "&outFields=NAME,GEOID" +
       "&returnGeometry=true" +
       "&outSR=4326" +
       "&f=geojson";
 
-    const response =
-      await fetch(countyUrl);
+    const response = await fetch(countyUrl);
 
     if (!response.ok) {
       throw new Error(
@@ -1004,8 +999,7 @@ async function highlightSelectedCounty(
       );
     }
 
-    const geojson =
-      await response.json();
+    const geojson = await response.json();
 
     if (
       !geojson.features ||
@@ -1016,107 +1010,56 @@ async function highlightSelectedCounty(
       );
     }
 
-    const instances = [];
+    const geometry =
+      geojson.features[0].geometry;
 
-    for (const feature of geojson.features) {
-      const geometry = feature.geometry;
+    const polygons =
+      geometry.type === "Polygon"
+        ? [geometry.coordinates]
+        : geometry.type === "MultiPolygon"
+          ? geometry.coordinates
+          : [];
 
-      if (!geometry) {
-        continue;
-      }
-
-      const polygons =
-        geometry.type === "Polygon"
-          ? [geometry.coordinates]
-          : geometry.type === "MultiPolygon"
-            ? geometry.coordinates
-            : [];
-
-      for (const polygon of polygons) {
-        if (!polygon.length) {
-          continue;
-        }
-
-        const outerRing =
-          polygon[0];
-
-        const outerPositions =
-          Cesium.Cartesian3.fromDegreesArray(
-            outerRing.flatMap(
-              coordinate => [
-                coordinate[0],
-                coordinate[1]
-              ]
-            )
-          );
-
-        const holes =
-          polygon.slice(1).map(
-            ring =>
-              new Cesium.PolygonHierarchy(
-                Cesium.Cartesian3.fromDegreesArray(
-                  ring.flatMap(
-                    coordinate => [
-                      coordinate[0],
-                      coordinate[1]
-                    ]
-                  )
-                )
-              )
-          );
-
-        instances.push(
-          new Cesium.GeometryInstance({
-            geometry:
-              new Cesium.PolygonGeometry({
-                polygonHierarchy:
-                  new Cesium.PolygonHierarchy(
-                    outerPositions,
-                    holes
-                  )
-              }),
-            attributes: {
-              color:
-                Cesium.ColorGeometryInstanceAttribute
-                  .fromColor(
-                    Cesium.Color
-                      .fromCssColorString(
-                        "#00d9ff"
-                      )
-                      .withAlpha(0.22)
-                  )
-            }
-          })
-        );
-      }
-    }
-
-    if (instances.length === 0) {
+    if (!polygons.length) {
       throw new Error(
-        "County geometry contained no drawable polygons."
+        "County geometry contained no polygons."
       );
     }
+
+    const ring = polygons[0][0];
+
+    const positions = ring.map(
+      coordinate =>
+        Cesium.Cartesian3.fromDegrees(
+          coordinate[0],
+          coordinate[1],
+          1500
+        )
+    );
 
     selectedCountyPrimitive =
-      viewer.scene.groundPrimitives.add(
-        new Cesium.GroundPrimitive({
-          geometryInstances:
-            instances,
-          appearance:
-            new Cesium.PerInstanceColorAppearance({
-              translucent: true,
-              closed: false
-            }),
-          classificationType:
-            Cesium.ClassificationType
-              .CESIUM_3D_TILE
-        })
-      );
+      viewer.entities.add({
+        name: `County ${geoid}`,
+        polyline: {
+          positions,
+          width: 6,
+          material:
+            Cesium.Color.fromCssColorString(
+              "#00e5ff"
+            ),
+          depthFailMaterial:
+            Cesium.Color.fromCssColorString(
+              "#00e5ff"
+            ),
+          arcType:
+            Cesium.ArcType.GEODESIC
+        }
+      });
 
     console.log(
-      `County classification loaded: ${geoid}`,
-      instances.length,
-      "polygon(s)"
+      `Elevated county boundary loaded: ${geoid}`,
+      positions.length,
+      "points"
     );
 
   } catch (error) {
