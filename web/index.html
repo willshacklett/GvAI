@@ -955,7 +955,8 @@ function classifyLaborAvailability(data) {
 }
 
 
-let selectedCountySource = null;
+
+let selectedCountyPrimitive = null;
 
 async function highlightSelectedCounty(
   stateFips,
@@ -969,13 +970,12 @@ async function highlightSelectedCounty(
       return;
     }
 
-    if (selectedCountySource) {
-      viewer.dataSources.remove(
-        selectedCountySource,
-        true
+    if (selectedCountyPrimitive) {
+      viewer.scene.groundPrimitives.remove(
+        selectedCountyPrimitive
       );
 
-      selectedCountySource = null;
+      selectedCountyPrimitive = null;
     }
 
     const geoid =
@@ -990,50 +990,110 @@ async function highlightSelectedCounty(
         `GEOID='${geoid}'`
       ) +
       "&outFields=NAME,GEOID" +
+      "&returnGeometry=true" +
       "&outSR=4326" +
       "&f=geojson";
 
-    const source =
-      await Cesium.GeoJsonDataSource.load(
-        countyUrl,
-        {
-          stroke:
-            Cesium.Color.fromCssColorString(
-              "#59d6ff"
-            ),
-          fill:
-            Cesium.Color.fromCssColorString(
-              "#59d6ff"
-            ).withAlpha(0.08),
-          strokeWidth: 4,
-          clampToGround: false
-        }
-      );
+    const response =
+      await fetch(countyUrl);
 
-    for (
-      const entity
-      of source.entities.values
+    if (!response.ok) {
+      throw new Error(
+        `County boundary returned ${response.status}`
+      );
+    }
+
+    const geojson =
+      await response.json();
+
+    if (
+      !geojson.features ||
+      geojson.features.length === 0
     ) {
-      if (entity.polygon) {
-        entity.polygon.height = 250;
-        entity.polygon.outline = true;
-        entity.polygon.outlineColor =
-          Cesium.Color.fromCssColorString(
-            "#59d6ff"
+      throw new Error(
+        `No county geometry found for ${geoid}`
+      );
+    }
+
+    const instances = [];
+
+    for (const feature of geojson.features) {
+      const geometry = feature.geometry;
+
+      if (!geometry) {
+        continue;
+      }
+
+      const polygons =
+        geometry.type === "Polygon"
+          ? [geometry.coordinates]
+          : geometry.type === "MultiPolygon"
+            ? geometry.coordinates
+            : [];
+
+      for (const polygon of polygons) {
+        for (const ring of polygon) {
+          const degrees = [];
+
+          for (const coordinate of ring) {
+            degrees.push(
+              coordinate[0],
+              coordinate[1]
+            );
+          }
+
+          if (degrees.length < 4) {
+            continue;
+          }
+
+          instances.push(
+            new Cesium.GeometryInstance({
+              geometry:
+                new Cesium.GroundPolylineGeometry({
+                  positions:
+                    Cesium.Cartesian3
+                      .fromDegreesArray(
+                        degrees
+                      ),
+                  width: 5
+                }),
+              attributes: {
+                color:
+                  Cesium.ColorGeometryInstanceAttribute
+                    .fromColor(
+                      Cesium.Color
+                        .fromCssColorString(
+                          "#59d6ff"
+                        )
+                    )
+              }
+            })
           );
-        entity.polygon.material =
-          Cesium.Color.fromCssColorString(
-            "#59d6ff"
-          ).withAlpha(0.08);
+        }
       }
     }
 
-    viewer.dataSources.add(
-      source
-    );
+    if (instances.length === 0) {
+      throw new Error(
+        "County geometry contained no drawable rings."
+      );
+    }
 
-    selectedCountySource =
-      source;
+    selectedCountyPrimitive =
+      viewer.scene.groundPrimitives.add(
+        new Cesium.GroundPolylinePrimitive({
+          geometryInstances:
+            instances,
+          appearance:
+            new Cesium.PolylineColorAppearance()
+        })
+      );
+
+    console.log(
+      `County boundary loaded: ${geoid}`,
+      instances.length,
+      "ring(s)"
+    );
 
   } catch (error) {
     console.error(
