@@ -1112,15 +1112,10 @@ async function loadSelectedCountyBoundary(
       await Cesium.GeoJsonDataSource.load(
         geojson,
         {
-          stroke:
-            Cesium.Color.fromCssColorString(
-              "#00e5ff"
-            ),
-          strokeWidth: 4,
           fill:
             Cesium.Color.fromCssColorString(
               "#00e5ff"
-            ).withAlpha(0.08),
+            ).withAlpha(0.10),
           clampToGround: true
         }
       );
@@ -1129,8 +1124,68 @@ async function loadSelectedCountyBoundary(
       selectedCountyDataSource
     );
 
+    // Polygon outlines are not supported when clamped
+    // to terrain, so draw the county border as its own
+    // ground-clamped polyline.
+    const boundaryRings = [];
+
+    if (geometry?.type === "Polygon") {
+      if (geometry.coordinates?.[0]) {
+        boundaryRings.push(
+          geometry.coordinates[0]
+        );
+      }
+    } else if (
+      geometry?.type === "MultiPolygon"
+    ) {
+      for (
+        const polygon
+        of geometry.coordinates
+      ) {
+        if (polygon?.[0]) {
+          boundaryRings.push(
+            polygon[0]
+          );
+        }
+      }
+    }
+
+    for (
+      const ring
+      of boundaryRings
+    ) {
+      const degrees = [];
+
+      for (
+        const coordinate
+        of ring
+      ) {
+        degrees.push(
+          coordinate[0],
+          coordinate[1]
+        );
+      }
+
+      selectedCountyDataSource.entities.add({
+        polyline: {
+          positions:
+            Cesium.Cartesian3.fromDegreesArray(
+              degrees
+            ),
+          width: 5,
+          clampToGround: true,
+          material:
+            Cesium.Color.fromCssColorString(
+              "#00e5ff"
+            )
+        }
+      });
+    }
+
     console.log(
-      `County boundary rendered: ${geoid}`
+      `County boundary rendered: ${geoid}`,
+      boundaryRings.length,
+      "ring(s)"
     );
 
     return geojson;
