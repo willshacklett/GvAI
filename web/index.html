@@ -1005,10 +1005,12 @@ function classifyLaborAvailability(data) {
 let selectedCountyGeoJson = null;
 let selectedCountyGeoid = null;
 let selectedCountyDataSource = null;
+let activeRegionRequestId = 0;
 
 async function loadSelectedCountyBoundary(
   stateFips,
-  countyFips
+  countyFips,
+  requestId
 ) {
   try {
     if (!stateFips || !countyFips) {
@@ -1042,6 +1044,16 @@ async function loadSelectedCountyBoundary(
 
     const geojson =
       await response.json();
+
+    if (
+      requestId !== activeRegionRequestId
+    ) {
+      console.log(
+        `Ignored stale county boundary: ${geoid}`
+      );
+
+      return null;
+    }
 
     if (
       !geojson.features ||
@@ -1240,6 +1252,9 @@ async function loadSelectedCountyBoundary(
 }
 
 async function loadRegionalData(latitude, longitude) {
+  const requestId =
+    ++activeRegionRequestId;
+
   const title =
     document.getElementById("location-title");
 
@@ -1270,6 +1285,16 @@ async function loadRegionalData(latitude, longitude) {
     const data =
       await response.json();
 
+    if (
+      requestId !== activeRegionRequestId
+    ) {
+      console.log(
+        `Ignored stale regional response: ${requestId}`
+      );
+
+      return;
+    }
+
     if (!data.supported) {
       sub.textContent =
         "Global regional datasets are coming next.";
@@ -1287,7 +1312,8 @@ async function loadRegionalData(latitude, longitude) {
     // Boundary failure must never block regional intelligence.
     void loadSelectedCountyBoundary(
       data.state_fips,
-      data.county_fips
+      data.county_fips,
+      requestId
     );
 
     document.getElementById(
