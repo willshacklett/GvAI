@@ -1110,6 +1110,20 @@ async function loadRegionalData(latitude, longitude) {
             )}
           </div>
         </div>
+
+        <div class="metric">
+          <div class="metric-label">
+            Home value / income
+          </div>
+          <div class="metric-value">
+            ${
+              data.home_value_to_income_ratio === null ||
+              data.home_value_to_income_ratio === undefined
+                ? "—"
+                : data.home_value_to_income_ratio + "×"
+            }
+          </div>
+        </div>
       </div>
 
       ${
