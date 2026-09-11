@@ -1010,6 +1010,9 @@ let selectedCountryGeoJson = null;
 let selectedCountryIso3 = null;
 let selectedCountryDataSource = null;
 
+let usStatesDataSource = null;
+let selectedStateDataSource = null;
+
 let activeRegionRequestId = 0;
 
 async function loadSelectedCountyBoundary(
@@ -1491,6 +1494,326 @@ async function loadSelectedCountryBoundary(
   }
 }
 
+
+const usStateFipsByName = {
+  "Alabama": "01",
+  "Alaska": "02",
+  "Arizona": "04",
+  "Arkansas": "05",
+  "California": "06",
+  "Colorado": "08",
+  "Connecticut": "09",
+  "Delaware": "10",
+  "District of Columbia": "11",
+  "Florida": "12",
+  "Georgia": "13",
+  "Hawaii": "15",
+  "Idaho": "16",
+  "Illinois": "17",
+  "Indiana": "18",
+  "Iowa": "19",
+  "Kansas": "20",
+  "Kentucky": "21",
+  "Louisiana": "22",
+  "Maine": "23",
+  "Maryland": "24",
+  "Massachusetts": "25",
+  "Michigan": "26",
+  "Minnesota": "27",
+  "Mississippi": "28",
+  "Missouri": "29",
+  "Montana": "30",
+  "Nebraska": "31",
+  "Nevada": "32",
+  "New Hampshire": "33",
+  "New Jersey": "34",
+  "New Mexico": "35",
+  "New York": "36",
+  "North Carolina": "37",
+  "North Dakota": "38",
+  "Ohio": "39",
+  "Oklahoma": "40",
+  "Oregon": "41",
+  "Pennsylvania": "42",
+  "Rhode Island": "44",
+  "South Carolina": "45",
+  "South Dakota": "46",
+  "Tennessee": "47",
+  "Texas": "48",
+  "Utah": "49",
+  "Vermont": "50",
+  "Virginia": "51",
+  "Washington": "53",
+  "West Virginia": "54",
+  "Wisconsin": "55",
+  "Wyoming": "56"
+};
+
+async function clearSelectedStateBoundary() {
+  if (selectedStateDataSource) {
+    viewer.dataSources.remove(
+      selectedStateDataSource,
+      true
+    );
+
+    selectedStateDataSource = null;
+  }
+}
+
+async function loadUsStateBoundaries(
+  requestId
+) {
+  if (usStatesDataSource) {
+    return usStatesDataSource;
+  }
+
+  try {
+    const url =
+      "https://tigerweb.geo.census.gov/arcgis/rest/services/" +
+      "TIGERweb/State_County/MapServer/0/query" +
+      "?where=1%3D1" +
+      "&outFields=NAME,STATE,GEOID" +
+      "&returnGeometry=true" +
+      "&outSR=4326" +
+      "&f=geojson";
+
+    const response =
+      await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(
+        `State boundaries returned ${response.status}`
+      );
+    }
+
+    const geojson =
+      await response.json();
+
+    if (
+      requestId !== activeRegionRequestId
+    ) {
+      console.log(
+        "Ignored stale U.S. state boundaries"
+      );
+
+      return null;
+    }
+
+    usStatesDataSource =
+      await Cesium.GeoJsonDataSource.load(
+        geojson,
+        {
+          fill:
+            Cesium.Color.TRANSPARENT,
+          stroke:
+            Cesium.Color
+              .fromCssColorString("#8bdff2")
+              .withAlpha(0.55),
+          strokeWidth: 1.25,
+          clampToGround: false
+        }
+      );
+
+    await viewer.dataSources.add(
+      usStatesDataSource
+    );
+
+    for (
+      const entity of
+      usStatesDataSource.entities.values
+    ) {
+      if (entity.polygon) {
+        entity.polygon.fill = false;
+        entity.polygon.outline = true;
+        entity.polygon.outlineColor =
+          Cesium.Color
+            .fromCssColorString("#8bdff2")
+            .withAlpha(0.55);
+      }
+    }
+
+    console.log(
+      "U.S. state boundaries rendered"
+    );
+
+    return usStatesDataSource;
+
+  } catch (error) {
+    console.error(
+      "U.S. state boundary load failed",
+      error
+    );
+
+    return null;
+  }
+}
+
+async function loadSelectedStateBoundary(
+  stateFips,
+  requestId
+) {
+  if (!stateFips) return null;
+
+  const fips =
+    String(stateFips).padStart(2, "0");
+
+  try {
+    const url =
+      "https://tigerweb.geo.census.gov/arcgis/rest/services/" +
+      "TIGERweb/State_County/MapServer/0/query" +
+      "?where=" +
+      encodeURIComponent(
+        `STATE='${fips}'`
+      ) +
+      "&outFields=NAME,STATE,GEOID" +
+      "&returnGeometry=true" +
+      "&outSR=4326" +
+      "&f=geojson";
+
+    const response =
+      await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(
+        `Selected state boundary returned ${response.status}`
+      );
+    }
+
+    const geojson =
+      await response.json();
+
+    if (
+      requestId !== activeRegionRequestId
+    ) {
+      console.log(
+        `Ignored stale selected state boundary: ${fips}`
+      );
+
+      return null;
+    }
+
+    if (
+      !geojson.features ||
+      geojson.features.length === 0
+    ) {
+      throw new Error(
+        `No state geometry found for ${fips}`
+      );
+    }
+
+    await clearSelectedStateBoundary();
+
+    selectedStateDataSource =
+      await Cesium.GeoJsonDataSource.load(
+        geojson,
+        {
+          fill:
+            Cesium.Color
+              .fromCssColorString("#00e5ff")
+              .withAlpha(0.08),
+          clampToGround: true
+        }
+      );
+
+    await viewer.dataSources.add(
+      selectedStateDataSource
+    );
+
+    for (
+      const entity of
+      selectedStateDataSource.entities.values
+    ) {
+      if (entity.polygon) {
+        entity.polygon.outline = false;
+      }
+    }
+
+    const geometry =
+      geojson.features[0].geometry;
+
+    const rings = [];
+
+    if (geometry?.type === "Polygon") {
+      if (geometry.coordinates?.[0]) {
+        rings.push(
+          geometry.coordinates[0]
+        );
+      }
+    } else if (
+      geometry?.type === "MultiPolygon"
+    ) {
+      for (
+        const polygon of
+        geometry.coordinates || []
+      ) {
+        if (polygon?.[0]) {
+          rings.push(
+            polygon[0]
+          );
+        }
+      }
+    }
+
+    for (const ring of rings) {
+      const degrees = [];
+
+      for (const coordinate of ring) {
+        degrees.push(
+          coordinate[0],
+          coordinate[1]
+        );
+      }
+
+      selectedStateDataSource.entities.add({
+        polyline: {
+          positions:
+            Cesium.Cartesian3.fromDegreesArray(
+              degrees
+            ),
+          width: 4,
+          clampToGround: false,
+          material:
+            Cesium.Color.fromCssColorString(
+              "#00e5ff"
+            )
+        }
+      });
+    }
+
+    await viewer.flyTo(
+      selectedStateDataSource,
+      {
+        duration: 1.8,
+        offset:
+          new Cesium.HeadingPitchRange(
+            0,
+            Cesium.Math.toRadians(-90),
+            0
+          )
+      }
+    );
+
+    viewer.camera.zoomOut(
+      viewer.camera.positionCartographic.height *
+      0.20
+    );
+
+    console.log(
+      `Selected state rendered: ${fips}`
+    );
+
+    return geojson;
+
+  } catch (error) {
+    console.error(
+      "Selected state boundary failed",
+      error
+    );
+
+    return null;
+  }
+}
+
 async function loadRegionalData(
   latitude,
   longitude,
@@ -1514,6 +1837,14 @@ async function loadRegionalData(
 
     sub.textContent =
       "Loading national intelligence...";
+
+  } else if (scope === "state") {
+    title.textContent =
+      "Selected state";
+
+    sub.textContent =
+      "Loading state intelligence...";
+
   } else {
     title.textContent =
       `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
@@ -1529,6 +1860,10 @@ async function loadRegionalData(
       endpoint =
         (window.GVAI_API_BASE || "") +
         "/api/region?scope=country";
+    } else if (scope === "state") {
+      endpoint =
+        (window.GVAI_API_BASE || "") +
+        `/api/region?scope=state&state=${encodeURIComponent(options.stateFips)}`;
     } else {
       endpoint =
         (window.GVAI_API_BASE || "") +
@@ -1587,7 +1922,6 @@ async function loadRegionalData(
     if (
       scope === "country"
     ) {
-      // Remove any previously selected county.
       if (selectedCountyDataSource) {
         viewer.dataSources.remove(
           selectedCountyDataSource,
@@ -1600,14 +1934,14 @@ async function loadRegionalData(
       selectedCountyGeoJson = null;
       selectedCountyGeoid = null;
 
-      // Load the selected national boundary independently.
-      // Boundary failure must never block national intelligence.
-      void loadSelectedCountryBoundary(
-        options.countryIso3 || "USA",
+      await clearSelectedStateBoundary();
+
+      // State borders collectively define the U.S. national footprint
+      // and remain visible in national view.
+      void loadUsStateBoundaries(
         requestId
       );
 
-      // National analytical view.
       viewer.camera.flyTo({
         destination:
           Cesium.Rectangle.fromDegrees(
@@ -1618,12 +1952,42 @@ async function loadRegionalData(
           ),
         duration: 2.0
       });
-    } else {
-      // Remove any previously selected country boundary.
+
+    } else if (
+      scope === "state"
+    ) {
+      if (selectedCountyDataSource) {
+        viewer.dataSources.remove(
+          selectedCountyDataSource,
+          true
+        );
+
+        selectedCountyDataSource = null;
+      }
+
+      selectedCountyGeoJson = null;
+      selectedCountyGeoid = null;
+
       await clearSelectedCountryBoundary();
 
-      // Load county boundary independently.
-      // Boundary failure must never block regional intelligence.
+      void loadUsStateBoundaries(
+        requestId
+      );
+
+      void loadSelectedStateBoundary(
+        data.state_fips ||
+        options.stateFips,
+        requestId
+      );
+
+    } else {
+      await clearSelectedCountryBoundary();
+      await clearSelectedStateBoundary();
+
+      void loadUsStateBoundaries(
+        requestId
+      );
+
       void loadSelectedCountyBoundary(
         data.state_fips,
         data.county_fips,
@@ -2040,7 +2404,39 @@ document
             null,
             null,
             {
-              scope: "country"
+              scope: "country",
+              countryIso3: "USA"
+            }
+          );
+
+          return;
+        }
+
+        const isStateOnly =
+          data.country_code === "us" &&
+          !!data.state &&
+          !data.county &&
+          !data.city &&
+          !data.postcode;
+
+        if (isStateOnly) {
+          const stateFips =
+            usStateFipsByName[
+              data.state
+            ];
+
+          if (!stateFips) {
+            throw new Error(
+              `No state FIPS mapping for ${data.state}`
+            );
+          }
+
+          await loadRegionalData(
+            null,
+            null,
+            {
+              scope: "state",
+              stateFips
             }
           );
 
