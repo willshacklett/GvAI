@@ -72,6 +72,8 @@ def api_geocode():
                 "format": "jsonv2",
                 "limit": 1,
                 "addressdetails": 1,
+                "polygon_geojson": 1,
+                "polygon_threshold": 0.01,
             },
             headers={
                 "User-Agent": "GVAI/1.0 (https://gvai.io)",
@@ -100,6 +102,7 @@ def api_geocode():
             "latitude": float(result["lat"]),
             "longitude": float(result["lon"]),
             "place_type": result.get("type"),
+            "geojson": result.get("geojson"),
             "country": address.get("country"),
             "country_code": address.get("country_code"),
             "state": address.get("state"),

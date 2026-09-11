@@ -1600,40 +1600,86 @@ async function loadUsStateBoundaries(
     }
 
     usStatesDataSource =
-      await Cesium.GeoJsonDataSource.load(
-        geojson,
-        {
-          fill:
-            Cesium.Color.TRANSPARENT,
-          stroke:
-            Cesium.Color
-              .fromCssColorString("#8bdff2")
-              .withAlpha(0.55),
-          strokeWidth: 1.25,
-          clampToGround: false
-        }
+      new Cesium.CustomDataSource(
+        "US State Boundaries"
       );
 
     await viewer.dataSources.add(
       usStatesDataSource
     );
 
+    const addStateRing =
+      ring => {
+        if (
+          !Array.isArray(ring) ||
+          ring.length < 2
+        ) {
+          return;
+        }
+
+        const degrees = [];
+
+        for (const coordinate of ring) {
+          if (
+            Array.isArray(coordinate) &&
+            coordinate.length >= 2
+          ) {
+            degrees.push(
+              Number(coordinate[0]),
+              Number(coordinate[1])
+            );
+          }
+        }
+
+        if (degrees.length < 4) {
+          return;
+        }
+
+        usStatesDataSource.entities.add({
+          polyline: {
+            positions:
+              Cesium.Cartesian3.fromDegreesArray(
+                degrees
+              ),
+            width: 1.5,
+            clampToGround: false,
+            material:
+              Cesium.Color
+                .fromCssColorString("#8bdff2")
+                .withAlpha(0.70)
+          }
+        });
+      };
+
     for (
-      const entity of
-      usStatesDataSource.entities.values
+      const feature of
+      geojson.features || []
     ) {
-      if (entity.polygon) {
-        entity.polygon.fill = false;
-        entity.polygon.outline = true;
-        entity.polygon.outlineColor =
-          Cesium.Color
-            .fromCssColorString("#8bdff2")
-            .withAlpha(0.55);
+      const geometry =
+        feature.geometry;
+
+      if (
+        geometry?.type === "Polygon"
+      ) {
+        addStateRing(
+          geometry.coordinates?.[0]
+        );
+      } else if (
+        geometry?.type === "MultiPolygon"
+      ) {
+        for (
+          const polygon of
+          geometry.coordinates || []
+        ) {
+          addStateRing(
+            polygon?.[0]
+          );
+        }
       }
     }
 
     console.log(
-      "U.S. state boundaries rendered"
+      "U.S. state boundaries rendered as explicit polylines"
     );
 
     return usStatesDataSource;
@@ -1814,6 +1860,320 @@ async function loadSelectedStateBoundary(
   }
 }
 
+
+function clearRegionalMetrics() {
+  const textIds = [
+    "stability-score",
+    "population",
+    "labor-force",
+    "automation",
+    "transition",
+    "job-risk-label",
+    "housing-label",
+    "industry-label",
+    "resilience-label"
+  ];
+
+  for (const id of textIds) {
+    const element =
+      document.getElementById(id);
+
+    if (element) {
+      element.textContent = "—";
+    }
+  }
+
+  const barIds = [
+    "job-risk-bar",
+    "housing-bar",
+    "industry-bar",
+    "resilience-bar"
+  ];
+
+  for (const id of barIds) {
+    const element =
+      document.getElementById(id);
+
+    if (element) {
+      element.style.width = "0%";
+    }
+  }
+
+  const badge =
+    document.getElementById(
+      "risk-badge"
+    );
+
+  if (badge) {
+    badge.textContent =
+      "NO SCORE";
+  }
+
+  const censusBox =
+    document.getElementById(
+      "census-details"
+    );
+
+  if (censusBox) {
+    censusBox.remove();
+  }
+}
+
+
+async function renderCountryGeoJsonBoundary(
+  rawGeoJson,
+  requestId,
+  label = "country"
+) {
+  if (!rawGeoJson) {
+    console.warn(
+      `No GeoJSON geometry available for ${label}`
+    );
+
+    return null;
+  }
+
+  if (
+    requestId !== activeRegionRequestId
+  ) {
+    return null;
+  }
+
+  try {
+    await clearSelectedCountryBoundary();
+
+    // Nominatim normally returns a raw Polygon or
+    // MultiPolygon geometry. Cesium is happiest with
+    // an actual GeoJSON Feature.
+    const geojson =
+      rawGeoJson.type === "Feature" ||
+      rawGeoJson.type === "FeatureCollection"
+        ? rawGeoJson
+        : {
+            type: "Feature",
+            properties: {
+              name: label
+            },
+            geometry: rawGeoJson
+          };
+
+    selectedCountryGeoJson =
+      geojson;
+
+    selectedCountryDataSource =
+      await Cesium.GeoJsonDataSource.load(
+        geojson,
+        {
+          fill:
+            Cesium.Color
+              .fromCssColorString(
+                "#00e5ff"
+              )
+              .withAlpha(0.06),
+          clampToGround: true
+        }
+      );
+
+    await viewer.dataSources.add(
+      selectedCountryDataSource
+    );
+
+    for (
+      const entity of
+      selectedCountryDataSource.entities.values
+    ) {
+      if (entity.polygon) {
+        entity.polygon.outline =
+          false;
+      }
+    }
+
+    const addRing =
+      ring => {
+        if (
+          !Array.isArray(ring) ||
+          ring.length < 2
+        ) {
+          return;
+        }
+
+        const degrees = [];
+
+        for (
+          const coordinate of ring
+        ) {
+          if (
+            Array.isArray(coordinate) &&
+            coordinate.length >= 2
+          ) {
+            degrees.push(
+              Number(coordinate[0]),
+              Number(coordinate[1])
+            );
+          }
+        }
+
+        if (degrees.length < 4) {
+          return;
+        }
+
+        selectedCountryDataSource
+          .entities.add({
+            polyline: {
+              positions:
+                Cesium.Cartesian3
+                  .fromDegreesArray(
+                    degrees
+                  ),
+              width: 4,
+              clampToGround: false,
+              material:
+                Cesium.Color
+                  .fromCssColorString(
+                    "#00e5ff"
+                  )
+            }
+          });
+      };
+
+    const addGeometry =
+      geometry => {
+        if (!geometry) return;
+
+        if (
+          geometry.type ===
+          "Polygon"
+        ) {
+          addRing(
+            geometry.coordinates?.[0]
+          );
+        } else if (
+          geometry.type ===
+          "MultiPolygon"
+        ) {
+          for (
+            const polygon of
+            geometry.coordinates || []
+          ) {
+            addRing(
+              polygon?.[0]
+            );
+          }
+        }
+      };
+
+    if (
+      geojson.type ===
+      "FeatureCollection"
+    ) {
+      for (
+        const feature of
+        geojson.features || []
+      ) {
+        addGeometry(
+          feature.geometry
+        );
+      }
+    } else if (
+      geojson.type === "Feature"
+    ) {
+      addGeometry(
+        geojson.geometry
+      );
+    }
+
+    if (
+      requestId !== activeRegionRequestId
+    ) {
+      return null;
+    }
+
+    await viewer.flyTo(
+      selectedCountryDataSource,
+      {
+        duration: 2.0,
+        offset:
+          new Cesium
+            .HeadingPitchRange(
+              0,
+              Cesium.Math
+                .toRadians(-90),
+              0
+            )
+      }
+    );
+
+    viewer.camera.zoomOut(
+      viewer.camera
+        .positionCartographic
+        .height * 0.08
+    );
+
+    console.log(
+      `Country boundary rendered from geocoder: ${label}`
+    );
+
+    return geojson;
+
+  } catch (error) {
+    console.error(
+      "Geocoder country boundary failed",
+      error
+    );
+
+    return null;
+  }
+}
+
+
+async function loadCountryBoundaryFromGeocoder(
+  query,
+  requestId
+) {
+  try {
+    const endpoint =
+      (window.GVAI_API_BASE || "") +
+      `/api/geocode?q=${encodeURIComponent(query)}`;
+
+    const response =
+      await fetch(endpoint);
+
+    const data =
+      await response.json();
+
+    if (
+      !response.ok ||
+      !data.ok
+    ) {
+      throw new Error(
+        data.reason ||
+        "Country lookup failed."
+      );
+    }
+
+    if (
+      requestId !== activeRegionRequestId
+    ) {
+      return null;
+    }
+
+    return await renderCountryGeoJsonBoundary(
+      data.geojson,
+      requestId,
+      data.country || query
+    );
+
+  } catch (error) {
+    console.error(
+      "Country geocoder boundary failed",
+      error
+    );
+
+    return null;
+  }
+}
+
+
 async function loadRegionalData(
   latitude,
   longitude,
@@ -1830,6 +2190,10 @@ async function loadRegionalData(
 
   const sub =
     document.getElementById("location-sub");
+
+  // Never allow statistics from the previously selected
+  // geography to survive into a new selection.
+  clearRegionalMetrics();
 
   if (scope === "country") {
     title.textContent =
@@ -1894,6 +2258,8 @@ async function loadRegionalData(
     }
 
     if (!data.supported) {
+      clearRegionalMetrics();
+
       sub.textContent =
         "Global regional datasets are coming next.";
 
@@ -1936,9 +2302,15 @@ async function loadRegionalData(
 
       await clearSelectedStateBoundary();
 
-      // State borders collectively define the U.S. national footprint
-      // and remain visible in national view.
+      // Thin internal state boundaries.
       void loadUsStateBoundaries(
+        requestId
+      );
+
+      // Thick national perimeter. The geocoder geometry
+      // is independent from Census economic data.
+      void loadCountryBoundaryFromGeocoder(
+        "United States",
         requestId
       );
 
@@ -2320,6 +2692,37 @@ document
         return;
       }
 
+      // Exact U.S. state names must also take precedence
+      // over fuzzy profiles and geocoding. Otherwise names
+      // such as Washington, New York, and Tennessee can be
+      // interpreted as a city, county, DC, or center-point county.
+      const stateEntry =
+        Object.entries(
+          usStateFipsByName
+        ).find(
+          ([stateName]) =>
+            stateName.toLowerCase() === query
+        );
+
+      if (stateEntry) {
+        const [
+          stateName,
+          stateFips
+        ] = stateEntry;
+
+        await loadRegionalData(
+          null,
+          null,
+          {
+            scope: "state",
+            stateFips,
+            stateName
+          }
+        );
+
+        return;
+      }
+
       const match =
         profiles.find(
           profile =>
@@ -2407,6 +2810,56 @@ document
               scope: "country",
               countryIso3: "USA"
             }
+          );
+
+          return;
+        }
+
+        const isForeignCountryOnly =
+          data.country_code &&
+          data.country_code !== "us" &&
+          !data.state &&
+          !data.county &&
+          !data.city &&
+          !data.postcode;
+
+        if (isForeignCountryOnly) {
+          const requestId =
+            ++activeRegionRequestId;
+
+          clearRegionalMetrics();
+
+          title.textContent =
+            data.country ||
+            rawQuery;
+
+          sub.textContent =
+            "Global regional datasets are coming next.";
+
+          if (
+            selectedCountyDataSource
+          ) {
+            viewer.dataSources.remove(
+              selectedCountyDataSource,
+              true
+            );
+
+            selectedCountyDataSource =
+              null;
+          }
+
+          selectedCountyGeoJson =
+            null;
+
+          selectedCountyGeoid =
+            null;
+
+          await clearSelectedStateBoundary();
+
+          await renderCountryGeoJsonBoundary(
+            data.geojson,
+            requestId,
+            data.country || rawQuery
           );
 
           return;
