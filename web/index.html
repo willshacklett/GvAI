@@ -669,6 +669,59 @@ viewer.scene.fog.enabled = true;
 // Start with Cesium's natural whole-Earth view.
 viewer.camera.flyHome(0);
 
+// Permanent U.S. state boundaries from U.S. Census TIGERweb.
+try {
+  const stateBoundaryUrl =
+    "https://tigerweb.geo.census.gov/arcgis/rest/services/" +
+    "TIGERweb/State_County/MapServer/0/query" +
+    "?where=1%3D1" +
+    "&outFields=NAME%2CSTATE%2CGEOID" +
+    "&outSR=4326" +
+    "&f=geojson";
+
+  const stateBoundaries =
+    await Cesium.GeoJsonDataSource.load(
+      stateBoundaryUrl,
+      {
+        stroke:
+          Cesium.Color.fromCssColorString(
+            "#79cfff"
+          ).withAlpha(0.55),
+        fill:
+          Cesium.Color.TRANSPARENT,
+        strokeWidth: 1.2,
+        clampToGround: true
+      }
+    );
+
+  viewer.dataSources.add(
+    stateBoundaries
+  );
+
+  for (
+    const entity
+    of stateBoundaries.entities.values
+  ) {
+    if (entity.polygon) {
+      entity.polygon.material =
+        Cesium.Color.TRANSPARENT;
+
+      entity.polygon.outline = true;
+
+      entity.polygon.outlineColor =
+        Cesium.Color.fromCssColorString(
+          "#79cfff"
+        ).withAlpha(0.55);
+    }
+  }
+
+} catch (error) {
+  console.error(
+    "State boundary layer failed",
+    error
+  );
+}
+
 const GOOGLE_KEY =
   window.GVAI_GOOGLE_MAPS_API_KEY ||
   "";
