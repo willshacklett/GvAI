@@ -662,6 +662,8 @@ const viewer = new Cesium.Viewer(
   }
 );
 
+window.gvaiViewer = viewer;
+
 viewer.scene.globe.enableLighting = true;
 viewer.scene.skyAtmosphere.show = true;
 viewer.scene.fog.enabled = true;
@@ -1564,6 +1566,8 @@ function flyToProfile(profile) {
     },
     duration: 2.1
   });
+
+
 
   renderProfile(profile);
 }
