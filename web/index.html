@@ -1004,6 +1004,7 @@ function classifyLaborAvailability(data) {
 
 let selectedCountyGeoJson = null;
 let selectedCountyGeoid = null;
+let selectedCountyDataSource = null;
 
 async function loadSelectedCountyBoundary(
   stateFips,
@@ -1094,6 +1095,42 @@ async function loadSelectedCountyBoundary(
       `County boundary data loaded: ${geoid}`,
       pointCount,
       "points"
+    );
+
+    // Render the selected county directly on the Cesium globe.
+    // Replace the previous county whenever the user selects a new region.
+    if (selectedCountyDataSource) {
+      viewer.dataSources.remove(
+        selectedCountyDataSource,
+        true
+      );
+
+      selectedCountyDataSource = null;
+    }
+
+    selectedCountyDataSource =
+      await Cesium.GeoJsonDataSource.load(
+        geojson,
+        {
+          stroke:
+            Cesium.Color.fromCssColorString(
+              "#00e5ff"
+            ),
+          strokeWidth: 4,
+          fill:
+            Cesium.Color.fromCssColorString(
+              "#00e5ff"
+            ).withAlpha(0.08),
+          clampToGround: true
+        }
+      );
+
+    await viewer.dataSources.add(
+      selectedCountyDataSource
+    );
+
+    console.log(
+      `County boundary rendered: ${geoid}`
     );
 
     return geojson;
