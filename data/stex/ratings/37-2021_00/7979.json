@@ -1,0 +1,22 @@
+{
+  "schema_version": "gvai.stex.task-rating.v0.1",
+  "rubric_version": "STEX v0.1",
+  "occupation_code": "37-2021.00",
+  "occupation_title": "Pest Control Workers",
+  "task_id": "7979",
+  "task_title": "Drive truck equipped with power spraying equipment.",
+  "task_category": "Core",
+  "source_importance": 74.0,
+  "importance_status": "rated",
+  "source_name": "O*NET Tasks / Incumbent",
+  "source_year": 2026,
+  "source_vintage_label": "O*NET Tasks / Incumbent 2026",
+  "digital_capability": 0.0,
+  "physical_execution": 3.0,
+  "human_presence_requirement": 3.0,
+  "augmentation_likelihood": 2.0,
+  "structural_exposure": 18.75,
+  "scorer_id": "openai-gpt-5.6-sol-stex-v0.1",
+  "scored_at_utc": "2026-09-11T23:30:00+00:00",
+  "rationale": "Vehicle operation has substantial demonstrated automation capability, but pest-control routes involve public roads, customer properties, equipment handling, and operational exceptions. Human supervision or presence remains strongly required in current commercial deployment."
+}
