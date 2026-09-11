@@ -1073,18 +1073,6 @@ function drawSelectedCountyOverlay() {
     rect.height
   );
 
-  // TEMP DEBUG: prove the overlay canvas is actually visible.
-  ctx.save();
-  ctx.strokeStyle = "#ff00ff";
-  ctx.lineWidth = 6;
-  ctx.beginPath();
-  ctx.moveTo(20, 20);
-  ctx.lineTo(rect.width - 20, rect.height - 20);
-  ctx.moveTo(rect.width - 20, 20);
-  ctx.lineTo(20, rect.height - 20);
-  ctx.stroke();
-  ctx.restore();
-
   if (
     selectedCountyPositions.length < 2
   ) {
