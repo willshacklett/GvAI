@@ -1088,15 +1088,47 @@ function drawSelectedCountyOverlay() {
     const position
     of selectedCountyPositions
   ) {
-    const windowPosition =
-      Cesium.SceneTransforms
-        .worldToWindowCoordinates(
-          viewer.scene,
-          position
-        );
+    const canvas =
+      viewer.scene.canvas;
+
+    const viewProjection =
+      Cesium.Matrix4.multiply(
+        viewer.camera.frustum.projectionMatrix,
+        viewer.camera.viewMatrix,
+        new Cesium.Matrix4()
+      );
+
+    const clip =
+      Cesium.Matrix4.multiplyByVector(
+        viewProjection,
+        new Cesium.Cartesian4(
+          position.x,
+          position.y,
+          position.z,
+          1
+        ),
+        new Cesium.Cartesian4()
+      );
 
     if (
-      !windowPosition ||
+      !Number.isFinite(clip.x) ||
+      !Number.isFinite(clip.y) ||
+      !Number.isFinite(clip.w) ||
+      clip.w <= 0
+    ) {
+      drawing = false;
+      continue;
+    }
+
+    const ndcX = clip.x / clip.w;
+    const ndcY = clip.y / clip.w;
+
+    const windowPosition = {
+      x: (ndcX + 1) * 0.5 * canvas.clientWidth,
+      y: (1 - ndcY) * 0.5 * canvas.clientHeight
+    };
+
+    if (
       !Number.isFinite(windowPosition.x) ||
       !Number.isFinite(windowPosition.y)
     ) {
