@@ -1216,6 +1216,13 @@ async function highlightSelectedCounty(
           )
       );
 
+    // Temporary diagnostics for the selected county overlay.
+    window.gvaiCountyPositions =
+      selectedCountyPositions;
+
+    window.gvaiDrawCountyOverlay =
+      drawSelectedCountyOverlay;
+
     drawSelectedCountyOverlay();
 
     console.log(
