@@ -1,0 +1,114 @@
+{
+  "schema_version": "gvai.onet.tasks.v0.1",
+  "retrieved_at_utc": "2026-09-11T23:05:11.666823+00:00",
+  "source": {
+    "name": "O*NET Web Services",
+    "occupation_updated_year": 2026,
+    "tasks_vintage": {
+      "source": "Incumbent",
+      "year": 2026
+    },
+    "api_base_url": "https://api-v2.onetcenter.org",
+    "occupation_endpoint": "https://api-v2.onetcenter.org/online/occupations/37-2021.00/",
+    "tasks_endpoint": "https://api-v2.onetcenter.org/online/occupations/37-2021.00/details/tasks"
+  },
+  "occupation": {
+    "onet_soc_code": "37-2021.00",
+    "title": "Pest Control Workers",
+    "description": "Apply or release chemical solutions or toxic gases and set traps to kill or remove pests and vermin that infest buildings and surrounding areas.",
+    "bright_outlook": true
+  },
+  "task_count": 15,
+  "tasks": [
+    {
+      "task_id": "7974",
+      "title": "Record work activities performed.",
+      "importance": 92.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "7977",
+      "title": "Clean work site after completion of job.",
+      "importance": 85.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "20760",
+      "title": "Measure area dimensions requiring treatment, calculate fumigant requirements, and estimate cost for service.",
+      "importance": 80.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "7976",
+      "title": "Spray or dust chemical solutions, powders, or gases into rooms, onto clothing, furnishings, or wood, or over marshlands, ditches, or catch basins.",
+      "importance": 80.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "20759",
+      "title": "Recommend treatment and prevention methods for pest problems to clients.",
+      "importance": 79.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "7975",
+      "title": "Inspect premises to identify infestation source and extent of damage to property, wall, or roof porosity and access to infested locations.",
+      "importance": 74.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "7979",
+      "title": "Drive truck equipped with power spraying equipment.",
+      "importance": 74.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "7978",
+      "title": "Direct, or assist other workers in, treatment or extermination processes to eliminate or control rodents, insects, or weeds.",
+      "importance": 66.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "7983",
+      "title": "Study preliminary reports or diagrams of infested area and determine treatment type required to eliminate and prevent recurrence of infestation.",
+      "importance": 60.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "7982",
+      "title": "Cut or bore openings in building or surrounding concrete, access infested areas, insert nozzle, and inject pesticide to impregnate ground.",
+      "importance": 64.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "7981",
+      "title": "Post warning signs and lock building doors to secure area to be fumigated.",
+      "importance": 60.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "7985",
+      "title": "Set mechanical traps, or place poisonous paste or bait in sewers, burrows, or ditches.",
+      "importance": 57.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "7986",
+      "title": "Clean and remove blockages from infested areas to facilitate spraying procedures and provide drainage, using brooms, mops, shovels, or rakes.",
+      "importance": 41.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "7987",
+      "title": "Position and fasten edges of tarpaulins over building, and tape vents to ensure air-tight environment and to check for leaks.",
+      "importance": 33.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "1001584",
+      "title": "Monitor inventory of chemicals and supplies.",
+      "importance": 0.0,
+      "category": "New"
+    }
+  ]
+}
