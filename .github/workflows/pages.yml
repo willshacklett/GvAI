@@ -31,6 +31,9 @@ jobs:
           cp web/index.html _site/index.html
           if [ -f web/api_config.js ]; then cp web/api_config.js _site/api_config.js; fi
           cp -R web/* _site/
+
+          printf '\nwindow.GVAI_GOOGLE_MAPS_API_KEY = "%s";\n'             "${{ secrets.GVAI_GOOGLE_MAPS_API_KEY }}"             >> _site/api_config.js
+
           if [ -d dashboard ]; then cp -R dashboard _site/dashboard; fi
 
       - name: Setup Pages
