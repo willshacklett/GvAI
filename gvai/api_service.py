@@ -10,7 +10,10 @@ from gvai.model_router import call_model, active_provider, available_providers
 from gvai.arbitrator import arbitrate_responses
 from gvai.gv_mode import gv_mode_prompt
 from gvai.adaptive_control import update_adaptive_control, get_adaptive_control_state
-from gvai.postlabor.region_intel import resolve_us_region
+from gvai.postlabor.region_intel import (
+    resolve_us_region,
+    resolve_us_aggregate_region,
+)
 
 app = Flask(__name__)
 # Railway deployment marker: live geographic search enabled.
@@ -121,20 +124,59 @@ def api_geocode():
 
 @app.get("/api/region")
 def api_region():
-    try:
-        latitude = float(request.args.get("lat"))
-        longitude = float(request.args.get("lon"))
-    except (TypeError, ValueError):
-        return jsonify({
-            "supported": False,
-            "reason": "Valid lat and lon query parameters are required."
-        }), 400
+    scope = (
+        request.args.get("scope")
+        or "county"
+    ).strip().lower()
 
     try:
+        if scope == "country":
+            result = resolve_us_aggregate_region(
+                scope="country",
+            )
+
+            return jsonify(result)
+
+        if scope == "state":
+            state_fips = (
+                request.args.get("state")
+                or ""
+            ).strip()
+
+            if not state_fips:
+                return jsonify({
+                    "supported": False,
+                    "reason":
+                        "state FIPS is required for state scope."
+                }), 400
+
+            result = resolve_us_aggregate_region(
+                scope="state",
+                state_fips=state_fips,
+            )
+
+            return jsonify(result)
+
+        try:
+            latitude = float(
+                request.args.get("lat")
+            )
+
+            longitude = float(
+                request.args.get("lon")
+            )
+        except (TypeError, ValueError):
+            return jsonify({
+                "supported": False,
+                "reason":
+                    "Valid lat and lon query parameters are required."
+            }), 400
+
         result = resolve_us_region(
             latitude=latitude,
             longitude=longitude,
         )
+
         return jsonify(result)
     except Exception as exc:
         return jsonify({

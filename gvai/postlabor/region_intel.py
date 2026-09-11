@@ -363,3 +363,311 @@ def build_county_occupation_profile(
         "groups": groups,
         "source": "U.S. Census Bureau ACS S2401",
     }
+
+
+def build_aggregate_occupation_profile(
+    *,
+    scope: str,
+    state_fips: str | None = None,
+    acs_year: int = 2024,
+    census_api_key: str | None = None,
+) -> Dict[str, Any]:
+    """
+    Retrieve ACS S2401 occupation composition for either
+    the United States or a single state.
+    """
+
+    key = (
+        census_api_key
+        or os.getenv("CENSUS_API_KEY")
+        or ""
+    ).strip()
+
+    if not key:
+        return {
+            "data_available": False,
+            "reason": "CENSUS_API_KEY is not configured.",
+            "source": "U.S. Census Bureau ACS S2401",
+        }
+
+    total_variable = "S2401_C01_001E"
+
+    variables = [
+        "NAME",
+        total_variable,
+        *[
+            item["variable"]
+            for item in ACS_OCCUPATION_GROUPS.values()
+        ],
+    ]
+
+    if scope == "country":
+        geography_params = {
+            "for": "us:*",
+        }
+    elif scope == "state":
+        if not state_fips:
+            raise ValueError(
+                "state_fips is required for state scope."
+            )
+
+        geography_params = {
+            "for": f"state:{str(state_fips).zfill(2)}",
+        }
+    else:
+        raise ValueError(
+            f"Unsupported aggregate scope: {scope}"
+        )
+
+    params = {
+        "get": ",".join(variables),
+        "key": key,
+        **geography_params,
+    }
+
+    response = requests.get(
+        f"{ACS_BASE}/{acs_year}/acs/acs5/subject",
+        params=params,
+        timeout=30,
+        headers={
+            "User-Agent": "GVAI/1.0",
+            "Accept": "application/json",
+        },
+    )
+
+    response.raise_for_status()
+
+    rows = response.json()
+
+    if len(rows) < 2:
+        return {
+            "data_available": False,
+            "source": "U.S. Census Bureau ACS S2401",
+        }
+
+    data = dict(zip(rows[0], rows[1]))
+
+    employed_total = _number(
+        data.get(total_variable)
+    )
+
+    groups = []
+
+    for group_id, definition in ACS_OCCUPATION_GROUPS.items():
+        employed = _number(
+            data.get(definition["variable"])
+        )
+
+        share_percent = None
+
+        if (
+            employed_total
+            and employed is not None
+        ):
+            share_percent = round(
+                employed / employed_total * 100,
+                1,
+            )
+
+        groups.append(
+            {
+                "group_id": group_id,
+                "label": definition["label"],
+                "employed": employed,
+                "share_percent": share_percent,
+            }
+        )
+
+    groups.sort(
+        key=lambda item: (
+            item["employed"]
+            if item["employed"] is not None
+            else -1
+        ),
+        reverse=True,
+    )
+
+    return {
+        "data_available": True,
+        "acs_year": acs_year,
+        "civilian_employed_16_plus": employed_total,
+        "groups": groups,
+        "source": "U.S. Census Bureau ACS S2401",
+    }
+
+
+def resolve_us_aggregate_region(
+    *,
+    scope: str,
+    state_fips: str | None = None,
+    acs_year: int = 2024,
+) -> Dict[str, Any]:
+    """
+    Retrieve U.S. national or state-level ACS indicators.
+
+    This intentionally runs separately from the existing
+    coordinate -> county path so county behavior remains stable.
+    """
+
+    census_api_key = (
+        os.getenv("CENSUS_API_KEY")
+        or ""
+    ).strip()
+
+    if scope not in {"country", "state"}:
+        raise ValueError(
+            f"Unsupported aggregate scope: {scope}"
+        )
+
+    if scope == "state":
+        if not state_fips:
+            raise ValueError(
+                "state_fips is required for state scope."
+            )
+
+        state_fips = str(state_fips).zfill(2)
+
+    variables = [
+        "NAME",
+        "B01003_001E",
+        "B23025_003E",
+        "B23025_005E",
+        "B19013_001E",
+        "B25077_001E",
+        "B01002_001E",
+    ]
+
+    if not census_api_key:
+        return {
+            "supported": True,
+            "data_available": False,
+            "scope": scope,
+            "state_fips": state_fips,
+            "acs_year": acs_year,
+            "reason": "CENSUS_API_KEY is not configured.",
+            "source": "U.S. Census Bureau",
+        }
+
+    if scope == "country":
+        geography_params = {
+            "for": "us:*",
+        }
+    else:
+        geography_params = {
+            "for": f"state:{state_fips}",
+        }
+
+    params = {
+        "get": ",".join(variables),
+        "key": census_api_key,
+        **geography_params,
+    }
+
+    response = requests.get(
+        f"{ACS_BASE}/{acs_year}/acs/acs5",
+        params=params,
+        timeout=30,
+        headers={
+            "User-Agent": "GVAI/1.0",
+            "Accept": "application/json",
+        },
+    )
+
+    response.raise_for_status()
+
+    rows = response.json()
+
+    if len(rows) < 2:
+        return {
+            "supported": True,
+            "data_available": False,
+            "scope": scope,
+            "state_fips": state_fips,
+            "acs_year": acs_year,
+        }
+
+    data = dict(zip(rows[0], rows[1]))
+
+    name = data.get("NAME")
+
+    population = _number(
+        data.get("B01003_001E")
+    )
+
+    labor_force = _number(
+        data.get("B23025_003E")
+    )
+
+    unemployed = _number(
+        data.get("B23025_005E")
+    )
+
+    median_income = _number(
+        data.get("B19013_001E")
+    )
+
+    median_home_value = _number(
+        data.get("B25077_001E")
+    )
+
+    median_age = _number(
+        data.get("B01002_001E")
+    )
+
+    unemployment_rate = None
+
+    if labor_force and unemployed is not None:
+        unemployment_rate = round(
+            unemployed / labor_force * 100,
+            1,
+        )
+
+    home_value_to_income_ratio = None
+
+    if (
+        median_home_value is not None
+        and median_income is not None
+        and median_income > 0
+    ):
+        home_value_to_income_ratio = round(
+            median_home_value / median_income,
+            2,
+        )
+
+    occupation_profile = (
+        build_aggregate_occupation_profile(
+            scope=scope,
+            state_fips=state_fips,
+            acs_year=acs_year,
+            census_api_key=census_api_key,
+        )
+    )
+
+    result = {
+        "supported": True,
+        "data_available": True,
+        "scope": scope,
+        "name": name,
+        "acs_year": acs_year,
+        "population": population,
+        "labor_force": labor_force,
+        "unemployed": unemployed,
+        "unemployment_rate": unemployment_rate,
+        "median_household_income": median_income,
+        "median_home_value": median_home_value,
+        "home_value_to_income_ratio":
+            home_value_to_income_ratio,
+        "median_age": median_age,
+        "occupation_profile": occupation_profile,
+        "source": "U.S. Census Bureau ACS 5-year",
+    }
+
+    if scope == "country":
+        result["country"] = "United States"
+        result["country_code"] = "US"
+
+    if scope == "state":
+        result["state"] = name
+        result["state_fips"] = state_fips
+
+    return result
