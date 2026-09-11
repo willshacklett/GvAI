@@ -1,0 +1,22 @@
+{
+  "schema_version": "gvai.stex.task-rating.v0.1",
+  "rubric_version": "STEX v0.1",
+  "occupation_code": "37-2021.00",
+  "occupation_title": "Pest Control Workers",
+  "task_id": "7974",
+  "task_title": "Record work activities performed.",
+  "task_category": "Core",
+  "source_importance": 92.0,
+  "importance_status": "rated",
+  "source_name": "O*NET Tasks / Incumbent",
+  "source_year": 2026,
+  "source_vintage_label": "O*NET Tasks / Incumbent 2026",
+  "digital_capability": 4.0,
+  "physical_execution": 0.0,
+  "human_presence_requirement": 0.0,
+  "augmentation_likelihood": 3.0,
+  "structural_exposure": 100.0,
+  "scorer_id": "openai-gpt-5.6-sol-stex-v0.1",
+  "scored_at_utc": "2026-09-11T23:15:52.354457+00:00",
+  "rationale": "The task is primarily information recording. Current software and AI systems can capture, transcribe, structure, summarize, and store work-activity records with high capability. The recording function does not itself require physical execution or a human to be physically present. In current occupational settings, automation is also likely to augment workers by reducing documentation effort while humans continue performing the underlying field work."
+}
