@@ -956,6 +956,7 @@ function classifyLaborAvailability(data) {
 
 
 
+
 let selectedCountyPrimitive = null;
 
 async function highlightSelectedCounty(
@@ -1032,67 +1033,90 @@ async function highlightSelectedCounty(
             : [];
 
       for (const polygon of polygons) {
-        for (const ring of polygon) {
-          const degrees = [];
-
-          for (const coordinate of ring) {
-            degrees.push(
-              coordinate[0],
-              coordinate[1]
-            );
-          }
-
-          if (degrees.length < 4) {
-            continue;
-          }
-
-          instances.push(
-            new Cesium.GeometryInstance({
-              geometry:
-                new Cesium.GroundPolylineGeometry({
-                  positions:
-                    Cesium.Cartesian3
-                      .fromDegreesArray(
-                        degrees
-                      ),
-                  width: 5
-                }),
-              attributes: {
-                color:
-                  Cesium.ColorGeometryInstanceAttribute
-                    .fromColor(
-                      Cesium.Color
-                        .fromCssColorString(
-                          "#59d6ff"
-                        )
-                    )
-              }
-            })
-          );
+        if (!polygon.length) {
+          continue;
         }
+
+        const outerRing =
+          polygon[0];
+
+        const outerPositions =
+          Cesium.Cartesian3.fromDegreesArray(
+            outerRing.flatMap(
+              coordinate => [
+                coordinate[0],
+                coordinate[1]
+              ]
+            )
+          );
+
+        const holes =
+          polygon.slice(1).map(
+            ring =>
+              new Cesium.PolygonHierarchy(
+                Cesium.Cartesian3.fromDegreesArray(
+                  ring.flatMap(
+                    coordinate => [
+                      coordinate[0],
+                      coordinate[1]
+                    ]
+                  )
+                )
+              )
+          );
+
+        instances.push(
+          new Cesium.GeometryInstance({
+            geometry:
+              new Cesium.PolygonGeometry({
+                polygonHierarchy:
+                  new Cesium.PolygonHierarchy(
+                    outerPositions,
+                    holes
+                  )
+              }),
+            attributes: {
+              color:
+                Cesium.ColorGeometryInstanceAttribute
+                  .fromColor(
+                    Cesium.Color
+                      .fromCssColorString(
+                        "#00d9ff"
+                      )
+                      .withAlpha(0.22)
+                  )
+            }
+          })
+        );
       }
     }
 
     if (instances.length === 0) {
       throw new Error(
-        "County geometry contained no drawable rings."
+        "County geometry contained no drawable polygons."
       );
     }
 
     selectedCountyPrimitive =
       viewer.scene.groundPrimitives.add(
-        new Cesium.GroundPolylinePrimitive({
+        new Cesium.GroundPrimitive({
           geometryInstances:
             instances,
           appearance:
-            new Cesium.PolylineColorAppearance()
+            new Cesium.PerInstanceColorAppearance({
+              translucent: true,
+              closed: false
+            }),
+          classificationType:
+            Cesium.ClassificationType
+              .CESIUM_3D_TILE
         })
       );
 
     console.log(
-      `County boundary loaded: ${geoid}`,
+      `County classification loaded: ${geoid}`,
       instances.length,
-      "ring(s)"
+      "polygon(s)"
     );
 
   } catch (error) {
