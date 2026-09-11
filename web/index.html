@@ -1467,8 +1467,6 @@ document
         );
 
       if (match) {
-        await enterLocal3DMode();
-
         flyToProfile(match);
 
         loadRegionalData(
@@ -1527,8 +1525,6 @@ document
 
         const longitude =
           Number(data.longitude);
-
-        await enterLocal3DMode();
 
         title.textContent =
           data.city ||
