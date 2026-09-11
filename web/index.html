@@ -685,10 +685,7 @@ try {
   const geojson =
     await response.json();
 
-  const stateBoundarySource =
-    new Cesium.CustomDataSource(
-      "US State Boundaries"
-    );
+  const geometryInstances = [];
 
   function addBoundaryRing(
     coordinates,
@@ -703,18 +700,16 @@ try {
           )
       );
 
-    stateBoundarySource.entities.add({
-      name,
-      polyline: {
-        positions,
-        width: 1.5,
-        material:
-          Cesium.Color.fromCssColorString(
-            "#79cfff"
-          ).withAlpha(0.72),
-        clampToGround: true
-      }
-    });
+    geometryInstances.push(
+      new Cesium.GeometryInstance({
+        geometry:
+          new Cesium.GroundPolylineGeometry({
+            positions,
+            width: 2.0
+          }),
+        id: name
+      })
+    );
   }
 
   for (
@@ -764,9 +759,30 @@ try {
     }
   }
 
-  await viewer.dataSources.add(
-    stateBoundarySource
-  );
+  if (geometryInstances.length) {
+    const stateBoundaryPrimitive =
+      new Cesium.GroundPolylinePrimitive({
+        geometryInstances,
+        appearance:
+          new Cesium.PolylineMaterialAppearance({
+            material:
+              Cesium.Material.fromType(
+                "Color",
+                {
+                  color:
+                    Cesium.Color.fromCssColorString(
+                      "#79cfff"
+                    ).withAlpha(0.78)
+                }
+              )
+          }),
+        asynchronous: true
+      });
+
+    viewer.scene.groundPrimitives.add(
+      stateBoundaryPrimitive
+    );
+  }
 
 } catch (error) {
   console.error(
