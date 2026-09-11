@@ -1298,7 +1298,7 @@ async function highlightSelectedCounty(
     drawSelectedCountyOverlay();
 
     // Cesium-native county boundary test.
-    // Runs only after regional/county data is already available.
+    // Render a narrow classified corridor directly onto Google 3D tiles.
     if (window.gvaiCountyGroundPrimitive) {
       viewer.scene.groundPrimitives.remove(
         window.gvaiCountyGroundPrimitive
@@ -1307,39 +1307,49 @@ async function highlightSelectedCounty(
       window.gvaiCountyGroundPrimitive = null;
     }
 
-    const groundGeometry =
-      new Cesium.GroundPolylineGeometry({
+    const boundaryCorridor =
+      new Cesium.CorridorGeometry({
         positions:
           selectedCountyPositions,
-        width: 6
+        width: 1200,
+        vertexFormat:
+          Cesium.PerInstanceColorAppearance
+            .VERTEX_FORMAT
       });
 
     window.gvaiCountyGroundPrimitive =
       viewer.scene.groundPrimitives.add(
-        new Cesium.GroundPolylinePrimitive({
+        new Cesium.GroundPrimitive({
           geometryInstances:
             new Cesium.GeometryInstance({
               geometry:
-                groundGeometry,
+                boundaryCorridor,
               attributes: {
                 color:
                   Cesium.ColorGeometryInstanceAttribute
                     .fromColor(
-                      Cesium.Color.fromCssColorString(
-                        "#00e5ff"
-                      )
+                      Cesium.Color
+                        .fromCssColorString(
+                          "#00e5ff"
+                        )
+                        .withAlpha(0.9)
                     )
               }
             }),
           appearance:
-            new Cesium.PolylineColorAppearance(),
+            new Cesium.PerInstanceColorAppearance({
+              flat: true,
+              translucent: true,
+              closed: false
+            }),
           classificationType:
-            Cesium.ClassificationType.CESIUM_3D_TILE
+            Cesium.ClassificationType
+              .CESIUM_3D_TILE
         })
       );
 
     console.log(
-      `County ground primitive loaded: ${geoid}`,
+      `County corridor classification loaded: ${geoid}`,
       selectedCountyPositions.length,
       "points"
     );
