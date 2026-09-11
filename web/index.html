@@ -676,28 +676,67 @@ const GOOGLE_KEY =
   window.GVAI_GOOGLE_MAPS_API_KEY ||
   "";
 
-if (GOOGLE_KEY) {
+let googleTileset = null;
+let googleTilesetPromise = null;
+let local3DMode = false;
+
+async function enterLocal3DMode() {
+  if (local3DMode && googleTileset) {
+    return true;
+  }
+
+  if (!GOOGLE_KEY) {
+    console.warn(
+      "Google Maps key unavailable; staying on Cesium globe."
+    );
+    return false;
+  }
+
   try {
-    viewer.imageryLayers.removeAll();
+    if (!googleTilesetPromise) {
+      googleTilesetPromise =
+        Cesium.Cesium3DTileset.fromUrl(
+          "https://tile.googleapis.com/v1/3dtiles/root.json?key=" +
+          encodeURIComponent(GOOGLE_KEY),
+          {
+            showCreditsOnScreen: true
+          }
+        );
+    }
+
+    if (!googleTileset) {
+      googleTileset =
+        await googleTilesetPromise;
+
+      viewer.scene.primitives.add(
+        googleTileset
+      );
+    }
+
+    // Only switch away from the smooth globe
+    // after Google 3D has loaded successfully.
     viewer.scene.globe.show = false;
 
-    const tileset =
-      await Cesium.Cesium3DTileset.fromUrl(
-        "https://tile.googleapis.com/v1/3dtiles/root.json?key=" +
-        encodeURIComponent(GOOGLE_KEY),
-        {
-          showCreditsOnScreen: true
-        }
-      );
+    googleTileset.show = true;
+    local3DMode = true;
 
-    viewer.scene.primitives.add(tileset);
+    console.log(
+      "GVAI local 3D mode enabled."
+    );
+
+    return true;
+
   } catch (error) {
     console.error(
-      "Google Photorealistic 3D Tiles failed; using Cesium globe.",
+      "Google Photorealistic 3D Tiles failed; staying on Cesium globe.",
       error
     );
 
+    googleTilesetPromise = null;
     viewer.scene.globe.show = true;
+    local3DMode = false;
+
+    return false;
   }
 }
 
@@ -1678,11 +1717,15 @@ document
         );
 
       if (match) {
+        await enterLocal3DMode();
+
         flyToProfile(match);
+
         loadRegionalData(
           match.lat,
           match.lon
         );
+
         return;
       }
 
@@ -1734,6 +1777,8 @@ document
 
         const longitude =
           Number(data.longitude);
+
+        await enterLocal3DMode();
 
         title.textContent =
           data.city ||
