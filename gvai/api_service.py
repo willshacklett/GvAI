@@ -1,4 +1,5 @@
 import os
+import json
 import time
 import requests
 from flask import Flask, request, jsonify
@@ -13,6 +14,11 @@ from gvai.adaptive_control import update_adaptive_control, get_adaptive_control_
 from gvai.postlabor.region_intel import (
     resolve_us_region,
     resolve_us_aggregate_region,
+)
+from gvai.postlabor.stex.store import (
+    InvalidSTEXOccupationCode,
+    STEXProfileNotFound,
+    load_occupation_stex_profile,
 )
 
 app = Flask(__name__)
@@ -123,6 +129,54 @@ def api_geocode():
             "reason": "Place search is temporarily unavailable.",
             "error_type": type(exc).__name__,
         }), 502
+
+
+@app.get("/api/stex/occupation")
+def api_stex_occupation():
+    code = (
+        request.args.get("code")
+        or ""
+    ).strip()
+
+    if not code:
+        return jsonify({
+            "ok": False,
+            "reason":
+                "An O*NET-SOC occupation code is required.",
+            "example": "37-2021.00",
+        }), 400
+
+    try:
+        profile = load_occupation_stex_profile(code)
+
+        return jsonify({
+            "ok": True,
+            "profile": profile,
+        })
+
+    except InvalidSTEXOccupationCode as exc:
+        return jsonify({
+            "ok": False,
+            "reason": str(exc),
+        }), 400
+
+    except STEXProfileNotFound:
+        return jsonify({
+            "ok": False,
+            "occupation_code": code,
+            "reason":
+                "No audited STEX profile is available "
+                "for this occupation yet.",
+        }), 404
+
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({
+            "ok": False,
+            "occupation_code": code,
+            "reason":
+                "The STEX profile could not be loaded.",
+            "error_type": type(exc).__name__,
+        }), 500
 
 
 @app.get("/api/region")
