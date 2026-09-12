@@ -1,0 +1,22 @@
+{
+  "schema_version": "gvai.stex.task-rating.v0.1",
+  "rubric_version": "STEX v0.1",
+  "occupation_code": "15-1252.00",
+  "occupation_title": "Software Developers",
+  "task_id": "21661",
+  "task_title": "Analyze information to determine, recommend, and plan installation of a new system or modification of an existing system.",
+  "task_category": "Core",
+  "source_importance": 65.0,
+  "importance_status": "rated",
+  "source_name": "O*NET Tasks / Incumbent",
+  "source_year": 2025,
+  "source_vintage_label": "O*NET Tasks / Incumbent 2025",
+  "digital_capability": 4.0,
+  "physical_execution": 0.0,
+  "human_presence_requirement": 0.0,
+  "augmentation_likelihood": 4.0,
+  "structural_exposure": 100.0,
+  "scorer_id": "openai-gpt-5.6-sol-stex-v0.1",
+  "scored_at_utc": "2026-09-12T00:10:00+00:00",
+  "rationale": "Analyzing information and recommending or planning a system installation or modification is primarily analytical and planning work. Current AI systems can compare requirements, constraints, architectures, dependencies, and implementation options without requiring physical execution."
+}

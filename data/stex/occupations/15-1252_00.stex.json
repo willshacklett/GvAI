@@ -1,0 +1,19 @@
+{
+  "occupation_code": "15-1252.00",
+  "occupation_title": "Software Developers",
+  "rated_task_count": 17,
+  "unrated_task_count": 0,
+  "total_importance_weight": 1092.0,
+  "structural_exposure": 75.9444,
+  "augmentation_likelihood": 3.8938,
+  "rubric_version": "STEX v0.1",
+  "schema_version": "gvai.stex.occupation-summary.v0.1",
+  "source": {
+    "name": "O*NET Web Services",
+    "tasks_source": "Incumbent",
+    "tasks_year": 2025,
+    "onet_soc_code": "15-1252.00"
+  },
+  "scorer_id": "openai-gpt-5.6-sol-stex-v0.1",
+  "interpretation": "Importance-weighted structural exposure of rated O*NET task content under STEX v0.1. This is not a probability of job loss or the percentage of jobs that can be automated."
+}

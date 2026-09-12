@@ -1,0 +1,22 @@
+{
+  "schema_version": "gvai.stex.task-rating.v0.1",
+  "rubric_version": "STEX v0.1",
+  "occupation_code": "15-1252.00",
+  "occupation_title": "Software Developers",
+  "task_id": "21669",
+  "task_title": "Develop or direct software system testing or validation procedures, programming, or documentation.",
+  "task_category": "Core",
+  "source_importance": 73.0,
+  "importance_status": "rated",
+  "source_name": "O*NET Tasks / Incumbent",
+  "source_year": 2025,
+  "source_vintage_label": "O*NET Tasks / Incumbent 2025",
+  "digital_capability": 4.0,
+  "physical_execution": 0.0,
+  "human_presence_requirement": 0.0,
+  "augmentation_likelihood": 4.0,
+  "structural_exposure": 100.0,
+  "scorer_id": "openai-gpt-5.6-sol-stex-v0.1",
+  "scored_at_utc": "2026-09-12T00:10:00+00:00",
+  "rationale": "Software testing, validation procedure development, programming, and documentation are predominantly digital activities. Current AI-assisted development systems can generate tests, code, documentation, and validation plans and can execute many of these activities inside software environments. Human review remains important, so strong augmentation is also likely."
+}
