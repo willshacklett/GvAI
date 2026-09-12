@@ -177,6 +177,31 @@ def api_stex_tasks():
 
         contributors = []
 
+        rated_tasks = [
+            task
+            for task in tasks
+            if (
+                task.get("importance_status")
+                == "rated"
+                and float(
+                    task.get(
+                        "source_importance"
+                    )
+                    or 0
+                ) > 0
+            )
+        ]
+
+        total_importance = sum(
+            float(
+                task.get(
+                    "source_importance"
+                )
+                or 0
+            )
+            for task in rated_tasks
+        )
+
         for task in tasks:
             importance = float(
                 task.get(
@@ -192,10 +217,29 @@ def api_stex_tasks():
                 or 0
             )
 
-            contribution = (
+            is_rated = (
+                task.get("importance_status")
+                == "rated"
+                and importance > 0
+            )
+
+            weighted_contribution = (
                 importance
                 * exposure
                 / 100.0
+                if is_rated
+                else 0.0
+            )
+
+            stex_contribution_points = (
+                importance
+                * exposure
+                / total_importance
+                if (
+                    is_rated
+                    and total_importance > 0
+                )
+                else 0.0
             )
 
             contributors.append({
@@ -221,7 +265,12 @@ def api_stex_tasks():
                     task.get("rationale"),
                 "weighted_contribution":
                     round(
-                        contribution,
+                        weighted_contribution,
+                        4,
+                    ),
+                "stex_contribution_points":
+                    round(
+                        stex_contribution_points,
                         4,
                     ),
             })
@@ -238,6 +287,13 @@ def api_stex_tasks():
             "ok": True,
             "occupation_code": code,
             "task_count": len(tasks),
+            "rated_task_count":
+                len(rated_tasks),
+            "total_importance_weight":
+                round(
+                    total_importance,
+                    4,
+                ),
             "contributors": contributors,
         })
 
