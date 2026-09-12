@@ -409,6 +409,23 @@
       margin-bottom: 10px;
     }
 
+    .occupation-select {
+      width: 100%;
+      margin-bottom: 10px;
+      border: 1px solid var(--border);
+      background: rgba(4, 14, 24, 0.82);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 9px 10px;
+      outline: none;
+      font-size: 12px;
+    }
+
+    .occupation-select:focus {
+      border-color: var(--accent);
+    }
+
+
     .occupation-name {
       font-size: 16px;
       font-weight: 800;
@@ -673,6 +690,17 @@
     </div>
 
     <div class="section-title">Occupation exposure pilot</div>
+
+    <select
+      id="stex-occupation-select"
+      class="occupation-select"
+      aria-label="Select audited occupation"
+    >
+      <option value="">
+        Loading audited occupations…
+      </option>
+    </select>
+
 
     <div class="occupation-card">
       <div class="occupation-head">
@@ -3290,7 +3318,114 @@ async function loadOccupationSTEX(
   }
 }
 
-loadOccupationSTEX();
+async function loadOccupationSTEXCatalog() {
+  const selectEl =
+    document.getElementById(
+      "stex-occupation-select"
+    );
+
+  try {
+    const endpoint =
+      (window.GVAI_API_BASE || "") +
+      "/api/stex/occupations";
+
+    const response = await fetch(endpoint);
+
+    if (!response.ok) {
+      throw new Error(
+        `STEX catalog request failed with ${response.status}`
+      );
+    }
+
+    const data = await response.json();
+    const profiles = data.profiles || [];
+
+    selectEl.innerHTML = "";
+
+    if (!profiles.length) {
+      const option =
+        document.createElement("option");
+
+      option.value = "";
+      option.textContent =
+        "No audited occupations available";
+
+      selectEl.appendChild(option);
+
+      document.getElementById(
+        "stex-status"
+      ).textContent =
+        "No audited STEX profiles are available.";
+
+      return;
+    }
+
+    for (const profile of profiles) {
+      const option =
+        document.createElement("option");
+
+      option.value =
+        profile.occupation_code || "";
+
+      option.textContent =
+        profile.occupation_title ||
+        profile.occupation_code ||
+        "Unknown occupation";
+
+      selectEl.appendChild(option);
+    }
+
+    const firstCode =
+      profiles[0]?.occupation_code;
+
+    if (firstCode) {
+      selectEl.value = firstCode;
+      await loadOccupationSTEX(firstCode);
+    }
+
+  } catch (error) {
+    console.error(
+      "STEX catalog load failed:",
+      error
+    );
+
+    selectEl.innerHTML = "";
+
+    const option =
+      document.createElement("option");
+
+    option.value = "";
+    option.textContent =
+      "Occupation catalog unavailable";
+
+    selectEl.appendChild(option);
+
+    document.getElementById(
+      "stex-status"
+    ).textContent =
+      "Occupation catalog temporarily unavailable.";
+  }
+}
+
+
+document
+  .getElementById(
+    "stex-occupation-select"
+  )
+  .addEventListener(
+    "change",
+    async (event) => {
+      const code =
+        event.target.value;
+
+      if (code) {
+        await loadOccupationSTEX(code);
+      }
+    }
+  );
+
+
+loadOccupationSTEXCatalog();
 
 
 
