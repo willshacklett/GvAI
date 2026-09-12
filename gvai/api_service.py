@@ -22,6 +22,10 @@ from gvai.postlabor.stex.store import (
     load_occupation_stex_profile,
     load_occupation_stex_tasks,
 )
+from gvai.postlabor.sources.oews import OEWSClient
+from gvai.postlabor.stex.regional import (
+    build_regional_stex_coverage_plan,
+)
 
 app = Flask(__name__)
 # Railway deployment marker: live geographic search enabled.
@@ -151,6 +155,96 @@ def api_stex_occupations():
                 "The STEX occupation catalog "
                 "could not be loaded.",
             "error_type": type(exc).__name__,
+        }), 500
+
+
+@app.get("/api/stex/regional")
+def api_stex_regional():
+    area = (request.args.get("area") or "").strip()
+    if len(area) != 7 or not area.isdigit():
+        return jsonify({
+            "ok": False,
+            "reason": "area must contain exactly 7 numeric digits.",
+        }), 400
+
+    raw_year = request.args.get("year")
+    year = None
+    if raw_year is not None:
+        try:
+            year = int(raw_year)
+        except (TypeError, ValueError):
+            return jsonify({
+                "ok": False,
+                "reason": "year must be an integer.",
+            }), 400
+
+    raw_limit = request.args.get("limit")
+    limit = 10
+    if raw_limit is not None:
+        try:
+            limit = int(raw_limit)
+        except (TypeError, ValueError):
+            return jsonify({
+                "ok": False,
+                "reason": "limit must be an integer between 0 and 50.",
+            }), 400
+    if limit < 0 or limit > 50:
+        return jsonify({
+            "ok": False,
+            "reason": "limit must be an integer between 0 and 50.",
+        }), 400
+
+    try:
+        client = OEWSClient()
+        total, rows = client.fetch_catalog_regional_employment(
+            area_code=area,
+            source_year=year,
+        )
+        if total is None:
+            raise RuntimeError("missing regional OEWS denominator")
+
+        profiles = list_occupation_stex_profiles()
+        occupation_titles = {
+            row.occupation_code: row.occupation_title
+            for row in rows
+            if row.occupation_title
+        }
+        plan = build_regional_stex_coverage_plan(
+            total_employment=total,
+            employment_rows=rows,
+            profiles=profiles,
+            occupation_titles=occupation_titles,
+            recommendation_limit=limit,
+        )
+        payload = plan.to_dict()
+        payload.update({
+            "ok": True,
+            "methodology": {
+                "scope": "covered audited occupations only",
+                "covered_occupation_stex_scope": (
+                    "audited occupations represented in the coverage numerator"
+                ),
+                "regional_automation_score": None,
+                "missing_stex_treatment": "unknown, not zero",
+                "coverage_denominator": (
+                    "BLS OEWS All Occupations employment"
+                ),
+            },
+        })
+        return jsonify(payload)
+
+    except RuntimeError:
+        return jsonify({
+            "ok": False,
+            "reason": (
+                "Regional OEWS employment data has not been refreshed "
+                "for the requested area and year."
+            ),
+        }), 503
+    except Exception:
+        return jsonify({
+            "ok": False,
+            "reason": "Regional STEX coverage could not be computed.",
         }), 500
 
 
