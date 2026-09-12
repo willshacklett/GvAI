@@ -18,6 +18,7 @@ from gvai.postlabor.region_intel import (
 from gvai.postlabor.stex.store import (
     InvalidSTEXOccupationCode,
     STEXProfileNotFound,
+    list_occupation_stex_profiles,
     load_occupation_stex_profile,
 )
 
@@ -129,6 +130,28 @@ def api_geocode():
             "reason": "Place search is temporarily unavailable.",
             "error_type": type(exc).__name__,
         }), 502
+
+
+@app.get("/api/stex/occupations")
+def api_stex_occupations():
+    try:
+        profiles = list_occupation_stex_profiles()
+
+        return jsonify({
+            "ok": True,
+            "count": len(profiles),
+            "profiles": profiles,
+        })
+
+    except OSError as exc:
+        return jsonify({
+            "ok": False,
+            "reason":
+                "The STEX occupation catalog "
+                "could not be loaded.",
+            "error_type": type(exc).__name__,
+        }), 500
+
 
 
 @app.get("/api/stex/occupation")

@@ -83,3 +83,81 @@ def test_rejects_mismatched_profile(tmp_path):
             "37-2021.00",
             data_root=tmp_path,
         )
+
+
+
+def test_list_occupation_stex_profiles(tmp_path):
+    from gvai.postlabor.stex.store import (
+        list_occupation_stex_profiles,
+    )
+
+    (tmp_path / "37-2021_00.stex.json").write_text(
+        json.dumps({
+            "occupation_code": "37-2021.00",
+            "occupation_title": "Pest Control Workers",
+            "structural_exposure": 35.6614,
+            "augmentation_likelihood": 2.4624,
+            "rated_task_count": 14,
+            "unrated_task_count": 1,
+            "rubric_version": "STEX v0.1",
+            "source": {
+                "name": "O*NET Web Services",
+                "tasks_year": 2026,
+            },
+        })
+    )
+
+    profiles = list_occupation_stex_profiles(
+        data_root=tmp_path
+    )
+
+    assert len(profiles) == 1
+    assert (
+        profiles[0]["occupation_code"]
+        == "37-2021.00"
+    )
+    assert (
+        profiles[0]["occupation_title"]
+        == "Pest Control Workers"
+    )
+    assert (
+        profiles[0]["structural_exposure"]
+        == 35.6614
+    )
+
+
+def test_list_occupation_stex_profiles_empty(tmp_path):
+    from gvai.postlabor.stex.store import (
+        list_occupation_stex_profiles,
+    )
+
+    profiles = list_occupation_stex_profiles(
+        data_root=tmp_path
+    )
+
+    assert profiles == []
+
+
+def test_list_occupation_stex_profiles_skips_bad_files(
+    tmp_path,
+):
+    from gvai.postlabor.stex.store import (
+        list_occupation_stex_profiles,
+    )
+
+    (tmp_path / "broken.stex.json").write_text(
+        "{not valid json"
+    )
+
+    (tmp_path / "bad-code.stex.json").write_text(
+        json.dumps({
+            "occupation_code": "../../etc/passwd",
+            "occupation_title": "Bad",
+        })
+    )
+
+    profiles = list_occupation_stex_profiles(
+        data_root=tmp_path
+    )
+
+    assert profiles == []

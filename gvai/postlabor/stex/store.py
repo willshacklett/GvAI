@@ -53,6 +53,63 @@ def occupation_profile_path(
     return root / f"{safe_code}.stex.json"
 
 
+def list_occupation_stex_profiles(
+    data_root: Path | None = None,
+) -> list[dict[str, Any]]:
+    root = (
+        Path(data_root)
+        if data_root is not None
+        else DEFAULT_STEX_DATA_ROOT
+    )
+
+    if not root.exists():
+        return []
+
+    profiles: list[dict[str, Any]] = []
+
+    for path in sorted(root.glob("*.stex.json")):
+        try:
+            payload = json.loads(path.read_text())
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+
+        code = payload.get("occupation_code")
+        title = payload.get("occupation_title")
+
+        if not code or not title:
+            continue
+
+        try:
+            normalize_occupation_code(code)
+        except InvalidSTEXOccupationCode:
+            continue
+
+        profiles.append({
+            "occupation_code": code,
+            "occupation_title": title,
+            "structural_exposure":
+                payload.get("structural_exposure"),
+            "augmentation_likelihood":
+                payload.get("augmentation_likelihood"),
+            "rated_task_count":
+                payload.get("rated_task_count"),
+            "unrated_task_count":
+                payload.get("unrated_task_count"),
+            "rubric_version":
+                payload.get("rubric_version"),
+            "source":
+                payload.get("source"),
+        })
+
+    profiles.sort(
+        key=lambda item:
+            item["occupation_title"].lower()
+    )
+
+    return profiles
+
+
+
 def load_occupation_stex_profile(
     code: str,
     data_root: Path | None = None,
