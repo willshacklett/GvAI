@@ -161,3 +161,85 @@ def test_list_occupation_stex_profiles_skips_bad_files(
     )
 
     assert profiles == []
+
+
+
+def test_load_occupation_stex_tasks(
+    tmp_path,
+):
+    from gvai.postlabor.stex.store import (
+        load_occupation_stex_tasks,
+    )
+
+    occupation_dir = (
+        tmp_path / "37-2021_00"
+    )
+
+    occupation_dir.mkdir()
+
+    (occupation_dir / "1.json").write_text(
+        json.dumps({
+            "occupation_code":
+                "37-2021.00",
+            "task_id": "1",
+            "source_importance": 40,
+            "structural_exposure": 50,
+        })
+    )
+
+    (occupation_dir / "2.json").write_text(
+        json.dumps({
+            "occupation_code":
+                "37-2021.00",
+            "task_id": "2",
+            "source_importance": 90,
+            "structural_exposure": 25,
+        })
+    )
+
+    tasks = load_occupation_stex_tasks(
+        "37-2021.00",
+        data_root=tmp_path,
+    )
+
+    assert len(tasks) == 2
+    assert tasks[0]["task_id"] == "2"
+    assert tasks[1]["task_id"] == "1"
+
+
+def test_load_occupation_stex_tasks_missing(
+    tmp_path,
+):
+    from gvai.postlabor.stex.store import (
+        STEXProfileNotFound,
+        load_occupation_stex_tasks,
+    )
+
+    import pytest
+
+    with pytest.raises(
+        STEXProfileNotFound
+    ):
+        load_occupation_stex_tasks(
+            "37-2021.00",
+            data_root=tmp_path,
+        )
+
+
+def test_load_occupation_stex_tasks_rejects_bad_code(
+    tmp_path,
+):
+    from gvai.postlabor.stex.store import (
+        InvalidSTEXOccupationCode,
+        load_occupation_stex_tasks,
+    )
+
+    import pytest
+
+    with pytest.raises(
+        InvalidSTEXOccupationCode
+    ):
+        load_occupation_stex_tasks(
+            "../../etc/passwd",
+            data_root=tmp_path,
+        )

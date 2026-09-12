@@ -13,6 +13,13 @@ DEFAULT_STEX_DATA_ROOT = (
     / "occupations"
 )
 
+DEFAULT_STEX_TASK_RATINGS_ROOT = (
+    Path(__file__).resolve().parents[3]
+    / "data"
+    / "stex"
+    / "ratings"
+)
+
 _ONET_SOC_RE = re.compile(r"^\d{2}-\d{4}\.\d{2}$")
 
 
@@ -107,6 +114,75 @@ def list_occupation_stex_profiles(
     )
 
     return profiles
+
+
+
+def load_occupation_stex_tasks(
+    code: str,
+    data_root: Path | None = None,
+) -> list[dict[str, Any]]:
+    code = normalize_occupation_code(code)
+
+    root = (
+        Path(data_root)
+        if data_root is not None
+        else DEFAULT_STEX_TASK_RATINGS_ROOT
+    )
+
+    safe_code = code.replace(".", "_")
+    occupation_dir = root / safe_code
+
+    if not occupation_dir.is_dir():
+        raise STEXProfileNotFound(
+            f"No STEX task ratings exist for {code}."
+        )
+
+    tasks: list[dict[str, Any]] = []
+
+    for path in sorted(
+        occupation_dir.glob("*.json")
+    ):
+        try:
+            payload = json.loads(
+                path.read_text()
+            )
+        except (
+            OSError,
+            ValueError,
+            json.JSONDecodeError,
+        ):
+            continue
+
+        if payload.get(
+            "occupation_code"
+        ) != code:
+            continue
+
+        tasks.append(payload)
+
+    if not tasks:
+        raise STEXProfileNotFound(
+            f"No STEX task ratings exist for {code}."
+        )
+
+    tasks.sort(
+        key=lambda item: (
+            -float(
+                item.get(
+                    "source_importance"
+                )
+                or 0
+            ),
+            str(
+                item.get(
+                    "task_id"
+                )
+                or ""
+            ),
+        )
+    )
+
+    return tasks
 
 
 

@@ -20,6 +20,7 @@ from gvai.postlabor.stex.store import (
     STEXProfileNotFound,
     list_occupation_stex_profiles,
     load_occupation_stex_profile,
+    load_occupation_stex_tasks,
 )
 
 app = Flask(__name__)
@@ -149,6 +150,123 @@ def api_stex_occupations():
             "reason":
                 "The STEX occupation catalog "
                 "could not be loaded.",
+            "error_type": type(exc).__name__,
+        }), 500
+
+
+
+@app.get("/api/stex/tasks")
+def api_stex_tasks():
+    code = (
+        request.args.get("code")
+        or ""
+    ).strip()
+
+    if not code:
+        return jsonify({
+            "ok": False,
+            "reason":
+                "An O*NET-SOC occupation code is required.",
+            "example": "37-2021.00",
+        }), 400
+
+    try:
+        tasks = load_occupation_stex_tasks(
+            code
+        )
+
+        contributors = []
+
+        for task in tasks:
+            importance = float(
+                task.get(
+                    "source_importance"
+                )
+                or 0
+            )
+
+            exposure = float(
+                task.get(
+                    "structural_exposure"
+                )
+                or 0
+            )
+
+            contribution = (
+                importance
+                * exposure
+                / 100.0
+            )
+
+            contributors.append({
+                "task_id":
+                    task.get("task_id"),
+                "task_title":
+                    task.get("task_title"),
+                "task_category":
+                    task.get("task_category"),
+                "source_importance":
+                    importance,
+                "structural_exposure":
+                    exposure,
+                "augmentation_likelihood":
+                    task.get(
+                        "augmentation_likelihood"
+                    ),
+                "importance_status":
+                    task.get(
+                        "importance_status"
+                    ),
+                "rationale":
+                    task.get("rationale"),
+                "weighted_contribution":
+                    round(
+                        contribution,
+                        4,
+                    ),
+            })
+
+        contributors.sort(
+            key=lambda item:
+                item[
+                    "weighted_contribution"
+                ],
+            reverse=True,
+        )
+
+        return jsonify({
+            "ok": True,
+            "occupation_code": code,
+            "task_count": len(tasks),
+            "contributors": contributors,
+        })
+
+    except InvalidSTEXOccupationCode as exc:
+        return jsonify({
+            "ok": False,
+            "reason": str(exc),
+        }), 400
+
+    except STEXProfileNotFound:
+        return jsonify({
+            "ok": False,
+            "occupation_code": code,
+            "reason":
+                "No audited STEX task ratings are "
+                "available for this occupation yet.",
+        }), 404
+
+    except (
+        OSError,
+        ValueError,
+        json.JSONDecodeError,
+    ) as exc:
+        return jsonify({
+            "ok": False,
+            "occupation_code": code,
+            "reason":
+                "The STEX task ratings could not "
+                "be loaded.",
             "error_type": type(exc).__name__,
         }), 500
 
