@@ -22,6 +22,12 @@ from gvai.postlabor.stex.store import (
     load_occupation_stex_profile,
     load_occupation_stex_tasks,
 )
+from gvai.postlabor.stex.review import (
+    STEXReviewError,
+    approve_occupation,
+    get_review_package,
+    list_proposed_occupations,
+)
 from gvai.postlabor.sources.oews import OEWSClient
 from gvai.postlabor.stex.regional import (
     build_regional_stex_coverage_plan,
@@ -156,6 +162,74 @@ def api_stex_occupations():
                 "could not be loaded.",
             "error_type": type(exc).__name__,
         }), 500
+
+
+@app.get("/api/stex/review/proposed")
+def api_stex_review_proposed():
+    try:
+        profiles = list_proposed_occupations()
+        return jsonify({
+            "ok": True,
+            "count": len(profiles),
+            "profiles": profiles,
+            "internal_only": True,
+        })
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "reason": "The STEX review queue could not be loaded.",
+            "error_type": type(exc).__name__,
+        }), 500
+
+
+@app.get("/api/stex/review/occupation")
+def api_stex_review_occupation():
+    code = (request.args.get("code") or "").strip()
+    if not code:
+        return jsonify({
+            "ok": False,
+            "reason": "An O*NET-SOC occupation code is required.",
+        }), 400
+    try:
+        return jsonify({
+            "ok": True,
+            "internal_only": True,
+            "package": get_review_package(code),
+        })
+    except FileNotFoundError:
+        return jsonify({"ok": False, "reason": "Review occupation not found."}), 404
+    except (STEXReviewError, ValueError) as exc:
+        return jsonify({"ok": False, "reason": str(exc)}), 409
+    except Exception:
+        return jsonify({"ok": False, "reason": "The STEX review package could not be loaded."}), 500
+
+
+@app.post("/api/stex/review/approve")
+def api_stex_review_approve():
+    if os.getenv("GVAI_STEX_REVIEW_WRITES_ENABLED") != "1":
+        return jsonify({
+            "ok": False,
+            "reason": "Internal STEX review writes are disabled.",
+        }), 403
+
+    payload = request.get_json(silent=True) or {}
+    try:
+        result = approve_occupation(
+            payload.get("occupation_code", ""),
+            payload.get("reviewed_by", ""),
+            payload.get("review_note"),
+        )
+        return jsonify({
+            "ok": True,
+            "internal_only": True,
+            "profile": result,
+        })
+    except FileNotFoundError:
+        return jsonify({"ok": False, "reason": "Review occupation not found."}), 404
+    except (STEXReviewError, ValueError) as exc:
+        return jsonify({"ok": False, "reason": str(exc)}), 409
+    except Exception:
+        return jsonify({"ok": False, "reason": "The STEX occupation could not be approved."}), 500
 
 
 @app.get("/api/stex/regional")

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal STEX Review</title>
+  <style>
+    :root { color-scheme: light; font-family: ui-sans-serif, system-ui, sans-serif; }
+    body { margin: 0; background: #f4f7f9; color: #17212b; }
+    header { background: #152b3a; color: white; padding: 24px clamp(18px, 5vw, 64px); }
+    header h1 { margin: 0 0 8px; font-size: 1.5rem; }
+    header p { margin: 0; font-weight: 700; letter-spacing: .04em; }
+    main { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: 20px; max-width: 1400px; margin: 24px auto; padding: 0 18px; }
+    section, aside { background: white; border: 1px solid #d8e1e7; border-radius: 6px; padding: 18px; }
+    aside { align-self: start; }
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; border: 0; border-radius: 4px; padding: 10px 14px; background: #1677a8; color: white; font-weight: 700; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .occupation { display: block; width: 100%; margin: 8px 0; text-align: left; background: #edf3f6; color: #17212b; }
+    .occupation.selected { outline: 3px solid #7ec8e8; }
+    .status { display: inline-block; padding: 4px 8px; border-radius: 4px; background: #fff0bd; font-weight: 800; }
+    .warning { border-left: 5px solid #d28b00; background: #fff8df; padding: 12px; font-weight: 800; }
+    .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 16px 0; }
+    .metric { background: #f4f7f9; padding: 10px; border-radius: 4px; }
+    .metric strong { display: block; font-size: 1.2rem; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 1000px; }
+    th, td { border-bottom: 1px solid #e3e9ed; padding: 9px; text-align: left; vertical-align: top; }
+    th { background: #edf3f6; }
+    .review { display: grid; gap: 10px; margin-top: 20px; }
+    label { display: grid; gap: 4px; font-weight: 700; }
+    input, textarea { border: 1px solid #bccbd3; border-radius: 4px; padding: 9px; }
+    #message { min-height: 24px; font-weight: 700; }
+    @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>INTERNAL STEX REVIEW</h1>
+    <p>Approval changes production eligibility. Review every task before approving.</p>
+  </header>
+  <main>
+    <aside>
+      <h2>Proposed occupations</h2>
+      <div id="queue">Loading...</div>
+    </aside>
+    <section>
+      <div id="message" role="status"></div>
+      <div id="detail"><p>Select a proposed occupation.</p></div>
+      <div class="review">
+        <label>Reviewer name <input id="reviewer" autocomplete="name" placeholder="Required human identifier"></label>
+        <label>Review note <textarea id="note" rows="3" placeholder="Optional review note"></textarea></label>
+        <button id="approve" disabled>Approve occupation</button>
+      </div>
+    </section>
+  </main>
+<script>
+  const queue = document.querySelector('#queue');
+  const detail = document.querySelector('#detail');
+  const message = document.querySelector('#message');
+  const approve = document.querySelector('#approve');
+  let selected = null;
+  const api = async (url, options) => {
+    const response = await fetch(url, options);
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.reason || 'Request failed.');
+    return payload;
+  };
+  function renderPackage(pkg) {
+    selected = pkg.occupation_code;
+    detail.innerHTML = `<h2>${pkg.occupation_title}</h2>
+      <p><span class="status">${pkg.review_status.toUpperCase()}</span> O*NET ${pkg.occupation_code}</p>
+      <p>Source: ${pkg.source?.name || 'Unavailable'}; task vintage: ${pkg.source?.tasks_source || ''} ${pkg.source?.tasks_year || ''}; rubric: ${pkg.rubric_version}</p>
+      <div class="summary"><div class="metric">STEX<strong>${pkg.structural_exposure}</strong></div><div class="metric">Augmentation<strong>${pkg.augmentation_likelihood}</strong></div><div class="metric">Rated tasks<strong>${pkg.rated_task_count}</strong></div><div class="metric">Unrated tasks<strong>${pkg.unrated_task_count}</strong></div></div>
+      <div class="table-wrap"><table><thead><tr><th>Task</th><th>Importance</th><th>D</th><th>P</th><th>R</th><th>Exposure</th><th>Augmentation</th><th>Rationale</th></tr></thead><tbody>${pkg.tasks.map(t => `<tr><td>${t.task_statement}<br><small>${t.task_id}</small></td><td>${t.source_importance}<br>${t.importance_status}</td><td>${t.digital_capability}</td><td>${t.physical_execution}</td><td>${t.human_presence_requirement}</td><td>${t.structural_exposure}</td><td>${t.augmentation_likelihood}</td><td>${t.rationale}</td></tr>`).join('')}</tbody></table></div>`;
+    approve.disabled = false;
+  }
+  async function loadQueue() {
+    try {
+      const data = await api('/api/stex/review/proposed');
+      queue.innerHTML = data.profiles.map(p => `<button class="occupation" data-code="${p.occupation_code}">${p.occupation_title}<br><small>${p.occupation_code} · STEX ${p.structural_exposure}</small></button>`).join('') || '<p>No proposed occupations.</p>';
+      queue.querySelectorAll('[data-code]').forEach(button => button.addEventListener('click', () => loadDetail(button.dataset.code)));
+    } catch (error) { queue.textContent = error.message; }
+  }
+  async function loadDetail(code) {
+    message.textContent = 'Loading review package...';
+    try { const data = await api(`/api/stex/review/occupation?code=${encodeURIComponent(code)}`); renderPackage(data.package); message.textContent = ''; }
+    catch (error) { message.textContent = error.message; }
+  }
+  approve.addEventListener('click', async () => {
+    const reviewer = document.querySelector('#reviewer').value.trim();
+    if (!reviewer) { message.textContent = 'Reviewer name is required.'; return; }
+    approve.disabled = true; message.textContent = 'Submitting approval...';
+    try {
+      await api('/api/stex/review/approve', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({occupation_code: selected, reviewed_by: reviewer, review_note: document.querySelector('#note').value}) });
+      message.textContent = 'Approved. Refreshing the proposed queue.'; detail.innerHTML = '<p>Approval recorded. Select another proposed occupation.</p>'; await loadQueue();
+    } catch (error) { message.textContent = error.message; approve.disabled = false; }
+  });
+  loadQueue();
+</script>
+</body>
+</html>
