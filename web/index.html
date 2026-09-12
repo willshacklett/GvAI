@@ -494,6 +494,65 @@
       color: var(--muted);
     }
 
+    .stex-contributors {
+      margin-top: 12px;
+      padding-top: 11px;
+      border-top: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .stex-contributors-title {
+      margin-bottom: 8px;
+      font-size: 10px;
+      font-weight: 750;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .stex-contributor {
+      margin-bottom: 10px;
+      padding: 9px;
+      border-radius: 9px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.055);
+    }
+
+    .stex-contributor-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .stex-contributor-title {
+      font-size: 11px;
+      line-height: 1.4;
+      font-weight: 650;
+    }
+
+    .stex-contributor-score {
+      flex: 0 0 auto;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .stex-contributor-meta {
+      margin-top: 6px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 9px;
+    }
+
+    .stex-contributor-reason {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.45;
+    }
+
 
     @media (max-width: 900px) {
       .brand-sub {
@@ -738,6 +797,19 @@
 
       <div id="stex-status" class="stex-status">
         Loading audited occupation profile…
+      </div>
+
+
+      <div class="stex-contributors">
+        <div class="stex-contributors-title">
+          Top task contributors
+        </div>
+
+        <div id="stex-contributors-list">
+          <div class="stex-status">
+            Loading task contributors…
+          </div>
+        </div>
       </div>
     </div>
 
@@ -3236,6 +3308,104 @@ document
     }
   );
 
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+async function loadOccupationSTEXTasks(code) {
+  const container =
+    document.getElementById(
+      "stex-contributors-list"
+    );
+
+  if (!container) return;
+
+  container.innerHTML =
+    '<div class="stex-status">Loading task contributors...</div>';
+
+  try {
+    const response = await fetch(
+      (window.GVAI_API_BASE || "") +
+      "/api/stex/tasks?code=" +
+      encodeURIComponent(code)
+    );
+
+    const data = await response.json();
+
+    if (
+      !response.ok ||
+      !data.ok ||
+      !Array.isArray(data.contributors)
+    ) {
+      throw new Error(
+        data.reason ||
+        "Task contributors unavailable."
+      );
+    }
+
+    const top =
+      data.contributors.slice(0, 5);
+
+    if (!top.length) {
+      container.innerHTML =
+        '<div class="stex-status">No audited task contributors are available.</div>';
+      return;
+    }
+
+    container.innerHTML = top.map(
+      (task) => `
+        <div class="stex-contributor">
+          <div class="stex-contributor-head">
+            <div class="stex-contributor-title">
+              ${escapeHtml(task.task_title)}
+            </div>
+
+            <div class="stex-contributor-score">
+              ${Number(
+                task.structural_exposure
+              ).toFixed(0)}
+            </div>
+          </div>
+
+          <div class="stex-contributor-meta">
+            <span>
+              Importance:
+              ${Number(
+                task.source_importance
+              ).toFixed(0)}
+            </span>
+
+            <span>
+              Contribution:
+              ${Number(
+                task.weighted_contribution
+              ).toFixed(1)}
+            </span>
+
+            <span>
+              Task ${escapeHtml(task.task_id)}
+            </span>
+          </div>
+
+          <div class="stex-contributor-reason">
+            ${escapeHtml(task.rationale)}
+          </div>
+        </div>
+      `
+    ).join("");
+
+  } catch (error) {
+    container.innerHTML =
+      '<div class="stex-status">Task contributor detail is temporarily unavailable.</div>';
+  }
+}
+
 async function loadOccupationSTEX(
   code = "37-2021.00"
 ) {
@@ -3306,7 +3476,19 @@ async function loadOccupationSTEX(
     statusEl.textContent =
       `${profile.rubric_version || "STEX"} • audited profile`;
 
+
+    await loadOccupationSTEXTasks(code);
+
   } catch (error) {
+    const contributors =
+      document.getElementById(
+        "stex-contributors-list"
+      );
+
+    if (contributors) {
+      contributors.innerHTML =
+        '<div class="stex-status">Task contributor detail is unavailable.</div>';
+    }
     console.error("STEX load failed:", error);
 
     document.getElementById(
