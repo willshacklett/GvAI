@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -13,6 +14,11 @@ from gvai.postlabor.sources.oews import (
     normalize_soc_code,
 )
 import gvai.postlabor.sources.oews as oews_module
+from gvai.postlabor.sources.oews_snapshot import (
+    OEWS_MACHINE_SOURCE,
+    OEWSSnapshotBuildError,
+    build_snapshot_from_lines,
+)
 
 
 def test_normalize_soc_code():
@@ -533,6 +539,157 @@ def test_employment_cache_isolates_area_year_and_missing_values(tmp_path):
     assert all(row.employment != 0 for row in rows)
 
 
+def test_employment_cache_path_precedence(monkeypatch, tmp_path):
+    explicit = tmp_path / "explicit.json"
+    env_path = tmp_path / "env.json"
+    packaged = tmp_path / "packaged.json"
+    monkeypatch.setenv("GVAI_OEWS_EMPLOYMENT_CACHE", str(env_path))
+    monkeypatch.setattr(
+        oews_module,
+        "OEWS_PACKAGED_EMPLOYMENT_CACHE_PATH",
+        packaged,
+    )
+
+    assert OEWSClient(employment_cache_path=explicit).employment_cache_path == explicit
+    assert OEWSClient().employment_cache_path == env_path
+
+    monkeypatch.delenv("GVAI_OEWS_EMPLOYMENT_CACHE")
+    packaged.write_text("{}", encoding="utf-8")
+    assert OEWSClient().employment_cache_path == packaged
+
+
+def test_machine_readable_builder_filters_series_and_preserves_provenance():
+    detail = SimpleNamespace(
+        area_code="0034980",
+        occupation_code="15-1252.00",
+        occupation_title="Software Developers",
+        series_id="OEUM003498000000015125201",
+        source_year=2025,
+        source="BLS OEWS time-series catalog",
+        display_level=3,
+    )
+    aggregate = SimpleNamespace(
+        area_code="0034980",
+        occupation_code="150000.00",
+        occupation_title="Computer and Mathematical Occupations",
+        series_id="OEUM003498000000015000001",
+        source_year=2025,
+        source="BLS OEWS time-series catalog",
+        display_level=1,
+    )
+    lines = [
+        "series_id\tyear\tperiod\tvalue\tfootnote_codes\n",
+        "OEUM003498000000015125201\t2024\tA01\t7000\t\n",
+        "OEUM003498000000015125201\t2025\tM12\t7000\t\n",
+        "OEUM001018000000015125201\t2025\tA01\t9999\t\n",
+        "OEUM003498000000015000001\t2025\tA01\t50000\t\n",
+        "OEUM003498000000015125201\t2025\tA01\t7750\t\n",
+        "OEUM003498000000000000001\t2025\tA01\t1099300\t\n",
+    ]
+
+    snapshot = build_snapshot_from_lines(
+        lines,
+        area_code="0034980",
+        source_year=2025,
+        catalog_rows=[detail, aggregate],
+        generated_at="2026-09-12T00:00:00+00:00",
+    )
+
+    assert len(snapshot["observations"]) == 1
+    assert snapshot["observations"][0]["employment"] == 7750.0
+    assert snapshot["observations"][0]["occupation_title"] == (
+        "Software Developers"
+    )
+    assert snapshot["totals"][0]["employment"] == 1099300.0
+    assert snapshot["source"] == OEWS_MACHINE_SOURCE
+    assert snapshot["source_years"] == [2025]
+    assert snapshot["generated_at"] == "2026-09-12T00:00:00+00:00"
+    assert snapshot["suppressed_or_missing_count"] == 0
+
+
+def test_machine_readable_builder_omits_suppressed_and_requires_denominator():
+    detail = SimpleNamespace(
+        area_code="0034980",
+        occupation_code="15-1252.00",
+        occupation_title="Software Developers",
+        series_id="OEUM003498000000015125201",
+        source_year=2025,
+        source="BLS OEWS time-series catalog",
+    )
+    lines = [
+        "series_id\tyear\tperiod\tvalue\tfootnote_codes\n",
+        "OEUM003498000000015125201\t2025\tA01\t#\tS\n",
+    ]
+    with pytest.raises(OEWSSnapshotBuildError, match="denominator"):
+        build_snapshot_from_lines(
+            lines,
+            area_code="0034980",
+            source_year=2025,
+            catalog_rows=[detail],
+        )
+
+
+def test_machine_readable_builder_rejects_duplicate_observations():
+    detail = SimpleNamespace(
+        area_code="0034980",
+        occupation_code="15-1252.00",
+        occupation_title="Software Developers",
+        series_id="OEUM003498000000015125201",
+        source_year=2025,
+        source="BLS OEWS time-series catalog",
+    )
+    lines = [
+        "series_id\tyear\tperiod\tvalue\tfootnote_codes\n",
+        "OEUM003498000000015125201\t2025\tA01\t7750\t\n",
+        "OEUM003498000000015125201\t2025\tA01\t7750\t\n",
+        "OEUM003498000000000000001\t2025\tA01\t1099300\t\n",
+    ]
+    with pytest.raises(OEWSSnapshotBuildError, match="Duplicate"):
+        build_snapshot_from_lines(
+            lines,
+            area_code="0034980",
+            source_year=2025,
+            catalog_rows=[detail],
+        )
+
+
+def test_generated_snapshot_round_trips_through_oews_client(tmp_path):
+    detail = SimpleNamespace(
+        area_code="0034980",
+        occupation_code="15-1252.00",
+        occupation_title="Software Developers",
+        series_id="OEUM003498000000015125201",
+        source_year=2025,
+        source="BLS OEWS time-series catalog",
+        display_level=3,
+    )
+    snapshot = build_snapshot_from_lines(
+        [
+            "series_id\tyear\tperiod\tvalue\tfootnote_codes\n",
+            "OEUM003498000000015125201\t2025\tA01\t7750\t\n",
+            "OEUM003498000000000000001\t2025\tA01\t1099300\t\n",
+        ],
+        area_code="0034980",
+        source_year=2025,
+        catalog_rows=[detail],
+    )
+    path = tmp_path / "employment.json"
+    path.write_text(json.dumps(snapshot), encoding="utf-8")
+
+    total, rows = OEWSClient(
+        employment_cache_path=path,
+    ).fetch_catalog_regional_employment(
+        area_code="0034980",
+        source_year=2025,
+    )
+
+    assert total is not None
+    assert total.employment == 1099300.0
+    assert rows[0].employment == 7750.0
+    assert rows[0].source == OEWS_MACHINE_SOURCE
+    assert rows[0].catalog_source == "BLS OEWS time-series catalog"
+
+
 def test_catalog_regional_fetch_rejects_empty_detailed_universe(
     monkeypatch,
     tmp_path,
@@ -573,6 +730,7 @@ def test_catalog_regional_fetch_rejects_empty_detailed_universe(
         bls_client=FakeBLSClient(),
         catalog_base_url="https://catalog.test",
         catalog_cache_path=tmp_path / "oews.json",
+        employment_cache_path=tmp_path / "missing-employment.json",
     )
 
     assert client.refresh_catalog_cache() == 0

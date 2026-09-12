@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Iterable, List, Mapping, Optional
@@ -25,12 +26,18 @@ OEWS_CATALOG_MIRROR_BASE_URL = (
 )
 OEWS_API_BATCH_SIZE = 50
 OEWS_CATALOG_CACHE_SCHEMA_VERSION = 2
-OEWS_EMPLOYMENT_CACHE_SCHEMA_VERSION = 1
+OEWS_EMPLOYMENT_CACHE_SCHEMA_VERSION = 2
 OEWS_DEFAULT_CACHE_PATH = Path(
     "data/oews/catalog_index.json"
 )
 OEWS_DEFAULT_EMPLOYMENT_CACHE_PATH = Path(
     "data/oews/employment_index.json"
+)
+OEWS_PACKAGED_EMPLOYMENT_CACHE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "snapshots"
+    / "oews"
+    / "employment_index.json"
 )
 
 
@@ -210,6 +217,7 @@ class OEWSOccupationSeries:
     industry_code: str
     source_year: int
     source: str = OEWS_CATALOG_SOURCE
+    display_level: int = 3
 
     def to_dict(self):
         return {
@@ -221,6 +229,7 @@ class OEWSOccupationSeries:
             "industry_code": self.industry_code,
             "source_year": self.source_year,
             "source": self.source,
+            "display_level": self.display_level,
         }
 
 
@@ -239,9 +248,7 @@ class OEWSClient:
         catalog_base_url: str = OEWS_CATALOG_BASE_URL,
         catalog_timeout: int = 30,
         catalog_cache_path: Path | str = OEWS_DEFAULT_CACHE_PATH,
-        employment_cache_path: Path | str = (
-            OEWS_DEFAULT_EMPLOYMENT_CACHE_PATH
-        ),
+        employment_cache_path: Path | str | None = None,
     ) -> None:
         self.bls_client = (
             bls_client
@@ -250,7 +257,22 @@ class OEWSClient:
         self.catalog_base_url = catalog_base_url.rstrip("/")
         self.catalog_timeout = catalog_timeout
         self.catalog_cache_path = Path(catalog_cache_path)
-        self.employment_cache_path = Path(employment_cache_path)
+        self.employment_cache_path = self._resolve_employment_cache_path(
+            employment_cache_path
+        )
+
+    @staticmethod
+    def _resolve_employment_cache_path(
+        explicit_path: Path | str | None,
+    ) -> Path:
+        if explicit_path is not None:
+            return Path(explicit_path)
+        env_path = os.getenv("GVAI_OEWS_EMPLOYMENT_CACHE")
+        if env_path:
+            return Path(env_path)
+        if OEWS_PACKAGED_EMPLOYMENT_CACHE_PATH.is_file():
+            return OEWS_PACKAGED_EMPLOYMENT_CACHE_PATH
+        return OEWS_DEFAULT_EMPLOYMENT_CACHE_PATH
 
     def fetch_total_employment(
         self,
@@ -617,7 +639,10 @@ class OEWSClient:
             raise RuntimeError(
                 "OEWS employment cache is unreadable; refresh it explicitly."
             ) from exc
-        if payload.get("schema_version") != OEWS_EMPLOYMENT_CACHE_SCHEMA_VERSION:
+        if payload.get("schema_version") not in (
+            1,
+            OEWS_EMPLOYMENT_CACHE_SCHEMA_VERSION,
+        ):
             raise RuntimeError(
                 "OEWS employment cache is stale or incompatible; "
                 "refresh it explicitly."
