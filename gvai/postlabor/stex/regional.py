@@ -230,13 +230,14 @@ def build_regional_stex_rows(
     return rows
 
 
-def build_regional_stex_coverage_plan(
+def _build_regional_stex_coverage_plan(
     *,
     total_employment: OEWSEmploymentEstimate,
     employment_rows: Iterable[OEWSEmploymentEstimate],
     profiles: Iterable[Mapping[str, Any]],
     occupation_titles: Optional[Mapping[str, str]] = None,
     recommendation_limit: int = 10,
+    allowed_review_statuses: frozenset[str],
 ) -> RegionalSTEXCoveragePlan:
     """Plan the next STEX audits from an explicit OEWS occupation universe.
 
@@ -255,7 +256,11 @@ def build_regional_stex_coverage_plan(
     for profile in profiles:
         code = profile.get("occupation_code")
         exposure = profile.get("structural_exposure")
-        if not code or exposure is None:
+        if (
+            not code
+            or exposure is None
+            or profile.get("review_status") not in allowed_review_statuses
+        ):
             continue
         profile_by_soc[normalize_soc_code(str(code))] = profile
 
@@ -343,3 +348,45 @@ def build_regional_stex_coverage_plan(
         ),
         source=total_employment.source,
     )
+
+
+def build_regional_stex_coverage_plan(
+    *,
+    total_employment: OEWSEmploymentEstimate,
+    employment_rows: Iterable[OEWSEmploymentEstimate],
+    profiles: Iterable[Mapping[str, Any]],
+    occupation_titles: Optional[Mapping[str, str]] = None,
+    recommendation_limit: int = 10,
+) -> RegionalSTEXCoveragePlan:
+    """Build the production plan from approved profiles only."""
+    return _build_regional_stex_coverage_plan(
+        total_employment=total_employment,
+        employment_rows=employment_rows,
+        profiles=profiles,
+        occupation_titles=occupation_titles,
+        recommendation_limit=recommendation_limit,
+        allowed_review_statuses=frozenset({"approved"}),
+    )
+
+
+def build_regional_stex_proposed_preview(
+    *,
+    total_employment: OEWSEmploymentEstimate,
+    employment_rows: Iterable[OEWSEmploymentEstimate],
+    profiles: Iterable[Mapping[str, Any]],
+    occupation_titles: Optional[Mapping[str, str]] = None,
+    recommendation_limit: int = 10,
+) -> dict[str, Any]:
+    """Build a clearly labeled, non-production projection."""
+    plan = _build_regional_stex_coverage_plan(
+        total_employment=total_employment,
+        employment_rows=employment_rows,
+        profiles=profiles,
+        occupation_titles=occupation_titles,
+        recommendation_limit=recommendation_limit,
+        allowed_review_statuses=frozenset({"approved", "proposed"}),
+    )
+    report = plan.to_dict()
+    report["review_status"] = "proposed"
+    report["production_eligible"] = False
+    return report

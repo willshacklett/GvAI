@@ -34,6 +34,19 @@ def test_record_preserves_provenance():
     assert record.source_vintage_label == (
         "O*NET Tasks / Incumbent 2026"
     )
+    assert record.review_status == "approved"
+
+
+@pytest.mark.parametrize("status", ["proposed", "approved"])
+def test_record_accepts_explicit_review_status(status):
+    record = make_record(review_status=status)
+
+    assert record.review_status == status
+
+
+def test_record_rejects_unknown_review_status():
+    with pytest.raises(ValueError):
+        make_record(review_status="unreviewed")
 
 
 def test_record_calculates_exposure():

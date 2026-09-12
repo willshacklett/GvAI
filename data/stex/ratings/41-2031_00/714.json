@@ -1,0 +1,23 @@
+{
+  "schema_version": "gvai.stex.task-rating.v0.1",
+  "rubric_version": "STEX v0.1",
+  "occupation_code": "41-2031.00",
+  "occupation_title": "Retail Salespersons",
+  "task_id": "714",
+  "task_title": "Estimate and quote trade-in allowances.",
+  "task_category": "Supplemental",
+  "source_importance": 80.0,
+  "importance_status": "rated",
+  "source_name": "O*NET Tasks / Incumbent",
+  "source_year": 2018,
+  "source_vintage_label": "O*NET Tasks / Incumbent 2018",
+  "digital_capability": 3.0,
+  "physical_execution": 1.0,
+  "human_presence_requirement": 2.0,
+  "augmentation_likelihood": 4.0,
+  "structural_exposure": 37.5,
+  "scorer_id": "openai-gpt-5.6-sol-stex-v0.1",
+  "scored_at_utc": "2026-09-12T00:00:00+00:00",
+  "rationale": "Explicit STEX v0.1 audit of the task statement: rate the strongest current digital or physical execution channel, then apply the human-presence constraint. Augmentation is retained separately. Task statement audited: Estimate and quote trade-in allowances.",
+  "review_status": "proposed"
+}

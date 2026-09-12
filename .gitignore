@@ -12,6 +12,35 @@ gvai-fpr/
 data/
 dashboard/data/
 
+# Nashville STEX milestone inputs and audited profiles
+!data/
+data/*
+!data/onet/
+!data/onet/raw/
+!data/onet/raw/11-1021_00.tasks.json
+!data/onet/raw/29-1141_00.tasks.json
+!data/onet/raw/35-3023_00.tasks.json
+!data/onet/raw/41-2031_00.tasks.json
+!data/onet/raw/53-7062_00.tasks.json
+!data/stex/
+!data/stex/occupations/
+!data/stex/occupations/11-1021_00.stex.json
+!data/stex/occupations/29-1141_00.stex.json
+!data/stex/occupations/35-3023_00.stex.json
+!data/stex/occupations/41-2031_00.stex.json
+!data/stex/occupations/53-7062_00.stex.json
+!data/stex/ratings/
+!data/stex/ratings/11-1021_00/
+!data/stex/ratings/11-1021_00/*.json
+!data/stex/ratings/29-1141_00/
+!data/stex/ratings/29-1141_00/*.json
+!data/stex/ratings/35-3023_00/
+!data/stex/ratings/35-3023_00/*.json
+!data/stex/ratings/41-2031_00/
+!data/stex/ratings/41-2031_00/*.json
+!data/stex/ratings/53-7062_00/
+!data/stex/ratings/53-7062_00/*.json
+
 # misc
 *.log
 *.png

@@ -361,6 +361,7 @@ def main() -> int:
             scored_at_utc=(
                 BATCH_SCORED_AT_UTC
             ),
+            review_status="approved",
         )
 
         output = (
@@ -398,6 +399,7 @@ def main() -> int:
     }
 
     summary["scorer_id"] = SCORER_ID
+    summary["review_status"] = "approved"
 
     summary["interpretation"] = (
         "Importance-weighted structural exposure "

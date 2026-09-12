@@ -75,6 +75,7 @@ def client(monkeypatch):
                 "occupation_code": "15-1252.00",
                 "occupation_title": "Software Developers",
                 "structural_exposure": 75.9444,
+                "review_status": "approved",
                 "source": {"name": "STEX v0.1"},
             }
         ],

@@ -1,0 +1,108 @@
+{
+  "schema_version": "gvai.onet.tasks.v0.1",
+  "retrieved_at_utc": "2026-09-12T22:56:35.446545+00:00",
+  "source": {
+    "name": "O*NET Web Services",
+    "occupation_updated_year": 2026,
+    "tasks_vintage": {
+      "source": "Incumbent",
+      "year": 2024
+    },
+    "api_base_url": "https://api-v2.onetcenter.org",
+    "occupation_endpoint": "https://api-v2.onetcenter.org/online/occupations/53-7062.00/",
+    "tasks_endpoint": "https://api-v2.onetcenter.org/online/occupations/53-7062.00/details/tasks"
+  },
+  "occupation": {
+    "onet_soc_code": "53-7062.00",
+    "title": "Laborers and Freight, Stock, and Material Movers, Hand",
+    "description": "Manually move freight, stock, luggage, or other materials, or perform other general labor. Includes all manual laborers not elsewhere classified.",
+    "bright_outlook": true
+  },
+  "task_count": 14,
+  "tasks": [
+    {
+      "task_id": "10789",
+      "title": "Maintain equipment storage areas to ensure that inventory is protected.",
+      "importance": 87.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "10779",
+      "title": "Read work orders or receive oral instructions to determine work assignments or material or equipment needs.",
+      "importance": 78.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "10781",
+      "title": "Move freight, stock, or other materials to and from storage or production areas, loading docks, delivery vehicles, ships, or containers, by hand or using trucks, tractors, or other equipment.",
+      "importance": 76.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "10788",
+      "title": "Install protective devices, such as bracing, padding, or strapping, to prevent shifting or damage to items being transported.",
+      "importance": 88.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "10782",
+      "title": "Sort cargo before loading and unloading.",
+      "importance": 82.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "10778",
+      "title": "Attach identifying tags to containers or mark them with identifying information.",
+      "importance": 79.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "10780",
+      "title": "Record numbers of units handled or moved, using daily production sheets or work tickets.",
+      "importance": 76.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "10790",
+      "title": "Attach slings, hooks, or other devices to lift cargo and guide loads.",
+      "importance": 74.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "10787",
+      "title": "Carry needed tools or supplies from storage or trucks and return them after use.",
+      "importance": 65.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "10786",
+      "title": "Pack containers and re-pack damaged containers.",
+      "importance": 57.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "10783",
+      "title": "Assemble product containers or crates, using hand tools and precut lumber.",
+      "importance": 56.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "10792",
+      "title": "Adjust controls to guide, position, or move equipment, such as cranes, booms, or cameras.",
+      "importance": 53.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "10796",
+      "title": "Connect electrical equipment to power sources so that it can be tested before use.",
+      "importance": 47.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "1001441",
+      "title": "Inspect products for damage or leaks.",
+      "importance": 0.0,
+      "category": "New"
+    }
+  ]
+}

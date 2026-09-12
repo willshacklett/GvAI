@@ -1,0 +1,23 @@
+{
+  "schema_version": "gvai.stex.task-rating.v0.1",
+  "rubric_version": "STEX v0.1",
+  "occupation_code": "11-1021.00",
+  "occupation_title": "General and Operations Managers",
+  "task_id": "947",
+  "task_title": "Direct non-merchandising departments of businesses, such as advertising or purchasing.",
+  "task_category": "Supplemental",
+  "source_importance": 63.0,
+  "importance_status": "rated",
+  "source_name": "O*NET Tasks / Incumbent",
+  "source_year": 2023,
+  "source_vintage_label": "O*NET Tasks / Incumbent 2023",
+  "digital_capability": 3.0,
+  "physical_execution": 0.0,
+  "human_presence_requirement": 2.0,
+  "augmentation_likelihood": 4.0,
+  "structural_exposure": 37.5,
+  "scorer_id": "openai-gpt-5.6-sol-stex-v0.1",
+  "scored_at_utc": "2026-09-12T00:00:00+00:00",
+  "rationale": "Explicit STEX v0.1 audit of the task statement: rate the strongest current digital or physical execution channel, then apply the human-presence constraint. Augmentation is retained separately. Task statement audited: Direct non-merchandising departments of businesses, such as advertising or purchasing.",
+  "review_status": "proposed"
+}

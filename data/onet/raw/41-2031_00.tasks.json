@@ -1,0 +1,168 @@
+{
+  "schema_version": "gvai.onet.tasks.v0.1",
+  "retrieved_at_utc": "2026-09-12T22:56:53.907334+00:00",
+  "source": {
+    "name": "O*NET Web Services",
+    "occupation_updated_year": 2026,
+    "tasks_vintage": {
+      "source": "Incumbent",
+      "year": 2018
+    },
+    "api_base_url": "https://api-v2.onetcenter.org",
+    "occupation_endpoint": "https://api-v2.onetcenter.org/online/occupations/41-2031.00/",
+    "tasks_endpoint": "https://api-v2.onetcenter.org/online/occupations/41-2031.00/details/tasks"
+  },
+  "occupation": {
+    "onet_soc_code": "41-2031.00",
+    "title": "Retail Salespersons",
+    "description": "Sell merchandise, such as furniture, motor vehicles, appliances, or apparel to consumers.",
+    "bright_outlook": true
+  },
+  "task_count": 24,
+  "tasks": [
+    {
+      "task_id": "694",
+      "title": "Greet customers and ascertain what each customer wants or needs.",
+      "importance": 96.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "700",
+      "title": "Recommend, select, and help locate or obtain merchandise based on customer needs and desires.",
+      "importance": 92.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "697",
+      "title": "Compute sales prices, total purchases, and receive and process cash or credit payment.",
+      "importance": 89.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "712",
+      "title": "Prepare merchandise for purchase or rental.",
+      "importance": 89.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "701",
+      "title": "Answer questions regarding the store and its merchandise.",
+      "importance": 88.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "696",
+      "title": "Maintain knowledge of current sales and promotions, policies regarding payment and exchanges, and security practices.",
+      "importance": 87.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "706",
+      "title": "Demonstrate use or operation of merchandise.",
+      "importance": 83.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "702",
+      "title": "Describe merchandise and explain use, operation, and care of merchandise to customers.",
+      "importance": 83.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "703",
+      "title": "Ticket, arrange, and display merchandise to promote sales.",
+      "importance": 82.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "711",
+      "title": "Inventory stock and requisition new stock.",
+      "importance": 81.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "708",
+      "title": "Exchange merchandise for customers and accept returns.",
+      "importance": 81.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "699",
+      "title": "Watch for and recognize security risks and thefts and know how to prevent or handle these situations.",
+      "importance": 77.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "705",
+      "title": "Place special orders or call other stores to find desired items.",
+      "importance": 69.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "707",
+      "title": "Clean shelves, counters, and tables.",
+      "importance": 68.0,
+      "category": "Core"
+    },
+    {
+      "task_id": "698",
+      "title": "Maintain records related to sales.",
+      "importance": 90.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "695",
+      "title": "Open and close cash registers, performing tasks such as counting money, separating charge slips, coupons, and vouchers, balancing cash drawers, and making deposits.",
+      "importance": 86.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "704",
+      "title": "Prepare sales slips or sales contracts.",
+      "importance": 84.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "714",
+      "title": "Estimate and quote trade-in allowances.",
+      "importance": 80.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "709",
+      "title": "Bag or package purchases and wrap gifts.",
+      "importance": 79.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "710",
+      "title": "Help customers try on or fit merchandise.",
+      "importance": 79.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "713",
+      "title": "Sell or arrange for delivery, insurance, financing, or service contracts for merchandise.",
+      "importance": 74.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "716",
+      "title": "Estimate quantity and cost of merchandise required, such as paint or floor covering.",
+      "importance": 69.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "717",
+      "title": "Rent merchandise to customers.",
+      "importance": 57.0,
+      "category": "Supplemental"
+    },
+    {
+      "task_id": "715",
+      "title": "Estimate cost of repair or alteration of merchandise.",
+      "importance": 56.0,
+      "category": "Supplemental"
+    }
+  ]
+}

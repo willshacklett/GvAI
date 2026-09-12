@@ -298,6 +298,7 @@ def main() -> int:
                 "scored_at_utc",
                 BATCH_SCORED_AT_UTC,
             ),
+            review_status="approved",
         )
 
         output = OUTPUT_DIR / f"{task['task_id']}.json"
@@ -325,6 +326,7 @@ def main() -> int:
         "onet_soc_code": occupation["onet_soc_code"],
     }
     summary["scorer_id"] = SCORER_ID
+    summary["review_status"] = "approved"
     summary["interpretation"] = (
         "Importance-weighted structural exposure of rated "
         "O*NET task content under STEX v0.1. This is not "

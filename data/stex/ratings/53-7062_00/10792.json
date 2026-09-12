@@ -1,0 +1,23 @@
+{
+  "schema_version": "gvai.stex.task-rating.v0.1",
+  "rubric_version": "STEX v0.1",
+  "occupation_code": "53-7062.00",
+  "occupation_title": "Laborers and Freight, Stock, and Material Movers, Hand",
+  "task_id": "10792",
+  "task_title": "Adjust controls to guide, position, or move equipment, such as cranes, booms, or cameras.",
+  "task_category": "Supplemental",
+  "source_importance": 53.0,
+  "importance_status": "rated",
+  "source_name": "O*NET Tasks / Incumbent",
+  "source_year": 2024,
+  "source_vintage_label": "O*NET Tasks / Incumbent 2024",
+  "digital_capability": 2.0,
+  "physical_execution": 4.0,
+  "human_presence_requirement": 3.0,
+  "augmentation_likelihood": 3.0,
+  "structural_exposure": 25.0,
+  "scorer_id": "openai-gpt-5.6-sol-stex-v0.1",
+  "scored_at_utc": "2026-09-12T00:00:00+00:00",
+  "rationale": "Explicit STEX v0.1 audit of the task statement: rate the strongest current digital or physical execution channel, then apply the human-presence constraint. Augmentation is retained separately. Task statement audited: Adjust controls to guide, position, or move equipment, such as cranes, booms, or cameras.",
+  "review_status": "proposed"
+}

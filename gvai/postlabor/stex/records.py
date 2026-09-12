@@ -9,6 +9,8 @@ from .scoring import (
     calculate_task_exposure,
 )
 
+STEX_REVIEW_STATUSES = frozenset({"proposed", "approved"})
+
 
 @dataclass(frozen=True)
 class TaskRatingRecord:
@@ -39,6 +41,7 @@ class TaskRatingRecord:
     scorer_id: str
     scored_at_utc: str
     rationale: str
+    review_status: str = "approved"
 
     @classmethod
     def create(
@@ -59,12 +62,18 @@ class TaskRatingRecord:
         scorer_id: str,
         rationale: str,
         scored_at_utc: str | None = None,
+        review_status: str = "approved",
     ) -> "TaskRatingRecord":
         if not rationale.strip():
             raise ValueError("rationale must not be empty")
 
         if not scorer_id.strip():
             raise ValueError("scorer_id must not be empty")
+
+        if review_status not in STEX_REVIEW_STATUSES:
+            raise ValueError(
+                "review_status must be 'proposed' or 'approved'"
+            )
 
         augmentation = float(augmentation_likelihood)
         if augmentation < 0 or augmentation > 4:
@@ -116,6 +125,7 @@ class TaskRatingRecord:
             scorer_id=scorer_id,
             scored_at_utc=scored_at_utc,
             rationale=rationale,
+            review_status=review_status,
         )
 
     def to_dict(self) -> dict[str, Any]:

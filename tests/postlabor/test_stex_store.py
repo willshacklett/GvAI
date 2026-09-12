@@ -96,6 +96,7 @@ def test_list_occupation_stex_profiles(tmp_path):
             "occupation_code": "37-2021.00",
             "occupation_title": "Pest Control Workers",
             "structural_exposure": 35.6614,
+            "review_status": "approved",
             "augmentation_likelihood": 2.4624,
             "rated_task_count": 14,
             "unrated_task_count": 1,

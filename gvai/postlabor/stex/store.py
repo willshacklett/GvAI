@@ -5,6 +5,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from .records import STEX_REVIEW_STATUSES
+
 
 DEFAULT_STEX_DATA_ROOT = (
     Path(__file__).resolve().parents[3]
@@ -62,7 +64,13 @@ def occupation_profile_path(
 
 def list_occupation_stex_profiles(
     data_root: Path | None = None,
+    *,
+    review_status: str | None = "approved",
 ) -> list[dict[str, Any]]:
+    if review_status is not None and review_status not in STEX_REVIEW_STATUSES:
+        raise ValueError(
+            "review_status must be 'proposed', 'approved', or None"
+        )
     root = (
         Path(data_root)
         if data_root is not None
@@ -86,6 +94,9 @@ def list_occupation_stex_profiles(
         if not code or not title:
             continue
 
+        if payload.get("review_status") != review_status and review_status is not None:
+            continue
+
         try:
             normalize_occupation_code(code)
         except InvalidSTEXOccupationCode:
@@ -104,6 +115,8 @@ def list_occupation_stex_profiles(
                 payload.get("unrated_task_count"),
             "rubric_version":
                 payload.get("rubric_version"),
+            "review_status":
+                payload.get("review_status"),
             "source":
                 payload.get("source"),
         })
