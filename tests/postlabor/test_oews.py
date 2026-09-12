@@ -92,6 +92,8 @@ class FakeBLSClient:
         ids = list(series_ids)
 
         values = {
+            "OEUM003498000000000000001":
+                1099300.0,
             "OEUM003498000000015125201":
                 7750.0,
             "OEUM003498000000037202101":
@@ -168,3 +170,39 @@ def test_fetch_employment():
         ].year
         == 2025
     )
+
+
+def test_fetch_total_employment():
+    client = OEWSClient(
+        bls_client=
+            FakeBLSClient()
+    )
+
+    result = (
+        client.fetch_total_employment(
+            area_code=
+                "0034980",
+            start_year=2025,
+            end_year=2025,
+        )
+    )
+
+    assert result is not None
+
+    assert (
+        result.occupation_code
+        == "00-0000.00"
+    )
+
+    assert (
+        result.series_id
+        ==
+        "OEUM003498000000000000001"
+    )
+
+    assert (
+        result.employment
+        == 1099300.0
+    )
+
+    assert result.year == 2025

@@ -10,6 +10,7 @@ from gvai.postlabor.sources.bls import (
 
 OEWS_EMPLOYMENT_DATATYPE = "01"
 OEWS_TOTAL_INDUSTRY = "000000"
+OEWS_ALL_OCCUPATIONS = "00-0000.00"
 
 
 def normalize_soc_code(
@@ -177,6 +178,33 @@ class OEWSClient:
             bls_client
             or BLSClient()
         )
+
+    def fetch_total_employment(
+        self,
+        *,
+        area_code: str,
+        start_year: Optional[int] = None,
+        end_year: Optional[int] = None,
+    ) -> Optional[OEWSEmploymentEstimate]:
+        """
+        Fetch OEWS All Occupations employment for an area.
+
+        This is used as the reference employment
+        denominator for regional STEX coverage.
+        """
+        rows = self.fetch_employment(
+            area_code=area_code,
+            occupation_codes=[
+                OEWS_ALL_OCCUPATIONS,
+            ],
+            start_year=start_year,
+            end_year=end_year,
+        )
+
+        if not rows:
+            return None
+
+        return rows[0]
 
     def fetch_employment(
         self,
