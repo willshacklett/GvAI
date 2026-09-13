@@ -12,6 +12,7 @@ from gvai.arbitrator import arbitrate_responses
 from gvai.gv_mode import gv_mode_prompt
 from gvai.adaptive_control import update_adaptive_control, get_adaptive_control_state
 from gvai.postlabor.region_intel import (
+    resolve_packaged_oews_area_code,
     resolve_us_region,
     resolve_us_aggregate_region,
 )
@@ -599,6 +600,12 @@ def api_region():
             latitude=latitude,
             longitude=longitude,
         )
+
+        if result.get("supported") and "oews_area_code" not in result:
+            result["oews_area_code"] = resolve_packaged_oews_area_code(
+                result.get("state_fips"),
+                result.get("county_fips"),
+            )
 
         return jsonify(result)
     except Exception as exc:

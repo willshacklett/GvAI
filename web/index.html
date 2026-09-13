@@ -553,6 +553,41 @@
       line-height: 1.45;
     }
 
+    .regional-stex-card {
+      display: none;
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--panel-soft);
+    }
+
+    .regional-stex-card.visible {
+      display: block;
+    }
+
+    .regional-stex-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+      margin-top: 10px;
+    }
+
+    .regional-stex-message {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .regional-stex-next {
+      margin: 12px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
 
     @media (max-width: 900px) {
       .brand-sub {
@@ -749,6 +784,12 @@
     </div>
 
     <div class="section-title">Occupation exposure pilot</div>
+
+    <div id="regional-stex-card" class="regional-stex-card" aria-live="polite">
+      <div class="section-title" style="margin-top:0">Regional STEX Coverage</div>
+      <div id="regional-stex-status" class="stex-status">Select a supported U.S. region.</div>
+      <div id="regional-stex-content"></div>
+    </div>
 
     <select
       id="stex-occupation-select"
@@ -2144,6 +2185,89 @@ function clearRegionalMetrics() {
   if (censusBox) {
     censusBox.remove();
   }
+
+  const regionalSTEXCard = document.getElementById("regional-stex-card");
+  const regionalSTEXStatus = document.getElementById("regional-stex-status");
+  const regionalSTEXContent = document.getElementById("regional-stex-content");
+  if (regionalSTEXCard) regionalSTEXCard.classList.remove("visible");
+  if (regionalSTEXStatus) regionalSTEXStatus.textContent = "Select a supported U.S. region.";
+  if (regionalSTEXContent) regionalSTEXContent.innerHTML = "";
+}
+
+
+function renderRegionalSTEXUnavailable(message) {
+  const card = document.getElementById("regional-stex-card");
+  const status = document.getElementById("regional-stex-status");
+  const content = document.getElementById("regional-stex-content");
+  if (!card || !status || !content) return;
+  card.classList.add("visible");
+  status.textContent = message;
+  content.innerHTML = "";
+}
+
+
+async function loadRegionalSTEX(areaCode, requestId) {
+  if (!areaCode) {
+    renderRegionalSTEXUnavailable(
+      "Regional STEX is unavailable for this geography."
+    );
+    return;
+  }
+
+  const card = document.getElementById("regional-stex-card");
+  const status = document.getElementById("regional-stex-status");
+  const content = document.getElementById("regional-stex-content");
+  if (!card || !status || !content) return;
+
+  card.classList.add("visible");
+  status.textContent = "Loading regional STEX coverage...";
+  content.innerHTML = "";
+
+  try {
+    const response = await fetch(
+      (window.GVAI_API_BASE || "") +
+      `/api/stex/regional?area=${encodeURIComponent(areaCode)}&year=2025&limit=10`
+    );
+    const data = await response.json();
+
+    if (requestId !== activeRegionRequestId) return;
+
+    if (response.status === 503) {
+      renderRegionalSTEXUnavailable(
+        "Regional STEX data is not refreshed for this area yet."
+      );
+      return;
+    }
+
+    if (!response.ok || !data.ok) {
+      throw new Error(data.reason || "Regional STEX unavailable.");
+    }
+
+    const nextOccupations = Array.isArray(data.recommended_unaudited_occupations)
+      ? data.recommended_unaudited_occupations.slice(0, 5)
+      : [];
+    const nextMarkup = nextOccupations.length
+      ? `<div class="regional-stex-message"><strong>Next occupations to audit</strong><ul class="regional-stex-next">${nextOccupations.map(item => `<li>${escapeHtml(item.occupation_title || "Unknown occupation")} (${escapeHtml(item.soc_code)}) · ${formatCompact(item.employment)} jobs · +${Number(item.potential_incremental_coverage || 0).toFixed(4)} coverage points</li>`).join("")}</ul></div>`
+      : "";
+
+    status.textContent = `${data.source_year} · ${data.methodology.scope}`;
+    content.innerHTML = `
+      <div class="regional-stex-grid">
+        <div class="occupation-meta-item"><div class="occupation-meta-label">STEX-covered employment</div><div class="occupation-meta-value">${formatCompact(data.stex_covered_employment)}</div></div>
+        <div class="occupation-meta-item"><div class="occupation-meta-label">Total employment</div><div class="occupation-meta-value">${formatCompact(data.total_employment)}</div></div>
+        <div class="occupation-meta-item"><div class="occupation-meta-label">Coverage</div><div class="occupation-meta-value">${Number(data.coverage_percentage).toFixed(4)}%</div></div>
+        <div class="occupation-meta-item"><div class="occupation-meta-label">STEX across audited covered occupations</div><div class="occupation-meta-value">${Number(data.covered_occupation_stex).toFixed(4)}</div></div>
+      </div>
+      <div class="regional-stex-message">Regional STEX coverage is still limited. Unrated employment is unknown, not zero.</div>
+      ${nextMarkup}
+    `;
+  } catch (error) {
+    if (requestId !== activeRegionRequestId) return;
+    console.error("Regional STEX load failed:", error);
+    renderRegionalSTEXUnavailable(
+      "Regional STEX coverage is temporarily unavailable."
+    );
+  }
 }
 
 
@@ -2511,6 +2635,8 @@ async function loadRegionalData(
       geographyLabel
         ? `${geographyLabel} · ${data.source || "Public data"}`
         : data.source || "Public data";
+
+      void loadRegionalSTEX(data.oews_area_code, requestId);
 
     if (
       scope === "country"

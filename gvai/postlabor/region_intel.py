@@ -13,6 +13,21 @@ CENSUS_GEOCODER = (
 
 ACS_BASE = "https://api.census.gov/data"
 
+# Only expose OEWS areas with an explicit packaged-data crosswalk. This keeps
+# unsupported county selections from being mapped to a guessed metro.
+PACKAGED_OEWS_AREA_BY_COUNTY = {
+    ("47", "037"): "0034980",
+}
+
+
+def resolve_packaged_oews_area_code(
+    state_fips: str | None,
+    county_fips: str | None,
+) -> str | None:
+    return PACKAGED_OEWS_AREA_BY_COUNTY.get(
+        (str(state_fips or "").zfill(2), str(county_fips or "").zfill(3))
+    )
+
 
 def _number(value):
     try:
@@ -213,6 +228,10 @@ def resolve_us_region(
         "county": county_name,
         "state_fips": state_fips,
         "county_fips": county_fips,
+        "oews_area_code": resolve_packaged_oews_area_code(
+            state_fips,
+            county_fips,
+        ),
         "acs_year": acs_year,
         "population": population,
         "labor_force": labor_force,
