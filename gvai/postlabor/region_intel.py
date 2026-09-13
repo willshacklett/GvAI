@@ -5,6 +5,10 @@ from typing import Any, Dict
 import os
 import requests
 
+from gvai.postlabor.sources.oews_geography import (
+    resolve_tennessee_county_oews_area,
+)
+
 
 CENSUS_GEOCODER = (
     "https://geocoding.geo.census.gov/"
@@ -13,19 +17,13 @@ CENSUS_GEOCODER = (
 
 ACS_BASE = "https://api.census.gov/data"
 
-# Only expose OEWS areas with an explicit packaged-data crosswalk. This keeps
-# unsupported county selections from being mapped to a guessed metro.
-PACKAGED_OEWS_AREA_BY_COUNTY = {
-    ("47", "037"): "0034980",
-}
-
-
 def resolve_packaged_oews_area_code(
     state_fips: str | None,
     county_fips: str | None,
 ) -> str | None:
-    return PACKAGED_OEWS_AREA_BY_COUNTY.get(
-        (str(state_fips or "").zfill(2), str(county_fips or "").zfill(3))
+    return resolve_tennessee_county_oews_area(
+        state_fips,
+        county_fips,
     )
 
 
