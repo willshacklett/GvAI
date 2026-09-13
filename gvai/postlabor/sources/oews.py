@@ -107,6 +107,7 @@ def build_oews_series_id(
     *,
     area_code: str,
     occupation_code: str,
+    area_type_code: str = "M",
     datatype_code: str = (
         OEWS_EMPLOYMENT_DATATYPE
     ),
@@ -133,6 +134,11 @@ def build_oews_series_id(
     area = normalize_area_code(
         area_code
     )
+    area_type = str(area_type_code).strip()
+    if len(area_type) != 1 or not area_type.isalpha():
+        raise ValueError(
+            "OEWS area type code must be one alphabetic character."
+        )
 
     occupation = normalize_soc_code(
         occupation_code
@@ -167,7 +173,7 @@ def build_oews_series_id(
     return (
         "OE"
         "U"
-        "M"
+        + area_type
         + area
         + industry
         + occupation
@@ -642,6 +648,7 @@ class OEWSClient:
         if payload.get("schema_version") not in (
             1,
             OEWS_EMPLOYMENT_CACHE_SCHEMA_VERSION,
+            3,
         ):
             raise RuntimeError(
                 "OEWS employment cache is stale or incompatible; "
