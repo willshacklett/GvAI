@@ -13,6 +13,7 @@ from gvai.gv_mode import gv_mode_prompt
 from gvai.adaptive_control import update_adaptive_control, get_adaptive_control_state
 from gvai.postlabor.region_intel import (
     resolve_packaged_oews_area_code,
+    resolve_state_county_labor_availability,
     resolve_us_region,
     resolve_us_aggregate_region,
 )
@@ -543,6 +544,42 @@ def api_stex_occupation():
             "reason":
                 "The STEX profile could not be loaded.",
             "error_type": type(exc).__name__,
+        }), 500
+
+
+@app.get("/api/region/labor-availability")
+def api_region_labor_availability():
+    state_fips = (
+        request.args.get("state")
+        or ""
+    ).strip()
+
+    if not state_fips:
+        return jsonify({
+            "supported": False,
+            "reason":
+                "state FIPS is required."
+        }), 400
+
+    try:
+        result = (
+            resolve_state_county_labor_availability(
+                state_fips
+            )
+        )
+
+        return jsonify(result)
+
+    except Exception as exc:
+        return jsonify({
+            "supported": False,
+            "state_fips": state_fips,
+            "reason":
+                "Labor availability lookup failed.",
+            "error_type":
+                type(exc).__name__,
+            "error":
+                str(exc),
         }), 500
 
 

@@ -244,6 +244,175 @@ def resolve_us_region(
     }
 
 
+
+def classify_labor_availability(
+    unemployment_rate: float | None,
+) -> str:
+    if unemployment_rate is None:
+        return "unknown"
+
+    if unemployment_rate < 3.5:
+        return "tight"
+
+    if unemployment_rate <= 5.5:
+        return "balanced"
+
+    return "available"
+
+
+def resolve_state_county_labor_availability(
+    state_fips: str,
+    *,
+    acs_year: int = 2024,
+) -> Dict[str, Any]:
+    """
+    Retrieve county-level labor availability for one U.S. state
+    using a single ACS 5-year API request.
+
+    Missing values remain unknown and are never converted to zero.
+    """
+
+    normalized_state_fips = (
+        str(state_fips or "")
+        .strip()
+        .zfill(2)
+    )
+
+    if not normalized_state_fips:
+        return {
+            "supported": False,
+            "reason": "state_fips is required.",
+        }
+
+    census_api_key = (
+        os.getenv("CENSUS_API_KEY")
+        or ""
+    ).strip()
+
+    if not census_api_key:
+        return {
+            "supported": True,
+            "data_available": False,
+            "state_fips": normalized_state_fips,
+            "acs_year": acs_year,
+            "counties": [],
+            "reason": "CENSUS_API_KEY is not configured.",
+            "source": "U.S. Census Bureau ACS 5-year",
+        }
+
+    variables = [
+        "NAME",
+        "B01003_001E",
+        "B23025_003E",
+        "B23025_005E",
+    ]
+
+    params = {
+        "get": ",".join(variables),
+        "for": "county:*",
+        "in": f"state:{normalized_state_fips}",
+        "key": census_api_key,
+    }
+
+    response = requests.get(
+        f"{ACS_BASE}/{acs_year}/acs/acs5",
+        params=params,
+        timeout=30,
+        headers={
+            "User-Agent": "GVAI/1.0",
+            "Accept": "application/json",
+        },
+    )
+
+    response.raise_for_status()
+
+    rows = response.json()
+
+    if len(rows) < 2:
+        return {
+            "supported": True,
+            "data_available": False,
+            "state_fips": normalized_state_fips,
+            "acs_year": acs_year,
+            "counties": [],
+            "source": "U.S. Census Bureau ACS 5-year",
+        }
+
+    headers = rows[0]
+    counties = []
+
+    for values in rows[1:]:
+        data = dict(zip(headers, values))
+
+        county_fips = (
+            str(data.get("county") or "")
+            .zfill(3)
+        )
+
+        population = _number(
+            data.get("B01003_001E")
+        )
+
+        labor_force = _number(
+            data.get("B23025_003E")
+        )
+
+        unemployed = _number(
+            data.get("B23025_005E")
+        )
+
+        unemployment_rate = None
+
+        if (
+            labor_force
+            and unemployed is not None
+        ):
+            unemployment_rate = round(
+                unemployed / labor_force * 100,
+                1,
+            )
+
+        counties.append({
+            "state_fips":
+                normalized_state_fips,
+            "county_fips":
+                county_fips,
+            "geoid":
+                normalized_state_fips
+                + county_fips,
+            "county":
+                data.get("NAME"),
+            "population":
+                population,
+            "labor_force":
+                labor_force,
+            "unemployed":
+                unemployed,
+            "unemployment_rate":
+                unemployment_rate,
+            "availability":
+                classify_labor_availability(
+                    unemployment_rate
+                ),
+        })
+
+    counties.sort(
+        key=lambda item:
+            item["county_fips"]
+    )
+
+    return {
+        "supported": True,
+        "data_available": True,
+        "state_fips": normalized_state_fips,
+        "acs_year": acs_year,
+        "count": len(counties),
+        "counties": counties,
+        "source": "U.S. Census Bureau ACS 5-year",
+    }
+
+
+
 ACS_OCCUPATION_GROUPS = {
     "management_business_science_arts": {
         "label": "Management, business, science, and arts",

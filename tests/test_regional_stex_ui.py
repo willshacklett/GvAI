@@ -128,3 +128,183 @@ def test_main_globe_contains_global_country_context_layer():
 
     assert artifact.exists()
     assert artifact.stat().st_size == 838726
+
+def test_labor_availability_classifier():
+    from gvai.postlabor.region_intel import (
+        classify_labor_availability,
+    )
+
+    assert classify_labor_availability(None) == "unknown"
+    assert classify_labor_availability(3.4) == "tight"
+    assert classify_labor_availability(3.5) == "balanced"
+    assert classify_labor_availability(5.5) == "balanced"
+    assert classify_labor_availability(5.6) == "available"
+
+
+def test_state_county_labor_availability_uses_single_acs_request(
+    monkeypatch,
+):
+    from gvai.postlabor import region_intel
+
+    monkeypatch.setenv(
+        "CENSUS_API_KEY",
+        "test-key",
+    )
+
+    calls = []
+
+    class FakeResponse:
+        headers = {
+            "content-type":
+                "application/json"
+        }
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [
+                [
+                    "NAME",
+                    "B01003_001E",
+                    "B23025_003E",
+                    "B23025_005E",
+                    "state",
+                    "county",
+                ],
+                [
+                    "Alpha County, Tennessee",
+                    "1000",
+                    "500",
+                    "10",
+                    "47",
+                    "001",
+                ],
+                [
+                    "Beta County, Tennessee",
+                    "2000",
+                    "1000",
+                    "70",
+                    "47",
+                    "003",
+                ],
+            ]
+
+    def fake_get(url, **kwargs):
+        calls.append(
+            (url, kwargs)
+        )
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        region_intel.requests,
+        "get",
+        fake_get,
+    )
+
+    result = (
+        region_intel
+        .resolve_state_county_labor_availability(
+            "47"
+        )
+    )
+
+    assert len(calls) == 1
+    assert result["supported"] is True
+    assert result["data_available"] is True
+    assert result["count"] == 2
+
+    assert result["counties"][0]["geoid"] == "47001"
+    assert (
+        result["counties"][0]
+        ["unemployment_rate"]
+        == 2.0
+    )
+    assert (
+        result["counties"][0]
+        ["availability"]
+        == "tight"
+    )
+
+    assert result["counties"][1]["geoid"] == "47003"
+    assert (
+        result["counties"][1]
+        ["unemployment_rate"]
+        == 7.0
+    )
+    assert (
+        result["counties"][1]
+        ["availability"]
+        == "available"
+    )
+
+
+def test_labor_availability_endpoint_requires_state():
+    import gvai.api_service as api_service
+
+    client = api_service.app.test_client()
+
+    response = client.get(
+        "/api/region/labor-availability"
+    )
+
+    assert response.status_code == 400
+    assert (
+        response.get_json()["supported"]
+        is False
+    )
+
+
+def test_labor_availability_endpoint_returns_batch(
+    monkeypatch,
+):
+    import gvai.api_service as api_service
+
+    monkeypatch.setattr(
+        api_service,
+        "resolve_state_county_labor_availability",
+        lambda state_fips: {
+            "supported": True,
+            "data_available": True,
+            "state_fips": state_fips,
+            "count": 1,
+            "counties": [
+                {
+                    "geoid": "47037",
+                    "availability":
+                        "balanced",
+                }
+            ],
+        },
+    )
+
+    client = api_service.app.test_client()
+
+    response = client.get(
+        "/api/region/labor-availability"
+        "?state=47"
+    )
+
+    assert response.status_code == 200
+
+    payload = response.get_json()
+
+    assert payload["state_fips"] == "47"
+    assert payload["count"] == 1
+    assert (
+        payload["counties"][0]
+        ["geoid"]
+        == "47037"
+    )
+
+
+def test_main_globe_contains_labor_availability_overlay():
+    html = (ROOT / "web/index.html").read_text()
+
+    assert "loadTennesseeLaborAvailabilityOverlay" in html
+    assert "/api/region/labor-availability?state=47" in html
+    assert "laborAvailabilityByGeoid" in html
+    assert "laborAvailabilityColor" in html
+    assert "labor-availability-legend" in html
+    assert "Human Labor Availability" in html
+    assert "tennesseeLaborAvailabilityDataSource" in html

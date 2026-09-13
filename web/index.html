@@ -553,6 +553,80 @@
       line-height: 1.45;
     }
 
+    .labor-availability-legend {
+      display: none;
+      position: absolute;
+      right: 18px;
+      bottom: 18px;
+      z-index: 30;
+      width: 220px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(8, 15, 28, 0.88);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 32px rgba(0,0,0,0.28);
+      color: var(--text);
+      pointer-events: none;
+    }
+
+    .labor-availability-legend.visible {
+      display: block;
+    }
+
+    .labor-legend-title {
+      margin-bottom: 9px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .labor-legend-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 6px;
+      font-size: 10px;
+    }
+
+    .labor-legend-note {
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 9px;
+    }
+
+    .labor-swatch {
+      display: inline-block;
+      width: 11px;
+      height: 11px;
+      border-radius: 3px;
+    }
+
+    .labor-swatch.tight {
+      background: #ff5c5c;
+    }
+
+    .labor-swatch.balanced {
+      background: #f5c451;
+    }
+
+    .labor-swatch.available {
+      background: #54d17a;
+    }
+
+    .labor-swatch.unknown {
+      background: #8b98a8;
+    }
+
+    .labor-legend-source {
+      margin-top: 9px;
+      color: var(--muted);
+      font-size: 8px;
+      line-height: 1.35;
+    }
+
+
     .regional-stex-card {
       display: none;
       margin-top: 14px;
@@ -1282,6 +1356,8 @@ let globalCountriesDataSource = null;
 let usStatesDataSource = null;
 let selectedStateDataSource = null;
 let tennesseeCountiesDataSource = null;
+let tennesseeLaborAvailabilityDataSource = null;
+let laborAvailabilityByGeoid = new Map();
 
 const GEOGRAPHY_VISIBILITY = {
   countriesMinHeight: 4000000,
@@ -2089,6 +2165,240 @@ async function loadUsStateBoundaries(
 }
 
 
+
+function laborAvailabilityColor(status) {
+  switch (status) {
+    case "tight":
+      return Cesium.Color
+        .fromCssColorString("#ff5c5c")
+        .withAlpha(0.32);
+
+    case "balanced":
+      return Cesium.Color
+        .fromCssColorString("#f5c451")
+        .withAlpha(0.30);
+
+    case "available":
+      return Cesium.Color
+        .fromCssColorString("#54d17a")
+        .withAlpha(0.30);
+
+    default:
+      return Cesium.Color
+        .fromCssColorString("#8b98a8")
+        .withAlpha(0.18);
+  }
+}
+
+
+function ensureLaborAvailabilityLegend() {
+  if (
+    document.getElementById(
+      "labor-availability-legend"
+    )
+  ) {
+    return;
+  }
+
+  const legend =
+    document.createElement("div");
+
+  legend.id =
+    "labor-availability-legend";
+
+  legend.className =
+    "labor-availability-legend";
+
+  legend.innerHTML = `
+    <div class="labor-legend-title">
+      Human Labor Availability
+    </div>
+
+    <div class="labor-legend-row">
+      <span class="labor-swatch tight"></span>
+      Tight
+      <span class="labor-legend-note">
+        &lt; 3.5% unemployment
+      </span>
+    </div>
+
+    <div class="labor-legend-row">
+      <span class="labor-swatch balanced"></span>
+      Balanced
+      <span class="labor-legend-note">
+        3.5–5.5%
+      </span>
+    </div>
+
+    <div class="labor-legend-row">
+      <span class="labor-swatch available"></span>
+      Available
+      <span class="labor-legend-note">
+        &gt; 5.5%
+      </span>
+    </div>
+
+    <div class="labor-legend-row">
+      <span class="labor-swatch unknown"></span>
+      Unknown
+    </div>
+
+    <div class="labor-legend-source">
+      U.S. Census Bureau ACS 5-year
+    </div>
+  `;
+
+  globeShell.appendChild(
+    legend
+  );
+}
+
+
+async function loadTennesseeLaborAvailabilityOverlay(
+  countyGeoJson
+) {
+  if (
+    tennesseeLaborAvailabilityDataSource
+  ) {
+    return (
+      tennesseeLaborAvailabilityDataSource
+    );
+  }
+
+  try {
+    const endpoint =
+      (window.GVAI_API_BASE || "") +
+      "/api/region/labor-availability?state=47";
+
+    const response =
+      await fetch(endpoint);
+
+    if (!response.ok) {
+      throw new Error(
+        `Labor availability returned ${response.status}`
+      );
+    }
+
+    const payload =
+      await response.json();
+
+    if (
+      !payload.supported ||
+      !payload.data_available
+    ) {
+      console.warn(
+        "Labor availability data unavailable",
+        payload.reason || ""
+      );
+
+      return null;
+    }
+
+    laborAvailabilityByGeoid =
+      new Map(
+        (payload.counties || []).map(
+          county => [
+            String(county.geoid),
+            county
+          ]
+        )
+      );
+
+    tennesseeLaborAvailabilityDataSource =
+      await Cesium.GeoJsonDataSource.load(
+        countyGeoJson,
+        {
+          clampToGround: true,
+          fill:
+            laborAvailabilityColor(
+              "unknown"
+            ),
+          stroke:
+            Cesium.Color.TRANSPARENT,
+          strokeWidth: 0
+        }
+      );
+
+    await viewer.dataSources.add(
+      tennesseeLaborAvailabilityDataSource
+    );
+
+    const now =
+      Cesium.JulianDate.now();
+
+    for (
+      const entity of
+      tennesseeLaborAvailabilityDataSource
+        .entities.values
+    ) {
+      if (!entity.polygon) {
+        continue;
+      }
+
+      entity.polygon.outline = false;
+
+      const geoid =
+        entity.properties?.GEOID
+          ?.getValue(now);
+
+      const county =
+        laborAvailabilityByGeoid.get(
+          String(geoid || "")
+        );
+
+      const status =
+        county?.availability ||
+        "unknown";
+
+      entity.polygon.material =
+        laborAvailabilityColor(
+          status
+        );
+
+      entity.name =
+        county?.county ||
+        entity.name;
+
+      entity.description = `
+        <strong>${
+          county?.county ||
+          "Tennessee county"
+        }</strong><br>
+        Labor availability: ${
+          status
+        }<br>
+        Unemployment: ${
+          county?.unemployment_rate ??
+          "Unknown"
+        }%
+      `;
+    }
+
+    ensureLaborAvailabilityLegend();
+
+    updateGeographyBoundaryVisibility();
+
+    console.log(
+      "Tennessee labor availability overlay rendered:",
+      laborAvailabilityByGeoid.size,
+      "counties"
+    );
+
+    return (
+      tennesseeLaborAvailabilityDataSource
+    );
+
+  } catch (error) {
+    console.error(
+      "Tennessee labor availability overlay failed",
+      error
+    );
+
+    return null;
+  }
+}
+
+
 async function loadTennesseeCountyBoundaries() {
   if (tennesseeCountiesDataSource) {
     return tennesseeCountiesDataSource;
@@ -2114,6 +2424,10 @@ async function loadTennesseeCountyBoundaries() {
     }
 
     const geojson = await response.json();
+
+    void loadTennesseeLaborAvailabilityOverlay(
+      geojson
+    );
 
     tennesseeCountiesDataSource =
       new Cesium.CustomDataSource(
@@ -2232,6 +2546,29 @@ function updateGeographyBoundaryVisibility() {
       height <=
       GEOGRAPHY_VISIBILITY
         .tennesseeCountiesMaxHeight;
+  }
+
+  if (
+    tennesseeLaborAvailabilityDataSource
+  ) {
+    tennesseeLaborAvailabilityDataSource.show =
+      height <=
+      GEOGRAPHY_VISIBILITY
+        .tennesseeCountiesMaxHeight;
+  }
+
+  const laborLegend =
+    document.getElementById(
+      "labor-availability-legend"
+    );
+
+  if (laborLegend) {
+    laborLegend.classList.toggle(
+      "visible",
+      height <=
+        GEOGRAPHY_VISIBILITY
+          .tennesseeCountiesMaxHeight
+    );
   }
 }
 
