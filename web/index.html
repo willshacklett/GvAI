@@ -1278,11 +1278,13 @@ let selectedCountryGeoJson = null;
 let selectedCountryIso3 = null;
 let selectedCountryDataSource = null;
 
+let globalCountriesDataSource = null;
 let usStatesDataSource = null;
 let selectedStateDataSource = null;
 let tennesseeCountiesDataSource = null;
 
 const GEOGRAPHY_VISIBILITY = {
+  countriesMinHeight: 4000000,
   statesMaxHeight: 12000000,
   tennesseeCountiesMaxHeight: 2500000
 };
@@ -1834,6 +1836,124 @@ async function clearSelectedStateBoundary() {
   }
 }
 
+
+async function loadGlobalCountryBoundaries() {
+  if (globalCountriesDataSource) {
+    return globalCountriesDataSource;
+  }
+
+  try {
+    const response =
+      await fetch(
+        "data/geography/ne_110m_admin_0_countries.geojson"
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        `Global country boundaries returned ${response.status}`
+      );
+    }
+
+    const geojson =
+      await response.json();
+
+    globalCountriesDataSource =
+      new Cesium.CustomDataSource(
+        "Global Country Boundaries"
+      );
+
+    await viewer.dataSources.add(
+      globalCountriesDataSource
+    );
+
+    const addCountryRing = ring => {
+      if (
+        !Array.isArray(ring) ||
+        ring.length < 2
+      ) {
+        return;
+      }
+
+      const degrees = [];
+
+      for (const coordinate of ring) {
+        if (
+          Array.isArray(coordinate) &&
+          coordinate.length >= 2
+        ) {
+          degrees.push(
+            Number(coordinate[0]),
+            Number(coordinate[1])
+          );
+        }
+      }
+
+      if (degrees.length < 4) {
+        return;
+      }
+
+      globalCountriesDataSource.entities.add({
+        polyline: {
+          positions:
+            Cesium.Cartesian3.fromDegreesArray(
+              degrees
+            ),
+          width: 1.1,
+          clampToGround: false,
+          material:
+            Cesium.Color
+              .fromCssColorString("#b7c9d6")
+              .withAlpha(0.48)
+        }
+      });
+    };
+
+    for (
+      const feature of
+      geojson.features || []
+    ) {
+      const geometry =
+        feature.geometry;
+
+      if (
+        geometry?.type === "Polygon"
+      ) {
+        addCountryRing(
+          geometry.coordinates?.[0]
+        );
+
+      } else if (
+        geometry?.type === "MultiPolygon"
+      ) {
+        for (
+          const polygon of
+          geometry.coordinates || []
+        ) {
+          addCountryRing(
+            polygon?.[0]
+          );
+        }
+      }
+    }
+
+    console.log(
+      "Global country boundaries rendered:",
+      geojson.features?.length || 0
+    );
+
+    return globalCountriesDataSource;
+
+  } catch (error) {
+    console.error(
+      "Global country boundary load failed",
+      error
+    );
+
+    return null;
+  }
+}
+
+
 async function loadUsStateBoundaries(
   requestId
 ) {
@@ -2095,6 +2215,12 @@ function updateGeographyBoundaryVisibility() {
   const height =
     viewer.camera.positionCartographic.height;
 
+  if (globalCountriesDataSource) {
+    globalCountriesDataSource.show =
+      height >=
+      GEOGRAPHY_VISIBILITY.countriesMinHeight;
+  }
+
   if (usStatesDataSource) {
     usStatesDataSource.show =
       height <=
@@ -2278,8 +2404,14 @@ async function loadSelectedStateBoundary(
 
 
 // Persistent geography context layer.
+// Countries provide globe-scale context.
 // State boundaries provide national context.
 // Tennessee counties become visible only at closer zoom levels.
+void loadGlobalCountryBoundaries()
+  .then(() => {
+    updateGeographyBoundaryVisibility();
+  });
+
 void loadUsStateBoundaries(
   activeRegionRequestId
 ).then(() => {
