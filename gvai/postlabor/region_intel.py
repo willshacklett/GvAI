@@ -437,6 +437,186 @@ ACS_OCCUPATION_GROUPS = {
 }
 
 
+
+def resolve_state_county_workforce_mix(
+    state_fips: str,
+    *,
+    acs_year: int = 2024,
+) -> Dict[str, Any]:
+    """
+    Retrieve broad occupation-group composition for every county
+    in one U.S. state using a single ACS S2401 subject-table request.
+
+    Missing values remain unknown and are never converted to zero.
+    """
+
+    normalized_state_fips = (
+        str(state_fips or "")
+        .strip()
+        .zfill(2)
+    )
+
+    if not normalized_state_fips:
+        return {
+            "supported": False,
+            "reason": "state_fips is required.",
+        }
+
+    census_api_key = (
+        os.getenv("CENSUS_API_KEY")
+        or ""
+    ).strip()
+
+    if not census_api_key:
+        return {
+            "supported": True,
+            "data_available": False,
+            "state_fips": normalized_state_fips,
+            "acs_year": acs_year,
+            "counties": [],
+            "reason": "CENSUS_API_KEY is not configured.",
+            "source": "U.S. Census Bureau ACS S2401",
+        }
+
+    total_variable = "S2401_C01_001E"
+
+    variables = [
+        "NAME",
+        total_variable,
+        *[
+            definition["variable"]
+            for definition
+            in ACS_OCCUPATION_GROUPS.values()
+        ],
+    ]
+
+    response = requests.get(
+        f"{ACS_BASE}/{acs_year}/acs/acs5/subject",
+        params={
+            "get": ",".join(variables),
+            "for": "county:*",
+            "in":
+                f"state:{normalized_state_fips}",
+            "key": census_api_key,
+        },
+        timeout=30,
+        headers={
+            "User-Agent": "GVAI/1.0",
+            "Accept": "application/json",
+        },
+    )
+
+    response.raise_for_status()
+
+    rows = response.json()
+
+    if len(rows) < 2:
+        return {
+            "supported": True,
+            "data_available": False,
+            "state_fips":
+                normalized_state_fips,
+            "acs_year": acs_year,
+            "counties": [],
+            "source":
+                "U.S. Census Bureau ACS S2401",
+        }
+
+    headers = rows[0]
+    counties = []
+
+    for values in rows[1:]:
+        data = dict(zip(headers, values))
+
+        county_fips = (
+            str(data.get("county") or "")
+            .zfill(3)
+        )
+
+        employed_total = _number(
+            data.get(total_variable)
+        )
+
+        groups = {}
+
+        for (
+            group_id,
+            definition
+        ) in ACS_OCCUPATION_GROUPS.items():
+
+            employed = _number(
+                data.get(
+                    definition["variable"]
+                )
+            )
+
+            share_percent = None
+
+            if (
+                employed_total
+                and employed is not None
+            ):
+                share_percent = round(
+                    employed
+                    / employed_total
+                    * 100,
+                    1,
+                )
+
+            groups[group_id] = {
+                "group_id": group_id,
+                "label":
+                    definition["label"],
+                "employed": employed,
+                "share_percent":
+                    share_percent,
+            }
+
+        counties.append({
+            "state_fips":
+                normalized_state_fips,
+            "county_fips":
+                county_fips,
+            "geoid":
+                normalized_state_fips
+                + county_fips,
+            "county":
+                data.get("NAME"),
+            "civilian_employed_16_plus":
+                employed_total,
+            "groups":
+                groups,
+        })
+
+    counties.sort(
+        key=lambda item:
+            item["county_fips"]
+    )
+
+    return {
+        "supported": True,
+        "data_available": True,
+        "state_fips":
+            normalized_state_fips,
+        "acs_year": acs_year,
+        "count": len(counties),
+        "group_definitions": {
+            group_id: {
+                "label":
+                    definition["label"],
+            }
+            for (
+                group_id,
+                definition
+            ) in ACS_OCCUPATION_GROUPS.items()
+        },
+        "counties": counties,
+        "source":
+            "U.S. Census Bureau ACS S2401",
+    }
+
+
+
 def build_county_occupation_profile(
     *,
     state_fips: str,

@@ -553,11 +553,85 @@
       line-height: 1.45;
     }
 
+    .labor-map-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: 6px;
+    }
+
+    .labor-map-controls select {
+      min-height: 32px;
+      max-width: 250px;
+      padding: 6px 28px 6px 9px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text);
+      font: inherit;
+      font-size: 10px;
+      outline: none;
+    }
+
+    .labor-map-controls select:focus {
+      border-color: var(--accent);
+    }
+
+    .workforce-mix-legend {
+      display: none;
+      position: absolute;
+      left: 18px;
+      right: auto;
+      bottom: 110px;
+      z-index: 30;
+      width: 235px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(8, 15, 28, 0.88);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 32px rgba(0,0,0,0.28);
+      color: var(--text);
+      pointer-events: none;
+    }
+
+    .workforce-mix-legend.visible {
+      display: block;
+    }
+
+    .workforce-legend-group {
+      margin-bottom: 9px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.4;
+    }
+
+    .workforce-gradient {
+      height: 10px;
+      border-radius: 999px;
+      background:
+        linear-gradient(
+          90deg,
+          rgba(0,216,255,0.12),
+          rgba(0,216,255,0.62)
+        );
+    }
+
+    .workforce-gradient-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 8px;
+    }
+
+
     .labor-availability-legend {
       display: none;
       position: absolute;
-      right: 18px;
-      bottom: 18px;
+      left: 18px;
+      right: auto;
+      bottom: 110px;
       z-index: 30;
       width: 220px;
       padding: 12px 14px;
@@ -959,6 +1033,42 @@
     <button class="layer-btn" data-layer="aging">
       Aging
     </button>
+
+    <div class="labor-map-controls">
+      <select
+        id="labor-map-mode"
+        aria-label="Labor map overlay"
+      >
+        <option value="labor">
+          Labor Availability
+        </option>
+        <option value="workforce">
+          Workforce Mix
+        </option>
+      </select>
+
+      <select
+        id="workforce-group-select"
+        aria-label="Workforce occupation group"
+        hidden
+      >
+        <option value="management_business_science_arts">
+          Management / Business / Science / Arts
+        </option>
+        <option value="service">
+          Service
+        </option>
+        <option value="sales_office">
+          Sales / Office
+        </option>
+        <option value="natural_resources_construction_maintenance">
+          Natural Resources / Construction / Maintenance
+        </option>
+        <option value="production_transportation_material_moving">
+          Production / Transportation / Material Moving
+        </option>
+      </select>
+    </div>
   </div>
 
   <div class="hint">
@@ -1357,7 +1467,14 @@ let usStatesDataSource = null;
 let selectedStateDataSource = null;
 let tennesseeCountiesDataSource = null;
 let tennesseeLaborAvailabilityDataSource = null;
+let tennesseeWorkforceMixDataSource = null;
+
 let laborAvailabilityByGeoid = new Map();
+let workforceMixByGeoid = new Map();
+
+let activeTennesseeOverlay = "labor";
+let activeWorkforceGroup =
+  "management_business_science_arts";
 
 const GEOGRAPHY_VISIBILITY = {
   countriesMinHeight: 4000000,
@@ -2399,6 +2516,376 @@ async function loadTennesseeLaborAvailabilityOverlay(
 }
 
 
+function workforceMixColor(sharePercent) {
+  if (
+    sharePercent === null ||
+    sharePercent === undefined
+  ) {
+    return Cesium.Color
+      .fromCssColorString("#8b98a8")
+      .withAlpha(0.16);
+  }
+
+  const share =
+    Math.max(
+      0,
+      Math.min(Number(sharePercent), 50)
+    );
+
+  const alpha =
+    0.12 + (share / 50) * 0.50;
+
+  return Cesium.Color
+    .fromCssColorString("#00d8ff")
+    .withAlpha(alpha);
+}
+
+
+function activeWorkforceGroupLabel() {
+  const select =
+    document.getElementById(
+      "workforce-group-select"
+    );
+
+  if (!select) {
+    return "Workforce group";
+  }
+
+  return (
+    select.options[
+      select.selectedIndex
+    ]?.textContent?.trim()
+    || "Workforce group"
+  );
+}
+
+
+function ensureWorkforceMixLegend() {
+  if (
+    document.getElementById(
+      "workforce-mix-legend"
+    )
+  ) {
+    return;
+  }
+
+  const legend =
+    document.createElement("div");
+
+  legend.id =
+    "workforce-mix-legend";
+
+  legend.className =
+    "workforce-mix-legend";
+
+  globeShell.appendChild(legend);
+
+  updateWorkforceMixLegend();
+}
+
+
+function updateWorkforceMixLegend() {
+  const legend =
+    document.getElementById(
+      "workforce-mix-legend"
+    );
+
+  if (!legend) {
+    return;
+  }
+
+  legend.innerHTML = `
+    <div class="labor-legend-title">
+      Workforce Mix
+    </div>
+
+    <div class="workforce-legend-group">
+      ${activeWorkforceGroupLabel()}
+    </div>
+
+    <div class="workforce-gradient"></div>
+
+    <div class="workforce-gradient-labels">
+      <span>Lower share</span>
+      <span>Higher share</span>
+    </div>
+
+    <div class="labor-legend-source">
+      Share of civilian employed population age 16+
+      <br>
+      U.S. Census Bureau ACS S2401
+    </div>
+  `;
+}
+
+
+function applyWorkforceMixGroup() {
+  if (!tennesseeWorkforceMixDataSource) {
+    return;
+  }
+
+  const now =
+    Cesium.JulianDate.now();
+
+  for (
+    const entity of
+    tennesseeWorkforceMixDataSource
+      .entities.values
+  ) {
+    if (!entity.polygon) {
+      continue;
+    }
+
+    const geoid =
+      entity.properties?.GEOID
+        ?.getValue(now);
+
+    const county =
+      workforceMixByGeoid.get(
+        String(geoid || "")
+      );
+
+    const group =
+      county?.groups?.[
+        activeWorkforceGroup
+      ];
+
+    const sharePercent =
+      group?.share_percent;
+
+    entity.polygon.material =
+      workforceMixColor(
+        sharePercent
+      );
+
+    entity.name =
+      county?.county ||
+      entity.name;
+
+    entity.description = `
+      <strong>${
+        county?.county ||
+        "Tennessee county"
+      }</strong><br>
+      ${group?.label ||
+        activeWorkforceGroupLabel()}:
+      ${
+        sharePercent === null ||
+        sharePercent === undefined
+          ? "Unknown"
+          : sharePercent + "%"
+      }<br>
+      Civilian employed 16+:
+      ${
+        county
+          ?.civilian_employed_16_plus
+          ?.toLocaleString?.() ||
+        county
+          ?.civilian_employed_16_plus ||
+        "Unknown"
+      }
+    `;
+  }
+
+  updateWorkforceMixLegend();
+}
+
+
+async function loadTennesseeWorkforceMixOverlay(
+  countyGeoJson
+) {
+  if (
+    tennesseeWorkforceMixDataSource
+  ) {
+    return tennesseeWorkforceMixDataSource;
+  }
+
+  try {
+    const endpoint =
+      (window.GVAI_API_BASE || "") +
+      "/api/region/workforce-mix?state=47";
+
+    const response =
+      await fetch(endpoint);
+
+    if (!response.ok) {
+      throw new Error(
+        `Workforce mix returned ${response.status}`
+      );
+    }
+
+    const payload =
+      await response.json();
+
+    if (
+      !payload.supported ||
+      !payload.data_available
+    ) {
+      console.warn(
+        "Workforce mix data unavailable",
+        payload.reason || ""
+      );
+
+      return null;
+    }
+
+    workforceMixByGeoid =
+      new Map(
+        (payload.counties || []).map(
+          county => [
+            String(county.geoid),
+            county
+          ]
+        )
+      );
+
+    tennesseeWorkforceMixDataSource =
+      await Cesium.GeoJsonDataSource.load(
+        countyGeoJson,
+        {
+          clampToGround: true,
+          fill: workforceMixColor(null),
+          stroke:
+            Cesium.Color.TRANSPARENT,
+          strokeWidth: 0
+        }
+      );
+
+    await viewer.dataSources.add(
+      tennesseeWorkforceMixDataSource
+    );
+
+    for (
+      const entity of
+      tennesseeWorkforceMixDataSource
+        .entities.values
+    ) {
+      if (entity.polygon) {
+        entity.polygon.outline = false;
+      }
+    }
+
+    ensureWorkforceMixLegend();
+    applyWorkforceMixGroup();
+    updateGeographyBoundaryVisibility();
+
+    console.log(
+      "Tennessee workforce mix overlay rendered:",
+      workforceMixByGeoid.size,
+      "counties"
+    );
+
+    return tennesseeWorkforceMixDataSource;
+
+  } catch (error) {
+    console.error(
+      "Tennessee workforce mix overlay failed",
+      error
+    );
+
+    return null;
+  }
+}
+
+
+function updateTennesseeOverlayMode() {
+  const height =
+    viewer.camera.positionCartographic.height;
+
+  const localVisible =
+    height <=
+    GEOGRAPHY_VISIBILITY
+      .tennesseeCountiesMaxHeight;
+
+  if (
+    tennesseeLaborAvailabilityDataSource
+  ) {
+    tennesseeLaborAvailabilityDataSource.show =
+      localVisible &&
+      activeTennesseeOverlay === "labor";
+  }
+
+  if (
+    tennesseeWorkforceMixDataSource
+  ) {
+    tennesseeWorkforceMixDataSource.show =
+      localVisible &&
+      activeTennesseeOverlay === "workforce";
+  }
+
+  const laborLegend =
+    document.getElementById(
+      "labor-availability-legend"
+    );
+
+  if (laborLegend) {
+    laborLegend.classList.toggle(
+      "visible",
+      localVisible &&
+      activeTennesseeOverlay === "labor"
+    );
+  }
+
+  const workforceLegend =
+    document.getElementById(
+      "workforce-mix-legend"
+    );
+
+  if (workforceLegend) {
+    workforceLegend.classList.toggle(
+      "visible",
+      localVisible &&
+      activeTennesseeOverlay === "workforce"
+    );
+  }
+}
+
+
+function initializeLaborMapControls() {
+  const modeSelect =
+    document.getElementById(
+      "labor-map-mode"
+    );
+
+  const groupSelect =
+    document.getElementById(
+      "workforce-group-select"
+    );
+
+  if (!modeSelect || !groupSelect) {
+    return;
+  }
+
+  modeSelect.addEventListener(
+    "change",
+    () => {
+      activeTennesseeOverlay =
+        modeSelect.value === "workforce"
+          ? "workforce"
+          : "labor";
+
+      groupSelect.hidden =
+        activeTennesseeOverlay !==
+        "workforce";
+
+      updateTennesseeOverlayMode();
+    }
+  );
+
+  groupSelect.addEventListener(
+    "change",
+    () => {
+      activeWorkforceGroup =
+        groupSelect.value;
+
+      applyWorkforceMixGroup();
+      updateTennesseeOverlayMode();
+    }
+  );
+}
+
+
+
 async function loadTennesseeCountyBoundaries() {
   if (tennesseeCountiesDataSource) {
     return tennesseeCountiesDataSource;
@@ -2426,6 +2913,10 @@ async function loadTennesseeCountyBoundaries() {
     const geojson = await response.json();
 
     void loadTennesseeLaborAvailabilityOverlay(
+      geojson
+    );
+
+    void loadTennesseeWorkforceMixOverlay(
       geojson
     );
 
@@ -2548,29 +3039,12 @@ function updateGeographyBoundaryVisibility() {
         .tennesseeCountiesMaxHeight;
   }
 
-  if (
-    tennesseeLaborAvailabilityDataSource
-  ) {
-    tennesseeLaborAvailabilityDataSource.show =
-      height <=
-      GEOGRAPHY_VISIBILITY
-        .tennesseeCountiesMaxHeight;
-  }
-
-  const laborLegend =
-    document.getElementById(
-      "labor-availability-legend"
-    );
-
-  if (laborLegend) {
-    laborLegend.classList.toggle(
-      "visible",
-      height <=
-        GEOGRAPHY_VISIBILITY
-          .tennesseeCountiesMaxHeight
-    );
-  }
+  updateTennesseeOverlayMode();
 }
+
+
+initializeLaborMapControls();
+
 
 
 async function loadSelectedStateBoundary(

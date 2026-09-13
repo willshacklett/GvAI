@@ -14,6 +14,7 @@ from gvai.adaptive_control import update_adaptive_control, get_adaptive_control_
 from gvai.postlabor.region_intel import (
     resolve_packaged_oews_area_code,
     resolve_state_county_labor_availability,
+    resolve_state_county_workforce_mix,
     resolve_us_region,
     resolve_us_aggregate_region,
 )
@@ -544,6 +545,42 @@ def api_stex_occupation():
             "reason":
                 "The STEX profile could not be loaded.",
             "error_type": type(exc).__name__,
+        }), 500
+
+
+@app.get("/api/region/workforce-mix")
+def api_region_workforce_mix():
+    state_fips = (
+        request.args.get("state")
+        or ""
+    ).strip()
+
+    if not state_fips:
+        return jsonify({
+            "supported": False,
+            "reason":
+                "state FIPS is required."
+        }), 400
+
+    try:
+        result = (
+            resolve_state_county_workforce_mix(
+                state_fips
+            )
+        )
+
+        return jsonify(result)
+
+    except Exception as exc:
+        return jsonify({
+            "supported": False,
+            "state_fips": state_fips,
+            "reason":
+                "Workforce mix lookup failed.",
+            "error_type":
+                type(exc).__name__,
+            "error":
+                str(exc),
         }), 500
 
 

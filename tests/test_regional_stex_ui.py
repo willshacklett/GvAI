@@ -308,3 +308,177 @@ def test_main_globe_contains_labor_availability_overlay():
     assert "labor-availability-legend" in html
     assert "Human Labor Availability" in html
     assert "tennesseeLaborAvailabilityDataSource" in html
+
+
+def test_state_county_workforce_mix_uses_single_acs_request(
+    monkeypatch,
+):
+    from gvai.postlabor import region_intel
+
+    monkeypatch.setenv(
+        "CENSUS_API_KEY",
+        "test-key",
+    )
+
+    calls = []
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [
+                [
+                    "NAME",
+                    "S2401_C01_001E",
+                    "S2401_C01_002E",
+                    "S2401_C01_018E",
+                    "S2401_C01_026E",
+                    "S2401_C01_029E",
+                    "S2401_C01_033E",
+                    "state",
+                    "county",
+                ],
+                [
+                    "Alpha County, Tennessee",
+                    "1000",
+                    "400",
+                    "150",
+                    "200",
+                    "100",
+                    "150",
+                    "47",
+                    "001",
+                ],
+                [
+                    "Beta County, Tennessee",
+                    "2000",
+                    "500",
+                    "300",
+                    "400",
+                    "300",
+                    "500",
+                    "47",
+                    "003",
+                ],
+            ]
+
+    def fake_get(url, **kwargs):
+        calls.append((url, kwargs))
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        region_intel.requests,
+        "get",
+        fake_get,
+    )
+
+    result = (
+        region_intel
+        .resolve_state_county_workforce_mix(
+            "47"
+        )
+    )
+
+    assert len(calls) == 1
+    assert result["supported"] is True
+    assert result["data_available"] is True
+    assert result["count"] == 2
+
+    first = result["counties"][0]
+
+    assert first["geoid"] == "47001"
+    assert (
+        first["civilian_employed_16_plus"]
+        == 1000.0
+    )
+    assert (
+        first["groups"]
+        ["management_business_science_arts"]
+        ["share_percent"]
+        == 40.0
+    )
+    assert (
+        first["groups"]
+        ["service"]
+        ["share_percent"]
+        == 15.0
+    )
+
+
+def test_workforce_mix_endpoint_requires_state():
+    import gvai.api_service as api_service
+
+    client = api_service.app.test_client()
+
+    response = client.get(
+        "/api/region/workforce-mix"
+    )
+
+    assert response.status_code == 400
+    assert (
+        response.get_json()["supported"]
+        is False
+    )
+
+
+def test_workforce_mix_endpoint_returns_batch(
+    monkeypatch,
+):
+    import gvai.api_service as api_service
+
+    monkeypatch.setattr(
+        api_service,
+        "resolve_state_county_workforce_mix",
+        lambda state_fips: {
+            "supported": True,
+            "data_available": True,
+            "state_fips": state_fips,
+            "count": 1,
+            "counties": [
+                {
+                    "geoid": "47037",
+                    "groups": {
+                        "service": {
+                            "share_percent": 17.5,
+                        }
+                    },
+                }
+            ],
+        },
+    )
+
+    client = api_service.app.test_client()
+
+    response = client.get(
+        "/api/region/workforce-mix"
+        "?state=47"
+    )
+
+    assert response.status_code == 200
+
+    payload = response.get_json()
+
+    assert payload["state_fips"] == "47"
+    assert payload["count"] == 1
+    assert (
+        payload["counties"][0]
+        ["groups"]["service"]
+        ["share_percent"]
+        == 17.5
+    )
+
+
+def test_main_globe_contains_workforce_mix_overlay():
+    html = (ROOT / "web/index.html").read_text()
+
+    assert "loadTennesseeWorkforceMixOverlay" in html
+    assert "/api/region/workforce-mix?state=47" in html
+    assert "tennesseeWorkforceMixDataSource" in html
+    assert "workforceMixByGeoid" in html
+    assert "workforceMixColor" in html
+    assert "labor-map-mode" in html
+    assert "workforce-group-select" in html
+    assert "Workforce Mix" in html
+    assert "management_business_science_arts" in html
+    assert "production_transportation_material_moving" in html
