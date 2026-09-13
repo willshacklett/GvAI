@@ -648,3 +648,161 @@ def test_main_globe_contains_housing_pressure_overlay():
     assert "Housing Pressure" in html
     assert 'value="housing"' in html
     assert "home_value_income_ratio" in html
+
+
+def test_statewide_stex_coverage_requires_state():
+    import gvai.api_service as api_service
+
+    client = api_service.app.test_client()
+
+    response = client.get(
+        "/api/region/stex-coverage"
+    )
+
+    assert response.status_code == 400
+    assert (
+        response.get_json()["supported"]
+        is False
+    )
+
+
+def test_statewide_stex_coverage_rejects_unsupported_state():
+    import gvai.api_service as api_service
+
+    client = api_service.app.test_client()
+
+    response = client.get(
+        "/api/region/stex-coverage"
+        "?state=01"
+    )
+
+    assert response.status_code == 400
+
+    payload = response.get_json()
+
+    assert payload["supported"] is False
+    assert payload["state_fips"] == "01"
+
+
+def test_statewide_stex_coverage_maps_counties_to_oews_areas(
+    monkeypatch,
+):
+    import gvai.api_service as api_service
+
+    class FakeEstimate:
+        def __init__(
+            self,
+            area_code,
+            occupation_code,
+            employment,
+            *,
+            title=None,
+            year=2025,
+        ):
+            self.area_code = area_code
+            self.occupation_code = (
+                occupation_code
+            )
+            self.employment = employment
+            self.occupation_title = title
+            self.year = year
+            self.series_id = "test"
+            self.source = "test"
+            self.catalog_source = None
+
+    class FakeClient:
+        def fetch_catalog_regional_employment(
+            self,
+            *,
+            area_code,
+            source_year=None,
+        ):
+            total = FakeEstimate(
+                area_code,
+                "00-0000",
+                100000,
+                year=source_year or 2025,
+            )
+
+            rows = [
+                FakeEstimate(
+                    area_code,
+                    "37-2021",
+                    1000,
+                    title="Pest Control Workers",
+                    year=source_year or 2025,
+                )
+            ]
+
+            return total, rows
+
+    monkeypatch.setattr(
+        api_service,
+        "OEWSClient",
+        lambda: FakeClient(),
+    )
+
+    monkeypatch.setattr(
+        api_service,
+        "list_occupation_stex_profiles",
+        lambda: [
+            {
+                "occupation_code":
+                    "37-2021.00",
+                "occupation_title":
+                    "Pest Control Workers",
+                "structural_exposure":
+                    50.0,
+                "review_status":
+                    "approved",
+            }
+        ],
+    )
+
+    client = api_service.app.test_client()
+
+    response = client.get(
+        "/api/region/stex-coverage"
+        "?state=47&year=2025"
+    )
+
+    assert response.status_code == 200
+
+    payload = response.get_json()
+
+    assert payload["supported"] is True
+    assert payload["count"] == 95
+    assert payload["area_count"] == 14
+
+    first = payload["counties"][0]
+
+    assert first["geoid"] == "47001"
+    assert first["oews_area_code"] == "0028940"
+    assert first["coverage_percentage"] == 1.0
+
+    assert (
+        payload["methodology"]
+        ["regional_automation_score"]
+        is None
+    )
+
+    assert (
+        payload["methodology"]
+        ["missing_stex_treatment"]
+        == "unknown, not zero"
+    )
+
+
+def test_main_globe_contains_stex_coverage_overlay():
+    html = (ROOT / "web/index.html").read_text()
+
+    assert "loadTennesseeSTEXCoverageOverlay" in html
+    assert "/api/region/stex-coverage?state=47&year=2025" in html
+    assert "tennesseeSTEXCoverageDataSource" in html
+    assert "stexCoverageByGeoid" in html
+    assert "stexCoverageColor" in html
+    assert "stex-coverage-legend" in html
+    assert 'value="stex"' in html
+    assert "STEX Coverage" in html
+    assert "Coverage is not automation risk." in html
+    assert "Missing STEX is unknown, not zero." in html

@@ -33,6 +33,9 @@ from gvai.postlabor.stex.review import (
     list_proposed_occupations,
 )
 from gvai.postlabor.sources.oews import OEWSClient
+from gvai.postlabor.sources.oews_geography import (
+    TENNESSEE_COUNTY_TO_OEWS_AREA,
+)
 from gvai.postlabor.stex.regional import (
     build_regional_stex_coverage_plan,
 )
@@ -326,6 +329,217 @@ def api_stex_regional():
             "reason": "Regional STEX coverage could not be computed.",
         }), 500
 
+
+
+@app.get("/api/region/stex-coverage")
+def api_region_stex_coverage():
+    state_fips = (
+        request.args.get("state")
+        or ""
+    ).strip()
+
+    if not state_fips:
+        return jsonify({
+            "supported": False,
+            "reason":
+                "state FIPS is required.",
+        }), 400
+
+    normalized_state_fips = (
+        state_fips.zfill(2)
+    )
+
+    if normalized_state_fips != "47":
+        return jsonify({
+            "supported": False,
+            "state_fips":
+                normalized_state_fips,
+            "reason":
+                "Statewide STEX coverage is currently packaged for Tennessee only.",
+        }), 400
+
+    raw_year = (
+        request.args.get("year")
+        or "2025"
+    )
+
+    try:
+        source_year = int(raw_year)
+    except (TypeError, ValueError):
+        return jsonify({
+            "supported": False,
+            "reason":
+                "year must be an integer.",
+        }), 400
+
+    try:
+        client = OEWSClient()
+
+        profiles = (
+            list_occupation_stex_profiles()
+        )
+
+        area_codes = sorted(
+            set(
+                TENNESSEE_COUNTY_TO_OEWS_AREA
+                .values()
+            )
+        )
+
+        area_results = {}
+
+        for area_code in area_codes:
+            total, rows = (
+                client
+                .fetch_catalog_regional_employment(
+                    area_code=area_code,
+                    source_year=source_year,
+                )
+            )
+
+            if total is None:
+                area_results[area_code] = None
+                continue
+
+            occupation_titles = {
+                row.occupation_code:
+                    row.occupation_title
+                for row in rows
+                if row.occupation_title
+            }
+
+            plan = (
+                build_regional_stex_coverage_plan(
+                    total_employment=total,
+                    employment_rows=rows,
+                    profiles=profiles,
+                    occupation_titles=
+                        occupation_titles,
+                    recommendation_limit=0,
+                )
+            )
+
+            area_results[area_code] = {
+                "area_code":
+                    area_code,
+                "source_year":
+                    plan.source_year,
+                "total_employment":
+                    plan.total_employment,
+                "stex_covered_employment":
+                    plan.covered_employment,
+                "coverage_percentage":
+                    plan.coverage_rate,
+                "covered_occupation_stex":
+                    plan.covered_stex,
+                "source":
+                    plan.source,
+            }
+
+        counties = []
+
+        for (
+            geoid,
+            area_code
+        ) in sorted(
+            TENNESSEE_COUNTY_TO_OEWS_AREA
+            .items()
+        ):
+            area = area_results.get(
+                area_code
+            )
+
+            counties.append({
+                "state_fips":
+                    geoid[:2],
+                "county_fips":
+                    geoid[2:],
+                "geoid":
+                    geoid,
+                "oews_area_code":
+                    area_code,
+                "data_available":
+                    area is not None,
+                "coverage_percentage":
+                    (
+                        area[
+                            "coverage_percentage"
+                        ]
+                        if area
+                        else None
+                    ),
+                "stex_covered_employment":
+                    (
+                        area[
+                            "stex_covered_employment"
+                        ]
+                        if area
+                        else None
+                    ),
+                "total_employment":
+                    (
+                        area[
+                            "total_employment"
+                        ]
+                        if area
+                        else None
+                    ),
+                "covered_occupation_stex":
+                    (
+                        area[
+                            "covered_occupation_stex"
+                        ]
+                        if area
+                        else None
+                    ),
+            })
+
+        return jsonify({
+            "supported": True,
+            "data_available":
+                any(
+                    item["data_available"]
+                    for item in counties
+                ),
+            "state_fips":
+                normalized_state_fips,
+            "source_year":
+                source_year,
+            "count":
+                len(counties),
+            "area_count":
+                len(area_codes),
+            "counties":
+                counties,
+            "methodology": {
+                "scope":
+                    "covered audited occupations only",
+                "regional_automation_score":
+                    None,
+                "missing_stex_treatment":
+                    "unknown, not zero",
+                "coverage_denominator":
+                    "BLS OEWS All Occupations employment",
+                "geography":
+                    (
+                        "County display inherits its BLS OEWS "
+                        "metropolitan/nonmetropolitan labor-market area."
+                    ),
+            },
+        })
+
+    except Exception as exc:
+        return jsonify({
+            "supported": False,
+            "state_fips":
+                normalized_state_fips,
+            "reason":
+                "Statewide STEX coverage could not be computed.",
+            "error_type":
+                type(exc).__name__,
+            "error":
+                str(exc),
+        }), 500
 
 
 @app.get("/api/stex/tasks")

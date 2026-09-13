@@ -626,6 +626,38 @@
     }
 
 
+    .stex-coverage-legend {
+      display: none;
+      position: absolute;
+      left: 18px;
+      right: auto;
+      bottom: 110px;
+      z-index: 30;
+      width: 245px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(8, 15, 28, 0.88);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 32px rgba(0,0,0,0.28);
+      color: var(--text);
+      pointer-events: none;
+    }
+
+    .stex-coverage-legend.visible {
+      display: block;
+    }
+
+    .stex-gradient {
+      background:
+        linear-gradient(
+          90deg,
+          rgba(181,124,255,0.16),
+          rgba(181,124,255,0.64)
+        );
+    }
+
+
     .housing-pressure-legend {
       display: none;
       position: absolute;
@@ -1081,6 +1113,10 @@
         <option value="housing">
           Housing Pressure
         </option>
+
+        <option value="stex">
+          STEX Coverage
+        </option>
       </select>
 
       <select
@@ -1505,10 +1541,12 @@ let tennesseeCountiesDataSource = null;
 let tennesseeLaborAvailabilityDataSource = null;
 let tennesseeWorkforceMixDataSource = null;
 let tennesseeHousingPressureDataSource = null;
+let tennesseeSTEXCoverageDataSource = null;
 
 let laborAvailabilityByGeoid = new Map();
 let workforceMixByGeoid = new Map();
 let housingPressureByGeoid = new Map();
+let stexCoverageByGeoid = new Map();
 
 let activeTennesseeOverlay = "labor";
 let activeWorkforceGroup =
@@ -2859,6 +2897,14 @@ function updateTennesseeOverlayMode() {
       activeTennesseeOverlay === "housing";
   }
 
+  if (
+    tennesseeSTEXCoverageDataSource
+  ) {
+    tennesseeSTEXCoverageDataSource.show =
+      localVisible &&
+      activeTennesseeOverlay === "stex";
+  }
+
   const laborLegend =
     document.getElementById(
       "labor-availability-legend"
@@ -2897,6 +2943,19 @@ function updateTennesseeOverlayMode() {
       activeTennesseeOverlay === "housing"
     );
   }
+
+  const stexLegend =
+    document.getElementById(
+      "stex-coverage-legend"
+    );
+
+  if (stexLegend) {
+    stexLegend.classList.toggle(
+      "visible",
+      localVisible &&
+      activeTennesseeOverlay === "stex"
+    );
+  }
 }
 
 
@@ -2928,6 +2987,11 @@ function initializeLaborMapControls() {
       ) {
         activeTennesseeOverlay =
           "housing";
+      } else if (
+        modeSelect.value === "stex"
+      ) {
+        activeTennesseeOverlay =
+          "stex";
       } else {
         activeTennesseeOverlay =
           "labor";
@@ -3183,6 +3247,242 @@ async function loadTennesseeHousingPressureOverlay(
 
 
 
+function stexCoverageColor(coveragePercent) {
+  if (
+    coveragePercent === null ||
+    coveragePercent === undefined
+  ) {
+    return Cesium.Color
+      .fromCssColorString("#8b98a8")
+      .withAlpha(0.16);
+  }
+
+  const normalized =
+    Math.max(
+      0,
+      Math.min(
+        Number(coveragePercent) / 1.0,
+        1
+      )
+    );
+
+  const alpha =
+    0.16 + normalized * 0.48;
+
+  return Cesium.Color
+    .fromCssColorString("#b57cff")
+    .withAlpha(alpha);
+}
+
+
+function ensureSTEXCoverageLegend() {
+  if (
+    document.getElementById(
+      "stex-coverage-legend"
+    )
+  ) {
+    return;
+  }
+
+  const legend =
+    document.createElement("div");
+
+  legend.id =
+    "stex-coverage-legend";
+
+  legend.className =
+    "stex-coverage-legend";
+
+  legend.innerHTML = `
+    <div class="labor-legend-title">
+      STEX Coverage
+    </div>
+
+    <div class="workforce-gradient stex-gradient"></div>
+
+    <div class="workforce-gradient-labels">
+      <span>0% audited</span>
+      <span>1%+ audited</span>
+    </div>
+
+    <div class="labor-legend-source">
+      Share of OEWS employment represented by
+      approved audited STEX occupations.
+      <br><br>
+      Coverage is not automation risk.
+      Missing STEX is unknown, not zero.
+      <br>
+      County display inherits its BLS OEWS labor-market area.
+    </div>
+  `;
+
+  globeShell.appendChild(legend);
+}
+
+
+async function loadTennesseeSTEXCoverageOverlay(
+  countyGeoJson
+) {
+  if (
+    tennesseeSTEXCoverageDataSource
+  ) {
+    return (
+      tennesseeSTEXCoverageDataSource
+    );
+  }
+
+  try {
+    const endpoint =
+      (window.GVAI_API_BASE || "") +
+      "/api/region/stex-coverage?state=47&year=2025";
+
+    const response =
+      await fetch(endpoint);
+
+    if (!response.ok) {
+      throw new Error(
+        `STEX coverage returned ${response.status}`
+      );
+    }
+
+    const payload =
+      await response.json();
+
+    if (
+      !payload.supported ||
+      !payload.data_available
+    ) {
+      console.warn(
+        "STEX coverage data unavailable",
+        payload.reason || ""
+      );
+
+      return null;
+    }
+
+    stexCoverageByGeoid =
+      new Map(
+        (payload.counties || []).map(
+          county => [
+            String(county.geoid),
+            county
+          ]
+        )
+      );
+
+    tennesseeSTEXCoverageDataSource =
+      await Cesium.GeoJsonDataSource.load(
+        countyGeoJson,
+        {
+          clampToGround: true,
+          fill:
+            stexCoverageColor(null),
+          stroke:
+            Cesium.Color.TRANSPARENT,
+          strokeWidth: 0
+        }
+      );
+
+    await viewer.dataSources.add(
+      tennesseeSTEXCoverageDataSource
+    );
+
+    const now =
+      Cesium.JulianDate.now();
+
+    for (
+      const entity of
+      tennesseeSTEXCoverageDataSource
+        .entities.values
+    ) {
+      if (!entity.polygon) {
+        continue;
+      }
+
+      entity.polygon.outline = false;
+
+      const geoid =
+        entity.properties?.GEOID
+          ?.getValue(now);
+
+      const county =
+        stexCoverageByGeoid.get(
+          String(geoid || "")
+        );
+
+      const coverage =
+        county?.coverage_percentage;
+
+      entity.polygon.material =
+        stexCoverageColor(
+          coverage
+        );
+
+      const coverageText =
+        coverage === null ||
+        coverage === undefined
+          ? "Unknown"
+          : `${Number(coverage).toFixed(4)}%`;
+
+      const coveredEmployment =
+        county?.stex_covered_employment;
+
+      const totalEmployment =
+        county?.total_employment;
+
+      entity.description = `
+        <strong>Tennessee county</strong><br>
+        STEX audited coverage: ${coverageText}<br>
+        OEWS area: ${
+          county?.oews_area_code ||
+          "Unknown"
+        }<br>
+        Covered employment: ${
+          coveredEmployment === null ||
+          coveredEmployment === undefined
+            ? "Unknown"
+            : Number(
+                coveredEmployment
+              ).toLocaleString()
+        }<br>
+        Total OEWS employment: ${
+          totalEmployment === null ||
+          totalEmployment === undefined
+            ? "Unknown"
+            : Number(
+                totalEmployment
+              ).toLocaleString()
+        }<br><br>
+        Coverage is not a regional automation score.
+      `;
+    }
+
+    ensureSTEXCoverageLegend();
+
+    updateGeographyBoundaryVisibility();
+
+    console.log(
+      "Tennessee STEX coverage overlay rendered:",
+      stexCoverageByGeoid.size,
+      "counties"
+    );
+
+    return (
+      tennesseeSTEXCoverageDataSource
+    );
+
+  } catch (error) {
+    console.error(
+      "Tennessee STEX coverage overlay failed",
+      error
+    );
+
+    return null;
+  }
+}
+
+
+
 async function loadTennesseeCountyBoundaries() {
   if (tennesseeCountiesDataSource) {
     return tennesseeCountiesDataSource;
@@ -3218,6 +3518,10 @@ async function loadTennesseeCountyBoundaries() {
     );
 
     void loadTennesseeHousingPressureOverlay(
+      geojson
+    );
+
+    void loadTennesseeSTEXCoverageOverlay(
       geojson
     );
 
