@@ -4,17 +4,17 @@
   "rated_task_count": 13,
   "unrated_task_count": 1,
   "total_importance_weight": 918.0,
-  "structural_exposure": 14.6242,
-  "augmentation_likelihood": 2.5305,
-  "rubric_version": "STEX v0.1",
-  "schema_version": "gvai.stex.occupation-summary.v0.1",
+  "structural_exposure": 56.7879,
+  "augmentation_likelihood": 3.2538,
+  "rubric_version": "STEX v0.2",
+  "schema_version": "gvai.stex.occupation-summary.v0.2",
   "source": {
     "name": "O*NET Web Services",
     "tasks_source": "Incumbent",
     "tasks_year": 2024,
     "onet_soc_code": "53-7062.00"
   },
-  "scorer_id": "openai-gpt-5.6-sol-stex-v0.1",
+  "scorer_id": "openai-gpt-5.6-sol-stex-v0.2",
   "review_status": "proposed",
-  "interpretation": "Importance-weighted structural exposure of rated O*NET task content under STEX v0.1. This is not a probability of job loss or the percentage of jobs that can be automated."
+  "interpretation": "Importance-weighted structural exposure under STEX v0.2. R is required human presence, not generic physical presence. This is not a probability of job loss or the percentage of jobs that can be automated."
 }

@@ -218,6 +218,7 @@ def api_stex_review_approve():
             payload.get("occupation_code", ""),
             payload.get("reviewed_by", ""),
             payload.get("review_note"),
+            payload.get("approval_revision"),
         )
         return jsonify({
             "ok": True,

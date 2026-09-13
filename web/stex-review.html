@@ -84,7 +84,7 @@
   }
   async function loadDetail(code) {
     message.textContent = 'Loading review package...';
-    try { const data = await api(`/api/stex/review/occupation?code=${encodeURIComponent(code)}`); renderPackage(data.package); message.textContent = ''; }
+    try { const data = await api(`/api/stex/review/occupation?code=${encodeURIComponent(code)}`); window.currentApprovalRevision = data.package.approval_revision; renderPackage(data.package); message.textContent = ''; }
     catch (error) { message.textContent = error.message; }
   }
   approve.addEventListener('click', async () => {
@@ -92,7 +92,7 @@
     if (!reviewer) { message.textContent = 'Reviewer name is required.'; return; }
     approve.disabled = true; message.textContent = 'Submitting approval...';
     try {
-      await api('/api/stex/review/approve', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({occupation_code: selected, reviewed_by: reviewer, review_note: document.querySelector('#note').value}) });
+      await api('/api/stex/review/approve', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({occupation_code: selected, reviewed_by: reviewer, review_note: document.querySelector('#note').value, approval_revision: window.currentApprovalRevision}) });
       message.textContent = 'Approved. Refreshing the proposed queue.'; detail.innerHTML = '<p>Approval recorded. Select another proposed occupation.</p>'; await loadQueue();
     } catch (error) { message.textContent = error.message; approve.disabled = false; }
   });
