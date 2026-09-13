@@ -1280,6 +1280,12 @@ let selectedCountryDataSource = null;
 
 let usStatesDataSource = null;
 let selectedStateDataSource = null;
+let tennesseeCountiesDataSource = null;
+
+const GEOGRAPHY_VISIBILITY = {
+  statesMaxHeight: 12000000,
+  tennesseeCountiesMaxHeight: 2500000
+};
 
 let activeRegionRequestId = 0;
 
@@ -1962,6 +1968,148 @@ async function loadUsStateBoundaries(
   }
 }
 
+
+async function loadTennesseeCountyBoundaries() {
+  if (tennesseeCountiesDataSource) {
+    return tennesseeCountiesDataSource;
+  }
+
+  try {
+    const url =
+      "https://tigerweb.geo.census.gov/arcgis/rest/services/" +
+      "TIGERweb/State_County/MapServer/7/query" +
+      "?where=" +
+      encodeURIComponent("STATE='47'") +
+      "&outFields=NAME,STATE,COUNTY,GEOID" +
+      "&returnGeometry=true" +
+      "&outSR=4326" +
+      "&f=geojson";
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(
+        `Tennessee county boundaries returned ${response.status}`
+      );
+    }
+
+    const geojson = await response.json();
+
+    tennesseeCountiesDataSource =
+      new Cesium.CustomDataSource(
+        "Tennessee County Boundaries"
+      );
+
+    await viewer.dataSources.add(
+      tennesseeCountiesDataSource
+    );
+
+    const addCountyRing = ring => {
+      if (
+        !Array.isArray(ring) ||
+        ring.length < 2
+      ) {
+        return;
+      }
+
+      const degrees = [];
+
+      for (const coordinate of ring) {
+        if (
+          Array.isArray(coordinate) &&
+          coordinate.length >= 2
+        ) {
+          degrees.push(
+            Number(coordinate[0]),
+            Number(coordinate[1])
+          );
+        }
+      }
+
+      if (degrees.length < 4) {
+        return;
+      }
+
+      tennesseeCountiesDataSource.entities.add({
+        polyline: {
+          positions:
+            Cesium.Cartesian3.fromDegreesArray(
+              degrees
+            ),
+          width: 0.8,
+          clampToGround: false,
+          material:
+            Cesium.Color
+              .fromCssColorString("#8bdff2")
+              .withAlpha(0.38)
+        }
+      });
+    };
+
+    for (
+      const feature of
+      geojson.features || []
+    ) {
+      const geometry =
+        feature.geometry;
+
+      if (
+        geometry?.type === "Polygon"
+      ) {
+        addCountyRing(
+          geometry.coordinates?.[0]
+        );
+      } else if (
+        geometry?.type === "MultiPolygon"
+      ) {
+        for (
+          const polygon of
+          geometry.coordinates || []
+        ) {
+          addCountyRing(
+            polygon?.[0]
+          );
+        }
+      }
+    }
+
+    console.log(
+      "Tennessee county boundaries rendered:",
+      geojson.features?.length || 0
+    );
+
+    return tennesseeCountiesDataSource;
+
+  } catch (error) {
+    console.error(
+      "Tennessee county boundary load failed",
+      error
+    );
+
+    return null;
+  }
+}
+
+
+function updateGeographyBoundaryVisibility() {
+  const height =
+    viewer.camera.positionCartographic.height;
+
+  if (usStatesDataSource) {
+    usStatesDataSource.show =
+      height <=
+      GEOGRAPHY_VISIBILITY.statesMaxHeight;
+  }
+
+  if (tennesseeCountiesDataSource) {
+    tennesseeCountiesDataSource.show =
+      height <=
+      GEOGRAPHY_VISIBILITY
+        .tennesseeCountiesMaxHeight;
+  }
+}
+
+
 async function loadSelectedStateBoundary(
   stateFips,
   requestId
@@ -2127,6 +2275,25 @@ async function loadSelectedStateBoundary(
     return null;
   }
 }
+
+
+// Persistent geography context layer.
+// State boundaries provide national context.
+// Tennessee counties become visible only at closer zoom levels.
+void loadUsStateBoundaries(
+  activeRegionRequestId
+).then(() => {
+  updateGeographyBoundaryVisibility();
+});
+
+void loadTennesseeCountyBoundaries()
+  .then(() => {
+    updateGeographyBoundaryVisibility();
+  });
+
+viewer.camera.moveEnd.addEventListener(
+  updateGeographyBoundaryVisibility
+);
 
 
 function clearRegionalMetrics() {

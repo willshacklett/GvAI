@@ -98,3 +98,16 @@ def test_public_stex_catalog_remains_approved_only():
         item["occupation_code"]
         for item in response.get_json()["profiles"]
     } == {"15-1252.00", "37-2021.00"}
+
+
+def test_main_globe_contains_geography_boundary_layer():
+    html = (ROOT / "web/index.html").read_text()
+
+    assert "loadUsStateBoundaries" in html
+    assert "loadTennesseeCountyBoundaries" in html
+    assert "updateGeographyBoundaryVisibility" in html
+    assert "GEOGRAPHY_VISIBILITY" in html
+    assert "TIGERweb/State_County/MapServer/0/query" in html
+    assert "TIGERweb/State_County/MapServer/7/query" in html
+    assert "tennesseeCountiesMaxHeight" in html
+    assert "viewer.camera.moveEnd.addEventListener" in html
