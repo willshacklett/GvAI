@@ -482,3 +482,169 @@ def test_main_globe_contains_workforce_mix_overlay():
     assert "Workforce Mix" in html
     assert "management_business_science_arts" in html
     assert "production_transportation_material_moving" in html
+
+
+def test_state_county_housing_pressure_uses_single_acs_request(
+    monkeypatch,
+):
+    from gvai.postlabor import region_intel
+
+    monkeypatch.setenv(
+        "CENSUS_API_KEY",
+        "test-key",
+    )
+
+    calls = []
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [
+                [
+                    "NAME",
+                    "B19013_001E",
+                    "B25077_001E",
+                    "state",
+                    "county",
+                ],
+                [
+                    "Alpha County, Tennessee",
+                    "50000",
+                    "200000",
+                    "47",
+                    "001",
+                ],
+                [
+                    "Beta County, Tennessee",
+                    "80000",
+                    "240000",
+                    "47",
+                    "003",
+                ],
+            ]
+
+    def fake_get(url, **kwargs):
+        calls.append(
+            (url, kwargs)
+        )
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        region_intel.requests,
+        "get",
+        fake_get,
+    )
+
+    result = (
+        region_intel
+        .resolve_state_county_housing_pressure(
+            "47"
+        )
+    )
+
+    assert len(calls) == 1
+    assert result["supported"] is True
+    assert result["data_available"] is True
+    assert result["count"] == 2
+
+    first = result["counties"][0]
+
+    assert first["geoid"] == "47001"
+    assert (
+        first["median_household_income"]
+        == 50000.0
+    )
+    assert (
+        first["median_home_value"]
+        == 200000.0
+    )
+    assert (
+        first["home_value_income_ratio"]
+        == 4.0
+    )
+
+    second = result["counties"][1]
+
+    assert (
+        second["home_value_income_ratio"]
+        == 3.0
+    )
+
+
+def test_housing_pressure_endpoint_requires_state():
+    import gvai.api_service as api_service
+
+    client = api_service.app.test_client()
+
+    response = client.get(
+        "/api/region/housing-pressure"
+    )
+
+    assert response.status_code == 400
+    assert (
+        response.get_json()["supported"]
+        is False
+    )
+
+
+def test_housing_pressure_endpoint_returns_batch(
+    monkeypatch,
+):
+    import gvai.api_service as api_service
+
+    monkeypatch.setattr(
+        api_service,
+        "resolve_state_county_housing_pressure",
+        lambda state_fips: {
+            "supported": True,
+            "data_available": True,
+            "state_fips": state_fips,
+            "count": 1,
+            "counties": [
+                {
+                    "geoid": "47037",
+                    "median_household_income":
+                        75000.0,
+                    "median_home_value":
+                        300000.0,
+                    "home_value_income_ratio":
+                        4.0,
+                }
+            ],
+        },
+    )
+
+    client = api_service.app.test_client()
+
+    response = client.get(
+        "/api/region/housing-pressure"
+        "?state=47"
+    )
+
+    assert response.status_code == 200
+
+    payload = response.get_json()
+
+    assert payload["state_fips"] == "47"
+    assert payload["count"] == 1
+    assert (
+        payload["counties"][0]
+        ["home_value_income_ratio"]
+        == 4.0
+    )
+
+
+def test_main_globe_contains_housing_pressure_overlay():
+    html = (ROOT / "web/index.html").read_text()
+
+    assert "loadTennesseeHousingPressureOverlay" in html
+    assert "/api/region/housing-pressure?state=47" in html
+    assert "tennesseeHousingPressureDataSource" in html
+    assert "housingPressureByGeoid" in html
+    assert "housingPressureColor" in html
+    assert "housing-pressure-legend" in html
+    assert "Housing Pressure" in html
+    assert 'value="housing"' in html
+    assert "home_value_income_ratio" in html
