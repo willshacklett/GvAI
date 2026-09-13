@@ -184,3 +184,23 @@ def test_regional_stex_unexpected_processing_error_returns_500(
         "ok": False,
         "reason": "Regional STEX coverage could not be computed.",
     }
+
+
+def test_second_packaged_tennessee_area_uses_local_snapshot(monkeypatch):
+    import gvai.postlabor.sources.bls as bls_module
+    import gvai.postlabor.sources.oews as oews_module
+
+    def fail_network(*args, **kwargs):
+        raise AssertionError("regional request attempted network access")
+
+    monkeypatch.setattr(bls_module.requests, "post", fail_network)
+    monkeypatch.setattr(oews_module.requests, "get", fail_network)
+    response = api_service.app.test_client().get(
+        "/api/stex/regional?area=0028940&year=2025&limit=10"
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["area_code"] == "0028940"
+    assert payload["total_employment"] > 0
+    assert payload["methodology"]["regional_automation_score"] is None

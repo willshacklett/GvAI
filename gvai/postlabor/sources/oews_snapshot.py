@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import tempfile
 from datetime import datetime, timezone
+from dataclasses import replace
 from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
@@ -25,7 +28,7 @@ OEWS_MACHINE_DATA_URL = (
 OEWS_MACHINE_MIRROR_URL = (
     "https://downloadt.bls.gov/pub/time.series/oe/oe.data.0.Current"
 )
-OEWS_SNAPSHOT_SCHEMA_VERSION = 2
+OEWS_SNAPSHOT_SCHEMA_VERSION = 3
 
 
 class OEWSSnapshotBuildError(ValueError):
@@ -147,7 +150,7 @@ def build_snapshot_from_lines(
         )
     observations.sort(key=lambda item: item["occupation_code"])
     return {
-        "schema_version": OEWS_SNAPSHOT_SCHEMA_VERSION,
+        "schema_version": 2,
         "source": OEWS_MACHINE_SOURCE,
         "source_url": source_url,
         "catalog_source": OEWS_CATALOG_SOURCE,
@@ -158,6 +161,195 @@ def build_snapshot_from_lines(
         "observations": observations,
         "totals": totals,
     }
+
+
+def build_multi_area_snapshot_from_lines(
+    lines: Iterable[str],
+    *,
+    area_codes: Iterable[str],
+    source_year: int,
+    catalog_rows: Iterable[object],
+    area_metadata: Mapping[str, Mapping[str, str]] | None = None,
+    source_url: str = OEWS_MACHINE_DATA_URL,
+    generated_at: Optional[str] = None,
+) -> dict:
+    """Build a schema-v3 local snapshot for explicit areas in one data pass."""
+    areas = sorted({normalize_area_code(code) for code in area_codes})
+    if not areas:
+        raise OEWSSnapshotBuildError("At least one OEWS area is required.")
+
+    details_by_series = {}
+    for item in catalog_rows:
+        if (
+            item.area_code in areas
+            and item.source_year == source_year
+            and getattr(item, "display_level", 3) == 3
+        ):
+            details_by_series[item.series_id] = item
+
+    missing_catalog_areas = [
+        area
+        for area in areas
+        if not any(item.area_code == area for item in details_by_series.values())
+    ]
+    if missing_catalog_areas:
+        raise OEWSSnapshotBuildError(
+            "The catalog has no detailed occupations for: "
+            + ", ".join(missing_catalog_areas)
+        )
+
+    totals_by_series = {
+        build_oews_series_id(
+            area_code=area,
+            occupation_code=OEWS_ALL_OCCUPATIONS,
+            area_type_code=(area_metadata or {}).get(
+                area,
+                {},
+            ).get("area_type", "M"),
+        ): area
+        for area in areas
+    }
+    wanted_series = set(details_by_series) | set(totals_by_series)
+    observations = []
+    totals = []
+    seen = set()
+    suppressed_by_area = {area: 0 for area in areas}
+
+    for fields in _iter_tab_records(lines):
+        series_id = fields["series_id"]
+        if series_id not in wanted_series or fields["period"] != "A01":
+            continue
+        try:
+            row_year = int(fields["year"])
+        except (TypeError, ValueError):
+            continue
+        if row_year != source_year:
+            continue
+        key = (series_id, row_year, fields["period"])
+        if key in seen:
+            raise OEWSSnapshotBuildError(
+                f"Duplicate OEWS observation for series {series_id}."
+            )
+        seen.add(key)
+        area = totals_by_series.get(series_id)
+        if area is None:
+            area = details_by_series[series_id].area_code
+        try:
+            employment = float(fields["value"])
+        except (TypeError, ValueError):
+            suppressed_by_area[area] += 1
+            continue
+        if employment < 0:
+            suppressed_by_area[area] += 1
+            continue
+        if series_id in totals_by_series:
+            totals.append({
+                "area_code": area,
+                "occupation_code": OEWS_ALL_OCCUPATIONS,
+                "occupation_title": "All Occupations",
+                "series_id": series_id,
+                "year": source_year,
+                "employment": employment,
+                "source": OEWS_MACHINE_SOURCE,
+                "catalog_source": OEWS_CATALOG_SOURCE,
+                "source_url": source_url,
+            })
+            continue
+        item = details_by_series[series_id]
+        observations.append({
+            "area_code": item.area_code,
+            "occupation_code": item.occupation_code,
+            "occupation_title": item.occupation_title,
+            "series_id": series_id,
+            "year": source_year,
+            "employment": employment,
+            "source": OEWS_MACHINE_SOURCE,
+            "catalog_source": item.source,
+            "source_url": source_url,
+        })
+
+    total_areas = {item["area_code"] for item in totals}
+    missing_denominators = sorted(set(areas) - total_areas)
+    if missing_denominators:
+        raise OEWSSnapshotBuildError(
+            "Exactly one numeric All Occupations denominator is required for: "
+            + ", ".join(missing_denominators)
+        )
+    if len(totals) != len(areas):
+        raise OEWSSnapshotBuildError("Duplicate OEWS area denominators found.")
+
+    observations.sort(
+        key=lambda item: (
+            item["area_code"],
+            item["occupation_code"],
+        )
+    )
+    totals.sort(key=lambda item: item["area_code"])
+    metadata = {
+        area: dict(area_metadata[area])
+        for area in areas
+        if area_metadata and area in area_metadata
+    }
+    return {
+        "schema_version": OEWS_SNAPSHOT_SCHEMA_VERSION,
+        "source": OEWS_MACHINE_SOURCE,
+        "source_url": source_url,
+        "catalog_source": OEWS_CATALOG_SOURCE,
+        "generated_at": generated_at or datetime.now(timezone.utc).isoformat(),
+        "source_years": [source_year],
+        "areas": areas,
+        "area_metadata": metadata,
+        "suppressed_or_missing_count": sum(suppressed_by_area.values()),
+        "suppressed_or_missing_by_area": suppressed_by_area,
+        "observations": observations,
+        "totals": totals,
+    }
+
+
+def _write_snapshot_atomically(path: Path, snapshot: Mapping[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=path.parent,
+        text=True,
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(snapshot, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def validate_preserved_area(
+    *,
+    existing_snapshot: Mapping[str, object],
+    replacement_snapshot: Mapping[str, object],
+    area_code: str,
+) -> None:
+    """Refuse a migration that changes existing area/year values."""
+    area = normalize_area_code(area_code)
+
+    def rows(snapshot: Mapping[str, object], key: str) -> list[dict]:
+        return sorted(
+            [
+                item
+                for item in snapshot.get(key, [])
+                if item.get("area_code") == area
+            ],
+            key=lambda item: item["series_id"],
+        )
+
+    for key in ("totals", "observations"):
+        if rows(existing_snapshot, key) != rows(replacement_snapshot, key):
+            raise OEWSSnapshotBuildError(
+                f"Existing {area} {key} do not match the replacement snapshot."
+            )
 
 
 def build_employment_snapshot(
@@ -204,6 +396,78 @@ def build_employment_snapshot(
         json.dumps(snapshot, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    return snapshot
+
+
+def build_multi_area_employment_snapshot(
+    *,
+    area_codes: Iterable[str],
+    source_year: int,
+    output_path: Path | str,
+    catalog_client: Optional[OEWSClient] = None,
+    data_url: str = OEWS_MACHINE_DATA_URL,
+    timeout: int = 120,
+) -> dict:
+    """Ingest explicit OEWS areas in one streaming data-file pass."""
+    areas = sorted({normalize_area_code(code) for code in area_codes})
+    client = catalog_client or OEWSClient()
+    catalog_rows = []
+    for area in areas:
+        catalog_rows.extend(
+            client.fetch_catalog_detailed_occupations(
+                area_code=area,
+                source_year=source_year,
+            )
+        )
+    area_metadata = {
+        row["area_code"]: {
+            "state_code": row["state_code"],
+            "area_type": row["areatype_code"],
+            "area_name": row["area_name"],
+        }
+        for row in client._iter_catalog_file("oe.area")
+        if row.get("area_code") in areas
+    }
+    if set(area_metadata) != set(areas):
+        missing = sorted(set(areas) - set(area_metadata))
+        raise OEWSSnapshotBuildError(
+            "Official OEWS area metadata is missing for: "
+            + ", ".join(missing)
+        )
+    catalog_rows = [
+        replace(
+            item,
+            series_id=build_oews_series_id(
+                area_code=item.area_code,
+                occupation_code=item.occupation_code,
+                area_type_code=area_metadata[item.area_code]["area_type"],
+            ),
+        )
+        for item in catalog_rows
+    ]
+    response = requests.get(data_url, timeout=timeout, stream=True)
+    resolved_data_url = data_url
+    if (
+        getattr(response, "status_code", 200) == 403
+        and data_url == OEWS_MACHINE_DATA_URL
+    ):
+        resolved_data_url = OEWS_MACHINE_MIRROR_URL
+        response = requests.get(
+            resolved_data_url,
+            timeout=timeout,
+            stream=True,
+        )
+    response.raise_for_status()
+    snapshot = build_multi_area_snapshot_from_lines(
+        response.iter_lines(decode_unicode=True),
+        area_codes=areas,
+        source_year=source_year,
+        catalog_rows=catalog_rows,
+        area_metadata=area_metadata,
+        source_url=data_url,
+    )
+    snapshot["retrieved_from_url"] = resolved_data_url
+    _write_snapshot_atomically(Path(output_path), snapshot)
     return snapshot
 
 

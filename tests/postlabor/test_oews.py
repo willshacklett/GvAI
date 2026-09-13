@@ -15,6 +15,7 @@ from gvai.postlabor.sources.oews import (
 )
 import gvai.postlabor.sources.oews as oews_module
 from gvai.postlabor.sources.oews_snapshot import (
+    OEWS_MACHINE_DATA_URL,
     OEWS_MACHINE_SOURCE,
     OEWSSnapshotBuildError,
     build_snapshot_from_lines,
@@ -87,6 +88,17 @@ def test_build_pest_control_series():
         )
         ==
         "OEUM003498000000037202101"
+    )
+
+
+def test_build_state_oews_series():
+    assert (
+        build_oews_series_id(
+            area_code="4700000",
+            occupation_code="00-0000.00",
+            area_type_code="S",
+        )
+        == "OEUS470000000000000000001"
     )
 
 
@@ -688,6 +700,147 @@ def test_generated_snapshot_round_trips_through_oews_client(tmp_path):
     assert rows[0].employment == 7750.0
     assert rows[0].source == OEWS_MACHINE_SOURCE
     assert rows[0].catalog_source == "BLS OEWS time-series catalog"
+
+
+def test_multi_area_builder_preserves_areas_and_suppressed_values(tmp_path):
+    from gvai.postlabor.sources.oews_snapshot import (
+        build_multi_area_snapshot_from_lines,
+    )
+
+    catalog_rows = [
+        SimpleNamespace(
+            area_code="0034980",
+            occupation_code="15-1252.00",
+            occupation_title="Software Developers",
+            series_id="OEUM003498000000015125201",
+            source_year=2025,
+            source="BLS OEWS time-series catalog",
+            display_level=3,
+        ),
+        SimpleNamespace(
+            area_code="0028940",
+            occupation_code="15-1252.00",
+            occupation_title="Software Developers",
+            series_id="OEUM002894000000015125201",
+            source_year=2025,
+            source="BLS OEWS time-series catalog",
+            display_level=3,
+        ),
+    ]
+    snapshot = build_multi_area_snapshot_from_lines(
+        [
+            "series_id\tyear\tperiod\tvalue\tfootnote_codes\n",
+            "OEUM003498000000015125201\t2025\tA01\t7750\t\n",
+            "OEUM003498000000000000001\t2025\tA01\t1099300\t\n",
+            "OEUM002894000000015125201\t2025\tA01\t#\tS\n",
+            "OEUM002894000000000000001\t2025\tA01\t450000\t\n",
+        ],
+        area_codes=["0028940", "0034980"],
+        source_year=2025,
+        catalog_rows=catalog_rows,
+        area_metadata={
+            "0028940": {"area_name": "Knoxville, TN"},
+            "0034980": {"area_name": "Nashville, TN"},
+        },
+        generated_at="2026-09-13T00:00:00+00:00",
+    )
+    path = tmp_path / "employment.json"
+    path.write_text(json.dumps(snapshot), encoding="utf-8")
+
+    assert snapshot["schema_version"] == 3
+    assert snapshot["areas"] == ["0028940", "0034980"]
+    assert snapshot["suppressed_or_missing_count"] == 1
+    assert snapshot["suppressed_or_missing_by_area"] == {
+        "0028940": 1,
+        "0034980": 0,
+    }
+    assert snapshot["source_url"] == OEWS_MACHINE_DATA_URL
+    total, rows = OEWSClient(employment_cache_path=path).fetch_catalog_regional_employment(
+        area_code="0034980",
+        source_year=2025,
+    )
+    assert total.employment == 1099300.0
+    assert rows[0].employment == 7750.0
+    knoxville_total, knoxville_rows = OEWSClient(
+        employment_cache_path=path
+    ).fetch_catalog_regional_employment(area_code="0028940", source_year=2025)
+    assert knoxville_total.employment == 450000.0
+    assert knoxville_rows == []
+
+
+def test_multi_area_builder_rejects_duplicate_and_missing_denominator():
+    from gvai.postlabor.sources.oews_snapshot import (
+        build_multi_area_snapshot_from_lines,
+    )
+
+    detail = SimpleNamespace(
+        area_code="0034980",
+        occupation_code="15-1252.00",
+        occupation_title="Software Developers",
+        series_id="OEUM003498000000015125201",
+        source_year=2025,
+        source="BLS OEWS time-series catalog",
+        display_level=3,
+    )
+    with pytest.raises(OEWSSnapshotBuildError, match="Duplicate"):
+        build_multi_area_snapshot_from_lines(
+            [
+                "series_id\tyear\tperiod\tvalue\tfootnote_codes\n",
+                "OEUM003498000000015125201\t2025\tA01\t7750\t\n",
+                "OEUM003498000000015125201\t2025\tA01\t7750\t\n",
+                "OEUM003498000000000000001\t2025\tA01\t1099300\t\n",
+            ],
+            area_codes=["0034980"],
+            source_year=2025,
+            catalog_rows=[detail],
+        )
+    with pytest.raises(OEWSSnapshotBuildError, match="0028940"):
+        build_multi_area_snapshot_from_lines(
+            [
+                "series_id\tyear\tperiod\tvalue\tfootnote_codes\n",
+                "OEUM003498000000015125201\t2025\tA01\t7750\t\n",
+                "OEUM003498000000000000001\t2025\tA01\t1099300\t\n",
+            ],
+            area_codes=["0034980", "0028940"],
+            source_year=2025,
+            catalog_rows=[
+                detail,
+                SimpleNamespace(
+                    area_code="0028940",
+                    occupation_code="15-1252.00",
+                    occupation_title="Software Developers",
+                    series_id="OEUM002894000000015125201",
+                    source_year=2025,
+                    source="BLS OEWS time-series catalog",
+                    display_level=3,
+                ),
+            ],
+        )
+
+
+def test_multi_area_builder_preserves_existing_area_rows():
+    from gvai.postlabor.sources.oews_snapshot import (
+        validate_preserved_area,
+    )
+
+    baseline = {
+        "totals": [{"area_code": "0034980", "series_id": "total"}],
+        "observations": [{"area_code": "0034980", "series_id": "detail"}],
+    }
+    validate_preserved_area(
+        existing_snapshot=baseline,
+        replacement_snapshot={
+            "totals": baseline["totals"],
+            "observations": baseline["observations"],
+        },
+        area_code="0034980",
+    )
+    with pytest.raises(OEWSSnapshotBuildError, match="observations"):
+        validate_preserved_area(
+            existing_snapshot=baseline,
+            replacement_snapshot={"totals": baseline["totals"], "observations": []},
+            area_code="0034980",
+        )
 
 
 def test_catalog_regional_fetch_rejects_empty_detailed_universe(
