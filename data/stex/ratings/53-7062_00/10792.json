@@ -13,11 +13,11 @@
   "source_vintage_label": "O*NET Tasks / Incumbent 2024",
   "digital_capability": 2.0,
   "physical_execution": 3.0,
-  "human_presence_requirement": 1.0,
+  "human_presence_requirement": 2.0,
   "augmentation_likelihood": 3.0,
-  "structural_exposure": 56.25,
+  "structural_exposure": 37.5,
   "scorer_id": "openai-gpt-5.6-sol-stex-v0.2",
   "scored_at_utc": "2026-09-12T00:00:00+00:00",
-  "rationale": "Computer-controlled cranes, booms, and camera systems can adjust position and movement from sensor or operator inputs. Human presence is mainly needed for unusual conditions, safety judgment, and exceptions.",
+  "rationale": "Controls and sensors can assist equipment movement, but cranes, booms, and cameras operate in varied sites with changing loads, visibility, and hazards. Representative operation retains human situational judgment and safety accountability.",
   "review_status": "proposed"
 }

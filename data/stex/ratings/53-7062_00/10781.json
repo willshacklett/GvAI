@@ -12,12 +12,12 @@
   "source_year": 2024,
   "source_vintage_label": "O*NET Tasks / Incumbent 2024",
   "digital_capability": 1.0,
-  "physical_execution": 4.0,
-  "human_presence_requirement": 1.0,
+  "physical_execution": 3.0,
+  "human_presence_requirement": 2.0,
   "augmentation_likelihood": 3.0,
-  "structural_exposure": 75.0,
+  "structural_exposure": 37.5,
   "scorer_id": "openai-gpt-5.6-sol-stex-v0.2",
   "scored_at_utc": "2026-09-12T00:00:00+00:00",
-  "rationale": "Conveyors, autonomous mobile robots, and automated forklifts can move standardized freight through configured routes. Human presence remains relevant for damaged, blocked, or irregular loads and safety exceptions, not for every movement.",
+  "rationale": "Material movement occurs across varied docks, vehicles, ships, storage areas, and production spaces. Powered equipment provides meaningful capability, but representative work includes changing routes, irregular loads, obstacles, and safety accountability that limit occupation-wide automation.",
   "review_status": "proposed"
 }

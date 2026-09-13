@@ -17,7 +17,7 @@ from gvai.postlabor.stex.store import (
 
 ROOT = Path(__file__).resolve().parents[2]
 OCCUPATIONS = {
-    "53-7062.00": ("Laborers and Freight, Stock, and Material Movers, Hand", 14, 13, 1, 56.7879, 3.2538, 33120),
+    "53-7062.00": ("Laborers and Freight, Stock, and Material Movers, Hand", 14, 13, 1, 36.6353, 3.2538, 33120),
     "35-3023.00": ("Fast Food and Counter Workers", 28, 27, 1, 22.7899, 2.9826, 28680),
     "41-2031.00": ("Retail Salespersons", 24, 24, 0, 34.8163, 3.6462, 28580),
     "29-1141.00": ("Registered Nurses", 27, 27, 0, 27.1862, 3.4712, 25100),
@@ -163,4 +163,4 @@ def test_nashville_proposed_preview_is_nonproduction(monkeypatch):
     assert preview["production_eligible"] is False
     assert preview["stex_covered_employment"] == 148100.0
     assert preview["coverage_percentage"] == 13.4722
-    assert preview["covered_occupation_stex"] == 38.1709
+    assert preview["covered_occupation_stex"] == 33.6642

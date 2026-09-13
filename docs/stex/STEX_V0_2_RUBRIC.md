@@ -13,6 +13,19 @@ A physical task does not automatically receive `R=4`. A robot, conveyor, autonom
 
 Conversely, human presence should remain high when the task intrinsically depends on interpersonal trust, bedside care, negotiation, responsibility requiring human judgment, or irregular physical manipulation beyond defensible current or near-current automation capability.
 
+## Occupation-wide scope rule
+
+Rate representative occupational settings, not one optimized facility. A `P=3`
+or `P=4` rating requires physical automation capability across a substantial
+share of ordinary settings in the occupation. Specialized automation in a
+single highly standardized facility does not by itself establish
+occupation-wide exposure.
+
+Ratings must reflect irregular manipulation, safety accountability, and
+situational judgment when those conditions are representative. Do not
+double-count the same constraint: use `P` for physical execution capability
+and `R` for required human presence.
+
 ## Formula
 
 The formula is unchanged:

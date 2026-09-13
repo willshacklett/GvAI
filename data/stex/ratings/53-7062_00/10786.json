@@ -12,12 +12,12 @@
   "source_year": 2024,
   "source_vintage_label": "O*NET Tasks / Incumbent 2024",
   "digital_capability": 1.0,
-  "physical_execution": 3.0,
-  "human_presence_requirement": 2.0,
+  "physical_execution": 2.0,
+  "human_presence_requirement": 3.0,
   "augmentation_likelihood": 3.0,
-  "structural_exposure": 37.5,
+  "structural_exposure": 12.5,
   "scorer_id": "openai-gpt-5.6-sol-stex-v0.2",
   "scored_at_utc": "2026-09-12T00:00:00+00:00",
-  "rationale": "Robotic packaging systems can pack standardized containers and assist with repacking predictable damage patterns. Irregular damage, materials, and exception decisions retain a moderate human-presence requirement.",
+  "rationale": "Packaging systems can handle some standard containers, while repacking damaged containers requires adapting materials and methods to the specific damage. Across ordinary settings, human handling and judgment remain materially involved.",
   "review_status": "proposed"
 }

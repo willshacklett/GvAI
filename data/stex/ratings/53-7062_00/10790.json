@@ -12,12 +12,12 @@
   "source_year": 2024,
   "source_vintage_label": "O*NET Tasks / Incumbent 2024",
   "digital_capability": 1.0,
-  "physical_execution": 3.0,
-  "human_presence_requirement": 2.0,
+  "physical_execution": 2.0,
+  "human_presence_requirement": 3.0,
   "augmentation_likelihood": 3.0,
-  "structural_exposure": 37.5,
+  "structural_exposure": 12.5,
   "scorer_id": "openai-gpt-5.6-sol-stex-v0.2",
   "scored_at_utc": "2026-09-12T00:00:00+00:00",
-  "rationale": "Powered lifting equipment and robotic load-handling systems can attach or manipulate standardized lifting devices. Human presence remains important for variable rigging, load balance, and safety exceptions, but the task is not universally human-dependent.",
+  "rationale": "Lifting devices and powered equipment can assist some repeatable loads, but rigging and guiding vary by cargo, equipment, and site. Representative work requires human adaptation to balance, visibility, communication, and safety accountability.",
   "review_status": "proposed"
 }

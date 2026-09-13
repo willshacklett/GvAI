@@ -45,21 +45,29 @@ OLD_RATINGS = {
     "10796": (2, 2, 3, 3), "1001441": (2, 2, 3, 3),
 }
 
+INITIAL_V02_RATINGS = {
+    "10789": (2, 3, 1), "10779": (4, 1, 1), "10781": (1, 4, 1),
+    "10788": (1, 3, 2), "10782": (2, 4, 1), "10778": (3, 3, 1),
+    "10780": (4, 1, 0), "10790": (1, 3, 2), "10787": (1, 3, 2),
+    "10786": (1, 3, 2), "10783": (1, 3, 2), "10792": (2, 3, 1),
+    "10796": (2, 3, 2), "1001441": (3, 3, 2),
+}
+
 # v0.2 ratings distinguish physical automation capability (P) from human presence (R).
 RATINGS = {
-    "10789": (2, 3, 1, 3, "Automated storage systems, inventory sensing, and forklifts can protect and organize standardized equipment areas. Human presence remains useful for irregular storage, exceptions, and safety accountability, but is not intrinsic to the task."),
+    "10789": (2, 2, 2, 3, "Storage areas vary across warehouses, yards, docks, and production sites. Inventory systems and powered equipment can assist protection and movement, but representative settings include irregular layouts, safety checks, exceptions, and accountability that require some human presence."),
     "10779": (4, 1, 1, 4, "Digital dispatch systems can deliver work orders and convert speech or text instructions into actionable assignments. Human interaction may be needed for ambiguous instructions, but routine assignment interpretation is not inherently human-present."),
-    "10781": (1, 4, 1, 3, "Conveyors, autonomous mobile robots, and automated forklifts can move standardized freight through configured routes. Human presence remains relevant for damaged, blocked, or irregular loads and safety exceptions, not for every movement."),
-    "10788": (1, 3, 2, 3, "Robotic palletizing and strapping equipment can install protective devices on standardized loads. Irregular freight, damaged packaging, and exception handling retain a moderate human-presence requirement."),
-    "10782": (2, 4, 1, 3, "Automated sortation and machine-vision systems can classify and route standardized cargo at scale. Human presence is mainly needed for exceptions, damaged freight, and unstructured items rather than ordinary sorting."),
+    "10781": (1, 3, 2, 3, "Material movement occurs across varied docks, vehicles, ships, storage areas, and production spaces. Powered equipment provides meaningful capability, but representative work includes changing routes, irregular loads, obstacles, and safety accountability that limit occupation-wide automation."),
+    "10788": (1, 2, 3, 3, "Protective bracing, padding, and strapping must fit varied cargo and transport conditions. Specialized equipment can assist some standardized loads, but representative work requires adaptation to irregular items, damage, load balance, and safety responsibility."),
+    "10782": (2, 3, 2, 3, "Machine vision and sortation can classify some cargo, but the occupation spans varied freight, facilities, loading conditions, and damaged or unmarked items. Representative sorting therefore retains human exception handling and situational judgment."),
     "10778": (3, 3, 1, 4, "Print-and-apply labeling, barcode systems, and machine vision can identify and mark standardized containers. Human presence is mainly an exception and accountability function when identifiers or containers are irregular."),
     "10780": (4, 1, 0, 4, "Scanners, RFID, sensors, and warehouse software can record units handled without a person being physically present at each recording event. Human review may address discrepancies, but the recording function itself is digital."),
-    "10790": (1, 3, 2, 3, "Powered lifting equipment and robotic load-handling systems can attach or manipulate standardized lifting devices. Human presence remains important for variable rigging, load balance, and safety exceptions, but the task is not universally human-dependent."),
-    "10787": (1, 3, 2, 3, "Autonomous carts, mobile robots, and powered vehicles can transport tools or supplies along known routes. Human presence remains useful for selection, obstacles, and irregular retrieval, while routine transport can be automated."),
-    "10786": (1, 3, 2, 3, "Robotic packaging systems can pack standardized containers and assist with repacking predictable damage patterns. Irregular damage, materials, and exception decisions retain a moderate human-presence requirement."),
-    "10783": (1, 3, 2, 3, "Robotic assembly cells can form standardized containers or crates from prepared components. Variable materials, tool handling, and nonstandard assemblies create human-dependent exceptions without making all assembly inherently human-present."),
-    "10792": (2, 3, 1, 3, "Computer-controlled cranes, booms, and camera systems can adjust position and movement from sensor or operator inputs. Human presence is mainly needed for unusual conditions, safety judgment, and exceptions."),
-    "10796": (2, 3, 2, 3, "Automated test fixtures and robotic connectors can connect standardized electrical equipment for testing. Human presence remains relevant to nonstandard equipment, safety isolation, and troubleshooting, but not every connection."),
+    "10790": (1, 2, 3, 3, "Lifting devices and powered equipment can assist some repeatable loads, but rigging and guiding vary by cargo, equipment, and site. Representative work requires human adaptation to balance, visibility, communication, and safety accountability."),
+    "10787": (1, 2, 2, 3, "Powered carts and vehicles can assist transport, but tools and supplies move through varied storage areas, trucks, docks, and work sites. Representative retrieval includes obstacles, selection, and irregular conditions that retain human presence."),
+    "10786": (1, 2, 3, 3, "Packaging systems can handle some standard containers, while repacking damaged containers requires adapting materials and methods to the specific damage. Across ordinary settings, human handling and judgment remain materially involved."),
+    "10783": (1, 2, 3, 3, "Some container assembly can be mechanized, but the task uses hand tools and precut lumber across varied loads, workspaces, and fit conditions. Representative assemblies require human manipulation, adjustment, and safety judgment."),
+    "10792": (2, 3, 2, 3, "Controls and sensors can assist equipment movement, but cranes, booms, and cameras operate in varied sites with changing loads, visibility, and hazards. Representative operation retains human situational judgment and safety accountability."),
+    "10796": (2, 2, 3, 3, "Test connections can be assisted by fixtures and connectors, but equipment, power sources, isolation requirements, and site conditions vary. Representative work retains human responsibility for safe connection and troubleshooting."),
     "1001441": (3, 3, 2, 3, "Machine vision and sensing can identify many standardized damage or leak indicators, while irregular defects and safety-sensitive exceptions need human judgment. The source marks this New task with zero importance, so it remains unrated and excluded from aggregation."),
 }
 
@@ -152,9 +160,11 @@ def main() -> int:
         "Status: PROPOSED. This profile remains excluded from production.",
         "",
         f"Old STEX (v0.1): {OLD_PROFILE['structural_exposure']}",
-        f"New STEX (v0.2): {result.structural_exposure}",
+        "Initial STEX v0.2: 56.7879",
+        f"Final proposed STEX (v0.2): {result.structural_exposure}",
         f"Old augmentation (v0.1): {OLD_PROFILE['augmentation_likelihood']}",
         f"New augmentation (v0.2): {result.augmentation_likelihood}",
+        "Ten physical tasks revised for occupation-wide scope.",
         f"Total importance weight: {result.total_importance_weight}",
         f"Rated/unrated tasks: {result.rated_task_count}/{result.unrated_task_count}",
         "",
@@ -175,10 +185,11 @@ def main() -> int:
         )
         old_tuple = (old_d, old_p, old_r)
         new_tuple = (record.digital_capability, record.physical_execution, record.human_presence_requirement)
+        initial_tuple = INITIAL_V02_RATINGS[record.task_id]
         lines.append(
             f"| {record.task_id} {record.task_title} | {record.source_importance:g} | "
             f"{old_tuple} | {new_tuple} | {old_exposure} | "
-            f"{record.structural_exposure} | {weight:.4f} | {'yes' if old_tuple != new_tuple or old_augmentation != record.augmentation_likelihood else 'no'} |"
+            f"{record.structural_exposure} | {weight:.4f} | {'yes' if initial_tuple != new_tuple else 'no'} |"
         )
     lines.extend([
         "",

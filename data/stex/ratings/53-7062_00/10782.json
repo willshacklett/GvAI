@@ -12,12 +12,12 @@
   "source_year": 2024,
   "source_vintage_label": "O*NET Tasks / Incumbent 2024",
   "digital_capability": 2.0,
-  "physical_execution": 4.0,
-  "human_presence_requirement": 1.0,
+  "physical_execution": 3.0,
+  "human_presence_requirement": 2.0,
   "augmentation_likelihood": 3.0,
-  "structural_exposure": 75.0,
+  "structural_exposure": 37.5,
   "scorer_id": "openai-gpt-5.6-sol-stex-v0.2",
   "scored_at_utc": "2026-09-12T00:00:00+00:00",
-  "rationale": "Automated sortation and machine-vision systems can classify and route standardized cargo at scale. Human presence is mainly needed for exceptions, damaged freight, and unstructured items rather than ordinary sorting.",
+  "rationale": "Machine vision and sortation can classify some cargo, but the occupation spans varied freight, facilities, loading conditions, and damaged or unmarked items. Representative sorting therefore retains human exception handling and situational judgment.",
   "review_status": "proposed"
 }

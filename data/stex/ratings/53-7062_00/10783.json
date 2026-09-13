@@ -12,12 +12,12 @@
   "source_year": 2024,
   "source_vintage_label": "O*NET Tasks / Incumbent 2024",
   "digital_capability": 1.0,
-  "physical_execution": 3.0,
-  "human_presence_requirement": 2.0,
+  "physical_execution": 2.0,
+  "human_presence_requirement": 3.0,
   "augmentation_likelihood": 3.0,
-  "structural_exposure": 37.5,
+  "structural_exposure": 12.5,
   "scorer_id": "openai-gpt-5.6-sol-stex-v0.2",
   "scored_at_utc": "2026-09-12T00:00:00+00:00",
-  "rationale": "Robotic assembly cells can form standardized containers or crates from prepared components. Variable materials, tool handling, and nonstandard assemblies create human-dependent exceptions without making all assembly inherently human-present.",
+  "rationale": "Some container assembly can be mechanized, but the task uses hand tools and precut lumber across varied loads, workspaces, and fit conditions. Representative assemblies require human manipulation, adjustment, and safety judgment.",
   "review_status": "proposed"
 }

@@ -12,12 +12,12 @@
   "source_year": 2024,
   "source_vintage_label": "O*NET Tasks / Incumbent 2024",
   "digital_capability": 1.0,
-  "physical_execution": 3.0,
+  "physical_execution": 2.0,
   "human_presence_requirement": 2.0,
   "augmentation_likelihood": 3.0,
-  "structural_exposure": 37.5,
+  "structural_exposure": 25.0,
   "scorer_id": "openai-gpt-5.6-sol-stex-v0.2",
   "scored_at_utc": "2026-09-12T00:00:00+00:00",
-  "rationale": "Autonomous carts, mobile robots, and powered vehicles can transport tools or supplies along known routes. Human presence remains useful for selection, obstacles, and irregular retrieval, while routine transport can be automated.",
+  "rationale": "Powered carts and vehicles can assist transport, but tools and supplies move through varied storage areas, trucks, docks, and work sites. Representative retrieval includes obstacles, selection, and irregular conditions that retain human presence.",
   "review_status": "proposed"
 }

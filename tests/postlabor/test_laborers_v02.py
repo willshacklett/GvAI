@@ -26,7 +26,7 @@ def test_laborers_v02_profile_and_tasks_remain_proposed():
 
     assert profile["rubric_version"] == "STEX v0.2"
     assert profile["review_status"] == "proposed"
-    assert profile["structural_exposure"] == 56.7879
+    assert profile["structural_exposure"] == 36.6353
     assert profile["augmentation_likelihood"] == 3.2538
     assert all(task["rubric_version"] == "STEX v0.2" for task in tasks)
     assert all(task["review_status"] == "proposed" for task in tasks)
@@ -71,10 +71,45 @@ def test_laborers_v02_rationale_is_task_specific():
     )
 
 
+def test_laborers_v02_has_complete_final_rating_map_and_ten_scope_revisions():
+    expected = {
+        "10789": (2.0, 2.0, 2.0), "10779": (4.0, 1.0, 1.0),
+        "10781": (1.0, 3.0, 2.0), "10788": (1.0, 2.0, 3.0),
+        "10782": (2.0, 3.0, 2.0), "10778": (3.0, 3.0, 1.0),
+        "10780": (4.0, 1.0, 0.0), "10790": (1.0, 2.0, 3.0),
+        "10787": (1.0, 2.0, 2.0), "10786": (1.0, 2.0, 3.0),
+        "10783": (1.0, 2.0, 3.0), "10792": (2.0, 3.0, 2.0),
+        "10796": (2.0, 2.0, 3.0), "1001441": (3.0, 3.0, 2.0),
+    }
+    tasks = {task["task_id"]: task for task in load_occupation_stex_tasks(CODE)}
+
+    assert {
+        task_id: (
+            tasks[task_id]["digital_capability"],
+            tasks[task_id]["physical_execution"],
+            tasks[task_id]["human_presence_requirement"],
+        )
+        for task_id in expected
+    } == expected
+    initial_v02 = {
+        "10789": (2, 3, 1), "10779": (4, 1, 1), "10781": (1, 4, 1),
+        "10788": (1, 3, 2), "10782": (2, 4, 1), "10778": (3, 3, 1),
+        "10780": (4, 1, 0), "10790": (1, 3, 2), "10787": (1, 3, 2),
+        "10786": (1, 3, 2), "10783": (1, 3, 2), "10792": (2, 3, 1),
+        "10796": (2, 3, 2), "1001441": (3, 3, 2),
+    }
+    assert sum(expected[task_id] != initial_v02[task_id] for task_id in expected) == 10
+
+    report = (ROOT / "docs/stex/LABORERS_V0_2_RERATING_REPORT.md").read_text()
+    assert "Ten physical tasks revised for occupation-wide scope." in report
+
+
 def test_v02_documentation_distinguishes_physical_execution_from_human_presence():
     rubric = (ROOT / "docs/stex/STEX_V0_2_RUBRIC.md").read_text()
 
     assert "physical automation system" in rubric
+    assert "Occupation-wide scope rule" in rubric
+    assert "representative occupational settings" in rubric
     assert "required human presence" in rubric
     assert "physical task does not automatically receive `R=4`" in rubric
     assert "automated cargo sorting" in rubric
