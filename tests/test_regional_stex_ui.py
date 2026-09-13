@@ -111,3 +111,20 @@ def test_main_globe_contains_geography_boundary_layer():
     assert "TIGERweb/State_County/MapServer/7/query" in html
     assert "tennesseeCountiesMaxHeight" in html
     assert "viewer.camera.moveEnd.addEventListener" in html
+
+
+def test_main_globe_contains_global_country_context_layer():
+    html = (ROOT / "web/index.html").read_text()
+
+    assert "loadGlobalCountryBoundaries" in html
+    assert "globalCountriesDataSource" in html
+    assert "countriesMinHeight" in html
+    assert "ne_110m_admin_0_countries.geojson" in html
+
+    artifact = (
+        ROOT
+        / "web/data/geography/ne_110m_admin_0_countries.geojson"
+    )
+
+    assert artifact.exists()
+    assert artifact.stat().st_size == 838726
