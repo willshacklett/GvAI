@@ -413,6 +413,163 @@ def resolve_state_county_labor_availability(
 
 
 
+
+def resolve_state_county_housing_pressure(
+    state_fips: str,
+    *,
+    acs_year: int = 2024,
+) -> Dict[str, Any]:
+    """
+    Retrieve county-level housing affordability inputs for one
+    U.S. state using a single ACS 5-year API request.
+
+    Housing pressure is expressed as median home value divided by
+    median household income. Missing values remain unknown.
+    """
+
+    raw_state_fips = (
+        str(state_fips or "")
+        .strip()
+    )
+
+    if not raw_state_fips:
+        return {
+            "supported": False,
+            "reason": "state_fips is required.",
+        }
+
+    normalized_state_fips = (
+        raw_state_fips.zfill(2)
+    )
+
+    census_api_key = (
+        os.getenv("CENSUS_API_KEY")
+        or ""
+    ).strip()
+
+    if not census_api_key:
+        return {
+            "supported": True,
+            "data_available": False,
+            "state_fips":
+                normalized_state_fips,
+            "acs_year": acs_year,
+            "counties": [],
+            "reason":
+                "CENSUS_API_KEY is not configured.",
+            "source":
+                "U.S. Census Bureau ACS 5-year",
+        }
+
+    variables = [
+        "NAME",
+        "B19013_001E",
+        "B25077_001E",
+    ]
+
+    response = requests.get(
+        f"{ACS_BASE}/{acs_year}/acs/acs5",
+        params={
+            "get": ",".join(variables),
+            "for": "county:*",
+            "in":
+                f"state:{normalized_state_fips}",
+            "key": census_api_key,
+        },
+        timeout=30,
+        headers={
+            "User-Agent": "GVAI/1.0",
+            "Accept": "application/json",
+        },
+    )
+
+    response.raise_for_status()
+
+    rows = response.json()
+
+    if len(rows) < 2:
+        return {
+            "supported": True,
+            "data_available": False,
+            "state_fips":
+                normalized_state_fips,
+            "acs_year": acs_year,
+            "counties": [],
+            "source":
+                "U.S. Census Bureau ACS 5-year",
+        }
+
+    headers = rows[0]
+    counties = []
+
+    for values in rows[1:]:
+        data = dict(zip(headers, values))
+
+        county_fips = (
+            str(data.get("county") or "")
+            .zfill(3)
+        )
+
+        median_household_income = _number(
+            data.get("B19013_001E")
+        )
+
+        median_home_value = _number(
+            data.get("B25077_001E")
+        )
+
+        home_value_income_ratio = None
+
+        if (
+            median_household_income
+            and median_household_income > 0
+            and median_home_value is not None
+        ):
+            home_value_income_ratio = round(
+                median_home_value
+                / median_household_income,
+                2,
+            )
+
+        counties.append({
+            "state_fips":
+                normalized_state_fips,
+            "county_fips":
+                county_fips,
+            "geoid":
+                normalized_state_fips
+                + county_fips,
+            "county":
+                data.get("NAME"),
+            "median_household_income":
+                median_household_income,
+            "median_home_value":
+                median_home_value,
+            "home_value_income_ratio":
+                home_value_income_ratio,
+        })
+
+    counties.sort(
+        key=lambda item:
+            item["county_fips"]
+    )
+
+    return {
+        "supported": True,
+        "data_available": True,
+        "state_fips":
+            normalized_state_fips,
+        "acs_year": acs_year,
+        "count": len(counties),
+        "counties": counties,
+        "measure":
+            "median_home_value_to_median_household_income",
+        "source":
+            "U.S. Census Bureau ACS 5-year",
+    }
+
+
+
 ACS_OCCUPATION_GROUPS = {
     "management_business_science_arts": {
         "label": "Management, business, science, and arts",

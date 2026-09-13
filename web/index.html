@@ -626,6 +626,38 @@
     }
 
 
+    .housing-pressure-legend {
+      display: none;
+      position: absolute;
+      left: 18px;
+      right: auto;
+      bottom: 110px;
+      z-index: 30;
+      width: 235px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(8, 15, 28, 0.88);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 32px rgba(0,0,0,0.28);
+      color: var(--text);
+      pointer-events: none;
+    }
+
+    .housing-pressure-legend.visible {
+      display: block;
+    }
+
+    .housing-gradient {
+      background:
+        linear-gradient(
+          90deg,
+          rgba(255,140,66,0.16),
+          rgba(255,140,66,0.64)
+        );
+    }
+
+
     .labor-availability-legend {
       display: none;
       position: absolute;
@@ -1044,6 +1076,10 @@
         </option>
         <option value="workforce">
           Workforce Mix
+        </option>
+
+        <option value="housing">
+          Housing Pressure
         </option>
       </select>
 
@@ -1468,9 +1504,11 @@ let selectedStateDataSource = null;
 let tennesseeCountiesDataSource = null;
 let tennesseeLaborAvailabilityDataSource = null;
 let tennesseeWorkforceMixDataSource = null;
+let tennesseeHousingPressureDataSource = null;
 
 let laborAvailabilityByGeoid = new Map();
 let workforceMixByGeoid = new Map();
+let housingPressureByGeoid = new Map();
 
 let activeTennesseeOverlay = "labor";
 let activeWorkforceGroup =
@@ -2813,6 +2851,14 @@ function updateTennesseeOverlayMode() {
       activeTennesseeOverlay === "workforce";
   }
 
+  if (
+    tennesseeHousingPressureDataSource
+  ) {
+    tennesseeHousingPressureDataSource.show =
+      localVisible &&
+      activeTennesseeOverlay === "housing";
+  }
+
   const laborLegend =
     document.getElementById(
       "labor-availability-legend"
@@ -2838,6 +2884,19 @@ function updateTennesseeOverlayMode() {
       activeTennesseeOverlay === "workforce"
     );
   }
+
+  const housingLegend =
+    document.getElementById(
+      "housing-pressure-legend"
+    );
+
+  if (housingLegend) {
+    housingLegend.classList.toggle(
+      "visible",
+      localVisible &&
+      activeTennesseeOverlay === "housing"
+    );
+  }
 }
 
 
@@ -2859,10 +2918,20 @@ function initializeLaborMapControls() {
   modeSelect.addEventListener(
     "change",
     () => {
-      activeTennesseeOverlay =
+      if (
         modeSelect.value === "workforce"
-          ? "workforce"
-          : "labor";
+      ) {
+        activeTennesseeOverlay =
+          "workforce";
+      } else if (
+        modeSelect.value === "housing"
+      ) {
+        activeTennesseeOverlay =
+          "housing";
+      } else {
+        activeTennesseeOverlay =
+          "labor";
+      }
 
       groupSelect.hidden =
         activeTennesseeOverlay !==
@@ -2882,6 +2951,234 @@ function initializeLaborMapControls() {
       updateTennesseeOverlayMode();
     }
   );
+}
+
+
+
+function housingPressureColor(ratio) {
+  if (
+    ratio === null ||
+    ratio === undefined
+  ) {
+    return Cesium.Color
+      .fromCssColorString("#8b98a8")
+      .withAlpha(0.16);
+  }
+
+  const normalized =
+    Math.max(
+      0,
+      Math.min(
+        (Number(ratio) - 2) / 4,
+        1
+      )
+    );
+
+  const alpha =
+    0.16 + normalized * 0.48;
+
+  return Cesium.Color
+    .fromCssColorString("#ff8c42")
+    .withAlpha(alpha);
+}
+
+
+function ensureHousingPressureLegend() {
+  if (
+    document.getElementById(
+      "housing-pressure-legend"
+    )
+  ) {
+    return;
+  }
+
+  const legend =
+    document.createElement("div");
+
+  legend.id =
+    "housing-pressure-legend";
+
+  legend.className =
+    "housing-pressure-legend";
+
+  legend.innerHTML = `
+    <div class="labor-legend-title">
+      Housing Pressure
+    </div>
+
+    <div class="workforce-gradient housing-gradient"></div>
+
+    <div class="workforce-gradient-labels">
+      <span>Lower pressure</span>
+      <span>Higher pressure</span>
+    </div>
+
+    <div class="labor-legend-source">
+      Median home value ÷ median household income
+      <br>
+      U.S. Census Bureau ACS 5-year
+    </div>
+  `;
+
+  globeShell.appendChild(legend);
+}
+
+
+async function loadTennesseeHousingPressureOverlay(
+  countyGeoJson
+) {
+  if (
+    tennesseeHousingPressureDataSource
+  ) {
+    return (
+      tennesseeHousingPressureDataSource
+    );
+  }
+
+  try {
+    const endpoint =
+      (window.GVAI_API_BASE || "") +
+      "/api/region/housing-pressure?state=47";
+
+    const response =
+      await fetch(endpoint);
+
+    if (!response.ok) {
+      throw new Error(
+        `Housing pressure returned ${response.status}`
+      );
+    }
+
+    const payload =
+      await response.json();
+
+    if (
+      !payload.supported ||
+      !payload.data_available
+    ) {
+      console.warn(
+        "Housing pressure data unavailable",
+        payload.reason || ""
+      );
+
+      return null;
+    }
+
+    housingPressureByGeoid =
+      new Map(
+        (payload.counties || []).map(
+          county => [
+            String(county.geoid),
+            county
+          ]
+        )
+      );
+
+    tennesseeHousingPressureDataSource =
+      await Cesium.GeoJsonDataSource.load(
+        countyGeoJson,
+        {
+          clampToGround: true,
+          fill:
+            housingPressureColor(null),
+          stroke:
+            Cesium.Color.TRANSPARENT,
+          strokeWidth: 0
+        }
+      );
+
+    await viewer.dataSources.add(
+      tennesseeHousingPressureDataSource
+    );
+
+    const now =
+      Cesium.JulianDate.now();
+
+    for (
+      const entity of
+      tennesseeHousingPressureDataSource
+        .entities.values
+    ) {
+      if (!entity.polygon) {
+        continue;
+      }
+
+      entity.polygon.outline = false;
+
+      const geoid =
+        entity.properties?.GEOID
+          ?.getValue(now);
+
+      const county =
+        housingPressureByGeoid.get(
+          String(geoid || "")
+        );
+
+      const ratio =
+        county?.home_value_income_ratio;
+
+      entity.polygon.material =
+        housingPressureColor(
+          ratio
+        );
+
+      entity.name =
+        county?.county ||
+        entity.name;
+
+      const ratioText =
+        ratio === null ||
+        ratio === undefined
+          ? "Unknown"
+          : `${ratio}×`;
+
+      const incomeText =
+        county?.median_household_income
+          ? `$${Math.round(
+              county.median_household_income
+            ).toLocaleString()}`
+          : "Unknown";
+
+      const homeText =
+        county?.median_home_value
+          ? `$${Math.round(
+              county.median_home_value
+            ).toLocaleString()}`
+          : "Unknown";
+
+      entity.description = `
+        <strong>${
+          county?.county ||
+          "Tennessee county"
+        }</strong><br>
+        Housing pressure: ${ratioText}<br>
+        Median household income: ${incomeText}<br>
+        Median home value: ${homeText}
+      `;
+    }
+
+    ensureHousingPressureLegend();
+
+    updateGeographyBoundaryVisibility();
+
+    console.log(
+      "Tennessee housing pressure overlay rendered:",
+      housingPressureByGeoid.size,
+      "counties"
+    );
+
+    return (
+      tennesseeHousingPressureDataSource
+    );
+
+  } catch (error) {
+    console.error(
+      "Tennessee housing pressure overlay failed",
+      error
+    );
+
+    return null;
+  }
 }
 
 
@@ -2917,6 +3214,10 @@ async function loadTennesseeCountyBoundaries() {
     );
 
     void loadTennesseeWorkforceMixOverlay(
+      geojson
+    );
+
+    void loadTennesseeHousingPressureOverlay(
       geojson
     );
 
