@@ -15,6 +15,7 @@ def make_record(
     category="Core",
     occupation_code="37-2021.00",
     occupation_title="Pest Control Workers",
+    rubric_version="STEX v0.1",
 ):
     d, p, r = exposure_inputs
 
@@ -34,6 +35,7 @@ def make_record(
         scorer_id="test-scorer",
         rationale="Aggregation test.",
         scored_at_utc="2026-09-11T00:00:00+00:00",
+        rubric_version=rubric_version,
     )
 
 
@@ -114,6 +116,14 @@ def test_rejects_mixed_occupations():
     )
 
     with pytest.raises(ValueError):
+        aggregate_occupation_stex([a, b])
+
+
+def test_rejects_mixed_rubric_versions():
+    a = make_record(task_id="1", importance=50, rubric_version="STEX v0.1")
+    b = make_record(task_id="2", importance=50, rubric_version="STEX v0.2")
+
+    with pytest.raises(ValueError, match="same rubric version"):
         aggregate_occupation_stex([a, b])
 
 

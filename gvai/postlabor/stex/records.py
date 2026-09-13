@@ -63,6 +63,7 @@ class TaskRatingRecord:
         rationale: str,
         scored_at_utc: str | None = None,
         review_status: str = "approved",
+        rubric_version: str = STEX_RUBRIC_VERSION,
     ) -> "TaskRatingRecord":
         if not rationale.strip():
             raise ValueError("rationale must not be empty")
@@ -74,6 +75,9 @@ class TaskRatingRecord:
             raise ValueError(
                 "review_status must be 'proposed' or 'approved'"
             )
+
+        if not rubric_version.strip():
+            raise ValueError("rubric_version must not be empty")
 
         augmentation = float(augmentation_likelihood)
         if augmentation < 0 or augmentation > 4:
@@ -101,8 +105,12 @@ class TaskRatingRecord:
         )
 
         return cls(
-            schema_version="gvai.stex.task-rating.v0.1",
-            rubric_version=STEX_RUBRIC_VERSION,
+            schema_version=(
+                "gvai.stex.task-rating.v0.2"
+                if rubric_version == "STEX v0.2"
+                else "gvai.stex.task-rating.v0.1"
+            ),
+            rubric_version=rubric_version,
             occupation_code=occupation_code,
             occupation_title=occupation_title,
             task_id=str(task_id),

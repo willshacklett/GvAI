@@ -1,6 +1,6 @@
 {
-  "schema_version": "gvai.stex.task-rating.v0.1",
-  "rubric_version": "STEX v0.1",
+  "schema_version": "gvai.stex.task-rating.v0.2",
+  "rubric_version": "STEX v0.2",
   "occupation_code": "53-7062.00",
   "occupation_title": "Laborers and Freight, Stock, and Material Movers, Hand",
   "task_id": "1001441",
@@ -11,13 +11,13 @@
   "source_name": "O*NET Tasks / Incumbent",
   "source_year": 2024,
   "source_vintage_label": "O*NET Tasks / Incumbent 2024",
-  "digital_capability": 2.0,
-  "physical_execution": 2.0,
-  "human_presence_requirement": 3.0,
+  "digital_capability": 3.0,
+  "physical_execution": 3.0,
+  "human_presence_requirement": 2.0,
   "augmentation_likelihood": 3.0,
-  "structural_exposure": 12.5,
-  "scorer_id": "openai-gpt-5.6-sol-stex-v0.1",
+  "structural_exposure": 37.5,
+  "scorer_id": "openai-gpt-5.6-sol-stex-v0.2",
   "scored_at_utc": "2026-09-12T00:00:00+00:00",
-  "rationale": "Explicit STEX v0.1 audit of the task statement: rate the strongest current digital or physical execution channel, then apply the human-presence constraint. Augmentation is retained separately. Task statement audited: Inspect products for damage or leaks.",
+  "rationale": "Machine vision and sensing can identify many standardized damage or leak indicators, while irregular defects and safety-sensitive exceptions need human judgment. The source marks this New task with zero importance, so it remains unrated and excluded from aggregation.",
   "review_status": "proposed"
 }

@@ -1,6 +1,6 @@
 {
-  "schema_version": "gvai.stex.task-rating.v0.1",
-  "rubric_version": "STEX v0.1",
+  "schema_version": "gvai.stex.task-rating.v0.2",
+  "rubric_version": "STEX v0.2",
   "occupation_code": "53-7062.00",
   "occupation_title": "Laborers and Freight, Stock, and Material Movers, Hand",
   "task_id": "10796",
@@ -16,8 +16,8 @@
   "human_presence_requirement": 3.0,
   "augmentation_likelihood": 3.0,
   "structural_exposure": 12.5,
-  "scorer_id": "openai-gpt-5.6-sol-stex-v0.1",
+  "scorer_id": "openai-gpt-5.6-sol-stex-v0.2",
   "scored_at_utc": "2026-09-12T00:00:00+00:00",
-  "rationale": "Explicit STEX v0.1 audit of the task statement: rate the strongest current digital or physical execution channel, then apply the human-presence constraint. Augmentation is retained separately. Task statement audited: Connect electrical equipment to power sources so that it can be tested before use.",
+  "rationale": "Test connections can be assisted by fixtures and connectors, but equipment, power sources, isolation requirements, and site conditions vary. Representative work retains human responsibility for safe connection and troubleshooting.",
   "review_status": "proposed"
 }

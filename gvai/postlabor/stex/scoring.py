@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 STEX_RUBRIC_VERSION = "STEX v0.1"
+STEX_RUBRIC_V0_2 = "STEX v0.2"
 
 
 def _validate_rating(name: str, value: int | float) -> float:
@@ -21,7 +22,7 @@ def calculate_task_exposure(
     human_presence_requirement: int | float,
 ) -> float:
     """
-    Calculate STEX v0.1 task structural exposure.
+    Calculate STEX task structural exposure.
 
     Formula:
 

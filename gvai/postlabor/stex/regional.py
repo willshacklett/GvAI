@@ -320,6 +320,8 @@ def _build_regional_stex_coverage_plan(
         )
         if profile.get("source") is not None:
             detail["stex_source"] = profile["source"]
+        if profile.get("rubric_version") is not None:
+            detail["stex_rubric_version"] = profile["rubric_version"]
         audited_details.append(detail)
 
     result = aggregate_regional_stex(

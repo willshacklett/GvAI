@@ -17,9 +17,19 @@ The five Nashville profiles remain `proposed`. Software Developers and Pest Cont
 4. Enable `GVAI_STEX_REVIEW_WRITES_ENABLED=1` only for the local/internal review service.
 5. Submit the explicit approval action.
 
+The review package includes a deterministic SHA-256 `approval_revision` computed
+from the complete canonical occupation profile and all task-rating records. The
+browser submits that revision with approval. Any task or profile change after
+the package was loaded makes the revision stale and approval is rejected; the
+reviewer must reload the package.
+
 The approval service validates the occupation summary, every task record, task aggregation, review state, schema, and rubric before writing. It stages each JSON replacement and restores already-replaced files if a later replacement fails. Proposed artifacts do not receive reviewer identity or review timestamps until approval.
 
 The approval POST route is disabled by default and is not a public product feature. Read-only review routes may inspect local artifacts without BLS or O*NET network access.
+
+Approval requires a non-empty string reviewer, an optional string review note,
+and a lowercase 64-character SHA-256 approval revision. Malformed values are
+rejected before any file is changed.
 
 ## Compatibility
 

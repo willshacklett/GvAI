@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
+import re
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,6 +24,54 @@ from .store import (
 
 class STEXReviewError(ValueError):
     pass
+
+
+_APPROVAL_REVISION_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _canonical_json(payload: Any) -> bytes:
+    return json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def _approval_revision(
+    profile: dict[str, Any],
+    tasks: list[dict[str, Any]],
+) -> str:
+    canonical = {
+        "profile": profile,
+        "tasks": sorted(
+            tasks,
+            key=lambda task: str(task.get("task_id") or ""),
+        ),
+    }
+    return hashlib.sha256(_canonical_json(canonical)).hexdigest()
+
+
+def _validate_approval_fields(
+    reviewed_by: str,
+    review_note: str | None,
+    approval_revision: str | None,
+) -> tuple[str, str | None, str]:
+    if not isinstance(reviewed_by, str) or not reviewed_by.strip():
+        raise STEXReviewError(
+            "reviewed_by must be a non-empty human identifier."
+        )
+    if review_note is not None and not isinstance(review_note, str):
+        raise STEXReviewError("review_note must be a string or null.")
+    if approval_revision is None:
+        raise STEXReviewError("approval_revision is required.")
+    if not isinstance(approval_revision, str) or not _APPROVAL_REVISION_RE.fullmatch(
+        approval_revision
+    ):
+        raise STEXReviewError(
+            "approval_revision must be a lowercase SHA-256 hex digest."
+        )
+    return reviewed_by.strip(), review_note, approval_revision
 
 
 def list_proposed_occupations(
@@ -83,6 +133,7 @@ def _task_record_from_payload(payload: dict[str, Any]) -> TaskRatingRecord:
             rationale=payload["rationale"],
             scored_at_utc=payload["scored_at_utc"],
             review_status=payload["review_status"],
+            rubric_version=payload["rubric_version"],
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise STEXReviewError(f"Invalid task rating schema: {exc}") from exc
@@ -141,6 +192,7 @@ def get_review_package(
         "rated_task_count": profile["rated_task_count"],
         "unrated_task_count": profile["unrated_task_count"],
         "source": profile.get("source"),
+        "approval_revision": _approval_revision(profile, tasks),
         "tasks": package_tasks,
     }
 
@@ -150,7 +202,7 @@ def _validate_approval(
     *,
     data_root: Path,
     ratings_root: Path,
-) -> tuple[dict[str, Any], list[TaskRatingRecord]]:
+) -> tuple[dict[str, Any], list[TaskRatingRecord], list[dict[str, Any]]]:
     profile = load_occupation_stex_profile(code, data_root=data_root)
     if profile.get("review_status") != "proposed":
         raise STEXReviewError("Occupation is not currently proposed.")
@@ -198,7 +250,7 @@ def _validate_approval(
             raise STEXReviewError(
                 f"Occupation summary does not match task aggregation: {field}"
             )
-    return profile, records
+    return profile, records, raw_tasks
 
 
 def _write_json_atomically(path: Path, payload: dict[str, Any]) -> None:
@@ -264,22 +316,30 @@ def approve_occupation(
     occupation_code: str,
     reviewed_by: str,
     review_note: str | None = None,
+    approval_revision: str | None = None,
     *,
     data_root: Path | None = None,
     ratings_root: Path | None = None,
     reviewed_at_utc: str | None = None,
 ) -> dict[str, Any]:
-    reviewer = (reviewed_by or "").strip()
-    if not reviewer:
-        raise STEXReviewError("reviewed_by must be a non-empty human identifier.")
+    reviewer, review_note, reviewed_revision = _validate_approval_fields(
+        reviewed_by,
+        review_note,
+        approval_revision,
+    )
     code = normalize_occupation_code(occupation_code)
     profile_root = Path(data_root) if data_root is not None else DEFAULT_STEX_DATA_ROOT
     ratings_base = Path(ratings_root) if ratings_root is not None else DEFAULT_STEX_TASK_RATINGS_ROOT
-    profile, records = _validate_approval(
+    profile, records, raw_tasks = _validate_approval(
         code,
         data_root=profile_root,
         ratings_root=ratings_base,
     )
+    current_revision = _approval_revision(profile, raw_tasks)
+    if current_revision != reviewed_revision:
+        raise STEXReviewError(
+            "approval_revision is stale; reload the review package."
+        )
     timestamp = _normalize_review_timestamp(reviewed_at_utc)
     profile_path = occupation_profile_path(code, data_root=profile_root)
     task_paths = [ratings_base / code.replace(".", "_") / f"{record.task_id}.json" for record in records]
@@ -308,6 +368,18 @@ def approve_occupation(
 
     replaced: list[Path] = []
     try:
+        latest_profile = load_occupation_stex_profile(
+            code,
+            data_root=profile_root,
+        )
+        latest_tasks = []
+        latest_task_dir = ratings_base / code.replace(".", "_")
+        for path in sorted(latest_task_dir.glob("*.json")):
+            latest_tasks.append(json.loads(path.read_text()))
+        if _approval_revision(latest_profile, latest_tasks) != reviewed_revision:
+            raise STEXReviewError(
+                "approval_revision is stale; reload the review package."
+            )
         for path, payload in updated_tasks:
             _write_json_atomically(path, payload)
             replaced.append(path)

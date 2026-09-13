@@ -2,12 +2,22 @@ import pytest
 
 from gvai.postlabor.stex import (
     STEX_RUBRIC_VERSION,
+    STEX_RUBRIC_V0_2,
     calculate_task_exposure,
 )
 
 
 def test_rubric_version():
     assert STEX_RUBRIC_VERSION == "STEX v0.1"
+    assert STEX_RUBRIC_V0_2 == "STEX v0.2"
+
+
+def test_v02_uses_the_same_exposure_formula_with_human_presence_r():
+    assert calculate_task_exposure(
+        digital_capability=2,
+        physical_execution=4,
+        human_presence_requirement=1,
+    ) == 75.0
 
 
 def test_digital_documentation_example():
