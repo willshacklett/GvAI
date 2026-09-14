@@ -2,6 +2,10 @@ import os
 from openai import OpenAI
 
 from privacy.egress import authorize_external_model
+from privacy.runtime import (
+    private_build_enabled,
+    run_private_model,
+)
 
 
 def active_provider():
@@ -24,6 +28,12 @@ def available_providers():
 
 
 def call_model(system_prompt: str, user_content: str):
+    if private_build_enabled():
+        return run_private_model(
+            system_prompt,
+            user_content,
+        )
+
     provider = active_provider()
 
     if provider == "openai":
