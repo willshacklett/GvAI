@@ -30,25 +30,38 @@ def private_env(monkeypatch):
 def test_model_router_blocked(monkeypatch):
     private_env(monkeypatch)
 
+    monkeypatch.delenv(
+        "GVAI_PRIVATE_MODEL_COMMAND",
+        raising=False,
+    )
+
     import gvai.model_router as mod
 
-    class FakeCompletions:
-        create = staticmethod(block_sdk_call)
-
-    class FakeChat:
-        completions = FakeCompletions()
-
-    class FakeClient:
-        chat = FakeChat()
+    class ForbiddenOpenAI:
+        def __init__(
+            self,
+            *args,
+            **kwargs,
+        ):
+            raise AssertionError(
+                "EXTERNAL MODEL CALL REACHED — "
+                "PRIVACY BYPASS DETECTED"
+            )
 
     monkeypatch.setattr(
         mod,
         "OpenAI",
-        lambda *a, **k: FakeClient(),
+        ForbiddenOpenAI,
     )
 
-    with pytest.raises(PermissionError):
-        mod.call_model("system", "PRIVATE")
+    with pytest.raises(
+        RuntimeError,
+        match="GVAI_PRIVATE_MODEL_COMMAND",
+    ):
+        mod.call_model(
+            "system",
+            "PRIVATE",
+        )
 
 
 def test_llm_blocked(monkeypatch):
