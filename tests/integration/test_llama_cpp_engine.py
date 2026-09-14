@@ -28,6 +28,10 @@ assert "-n" in args
 assert "-c" in args
 assert "--temp" in args
 assert "--no-display-prompt" in args
+assert "--single-turn" in args
+assert "--simple-io" in args
+assert "--log-disable" in args
+assert "--no-show-timings" in args
 
 prompt = args[
     args.index("-p") + 1
@@ -207,3 +211,31 @@ def test_llama_adapter_fails_closed_without_model(
             "system",
             "private",
         )
+
+
+def test_llama_output_extractor_removes_console_wrapper():
+    from privacy.llama_cpp_engine import (
+        _extract_model_reply,
+    )
+
+    raw = """
+Loading model...
+
+> System:
+You are GVAI.
+
+User:
+Say hello.
+
+Assistant:
+
+Hello from the local model.
+
+
+Exiting...
+"""
+
+    assert (
+        _extract_model_reply(raw)
+        == "Hello from the local model."
+    )
