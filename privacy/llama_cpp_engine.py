@@ -113,6 +113,24 @@ def _temperature() -> float:
     return value
 
 
+def _extract_model_reply(output: str) -> str:
+    text = output.strip()
+
+    if "Assistant:" in text:
+        text = text.rsplit(
+            "Assistant:",
+            1,
+        )[1]
+
+    if "Exiting..." in text:
+        text = text.split(
+            "Exiting...",
+            1,
+        )[0]
+
+    return text.strip()
+
+
 def run() -> str:
     prompt = sys.stdin.read()
 
@@ -155,6 +173,10 @@ def run() -> str:
         "--temp",
         str(temperature),
         "--no-display-prompt",
+        "--single-turn",
+        "--simple-io",
+        "--log-disable",
+        "--no-show-timings",
     ]
 
     result = subprocess.run(
@@ -171,7 +193,9 @@ def run() -> str:
             f"stderr={result.stderr.strip()}"
         )
 
-    reply = result.stdout.strip()
+    reply = _extract_model_reply(
+        result.stdout
+    )
 
     if not reply:
         raise RuntimeError(
