@@ -1,6 +1,4 @@
 import os
-from openai import OpenAI
-
 from privacy.egress import authorize_external_model
 from privacy.runtime import (
     private_build_enabled,
@@ -37,6 +35,7 @@ def call_model(system_prompt: str, user_content: str):
     provider = active_provider()
 
     if provider == "openai":
+        from openai import OpenAI
         payload = {
             "model": os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
             "messages": [
