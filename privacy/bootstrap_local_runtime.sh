@@ -20,7 +20,7 @@ if [[ ! -x "$LLAMA_BIN" ]]; then
   tmp_dir="$(mktemp -d)"
   trap 'rm -rf "$tmp_dir"' EXIT
   echo "Downloading llama.cpp $LLAMA_BUILD..."
-  curl -fL "$LLAMA_URL" -o "$tmp_dir/$LLAMA_ARCHIVE"
+  python -c 'import sys, urllib.request; urllib.request.urlretrieve(sys.argv[1], sys.argv[2])' "$LLAMA_URL" "$tmp_dir/$LLAMA_ARCHIVE"
   tar -xzf "$tmp_dir/$LLAMA_ARCHIVE" -C "$LLAMA_DIR"
   candidate="$(find "$LLAMA_DIR" -type f -name llama-cli -print -quit)"
   if [[ -z "$candidate" ]]; then
@@ -35,7 +35,7 @@ fi
 
 if [[ ! -f "$MODEL_PATH" ]]; then
   echo "Downloading Qwen GGUF..."
-  curl -fL "$MODEL_URL" -o "$MODEL_PATH"
+  python -c 'import sys, urllib.request; urllib.request.urlretrieve(sys.argv[1], sys.argv[2])' "$MODEL_URL" "$MODEL_PATH"
 fi
 
 actual_sha="$(sha256sum "$MODEL_PATH" | awk '{print $1}')"
