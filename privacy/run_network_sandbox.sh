@@ -15,9 +15,12 @@ exec unshare \
     set -eu
 
     # The sandbox receives a fresh network namespace.
-    # Only loopback is enabled. There is deliberately
+    # Enable loopback when iproute2 is available.
+    # Without it, loopback remains down; there is still
     # no route or external network interface.
-    ip link set lo up
+    if command -v ip >/dev/null 2>&1; then
+      ip link set lo up
+    fi
 
     exec "$@"
   ' sh "$@"
