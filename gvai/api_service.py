@@ -19,6 +19,9 @@ from gvai.postlabor.region_intel import (
     resolve_us_region,
     resolve_us_aggregate_region,
 )
+from gvai.postlabor.region_labor_intelligence import (
+    synthesize_region_labor_intelligence,
+)
 from gvai.postlabor.stex.store import (
     InvalidSTEXOccupationCode,
     STEXProfileNotFound,
@@ -943,6 +946,38 @@ def api_region():
             "error_type": type(exc).__name__,
             "error": str(exc),
         }), 500
+
+
+@app.get("/api/region/labor-intelligence")
+def api_region_labor_intelligence():
+    try:
+        latitude = float(request.args.get("lat"))
+        longitude = float(request.args.get("lon"))
+    except (TypeError, ValueError):
+        return jsonify({
+            "supported": False,
+            "reason":
+                "Valid lat and lon query parameters are required.",
+        }), 400
+
+    try:
+        result = synthesize_region_labor_intelligence(
+            latitude=latitude,
+            longitude=longitude,
+        )
+
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({
+            "supported": False,
+            "latitude": latitude,
+            "longitude": longitude,
+            "reason":
+                "Regional labor intelligence synthesis failed.",
+            "error_type": type(exc).__name__,
+            "error": str(exc),
+        }), 500
+
 
 def build_gv_runtime_policy(user_message=""):
     """
