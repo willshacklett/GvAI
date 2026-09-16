@@ -836,6 +836,47 @@
       line-height: 1.5;
     }
 
+    .worker-outlook-card {
+      display: none;
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--panel-soft);
+    }
+
+    .worker-outlook-card.visible {
+      display: block;
+    }
+
+    .worker-outlook-button {
+      margin-top: 10px;
+      width: 100%;
+    }
+
+    .worker-outlook-summary {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .worker-outlook-facts {
+      margin: 10px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .worker-outlook-gaps {
+      margin: 10px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
 
     @media (max-width: 900px) {
       .brand-sub {
@@ -1106,6 +1147,19 @@
           </div>
         </div>
       </div>
+
+      <button
+        id="worker-outlook-btn"
+        class="worker-outlook-button"
+      >
+        View Worker Outlook for this region
+      </button>
+    </div>
+
+    <div id="worker-outlook-card" class="worker-outlook-card" aria-live="polite">
+      <div class="section-title" style="margin-top:0">Worker Outlook</div>
+      <div id="worker-outlook-status" class="stex-status">Select a region and an audited occupation.</div>
+      <div id="worker-outlook-content"></div>
     </div>
 
 
@@ -1601,6 +1655,9 @@ const GEOGRAPHY_VISIBILITY = {
 };
 
 let activeRegionRequestId = 0;
+let currentRegionLatitude = null;
+let currentRegionLongitude = null;
+let currentOccupationCode = null;
 
 async function loadSelectedCountyBoundary(
   stateFips,
@@ -4380,6 +4437,10 @@ async function loadRegionalData(
   // Never allow statistics from the previously selected
   // geography to survive into a new selection.
   clearRegionalMetrics();
+  clearWorkerOutlook();
+  currentRegionLatitude = null;
+  currentRegionLongitude = null;
+  renderWorkerOutlookAvailability();
 
   if (scope === "country") {
     title.textContent =
@@ -4446,6 +4507,10 @@ async function loadRegionalData(
     if (!data.supported) {
       clearRegionalMetrics();
 
+      currentRegionLatitude = null;
+      currentRegionLongitude = null;
+      renderWorkerOutlookAvailability();
+
       sub.textContent =
         "Global regional datasets are coming next.";
 
@@ -4474,8 +4539,15 @@ async function loadRegionalData(
       void loadRegionalSTEX(data.oews_area_code, requestId);
 
     if (scope !== "country" && scope !== "state") {
+      currentRegionLatitude = latitude;
+      currentRegionLongitude = longitude;
       void loadRegionalLaborIntelligence(latitude, longitude, requestId);
+    } else {
+      currentRegionLatitude = null;
+      currentRegionLongitude = null;
     }
+
+    renderWorkerOutlookAvailability();
 
     if (
       scope === "country"
@@ -5020,6 +5092,10 @@ document
             ++activeRegionRequestId;
 
           clearRegionalMetrics();
+          clearWorkerOutlook();
+          currentRegionLatitude = null;
+          currentRegionLongitude = null;
+          renderWorkerOutlookAvailability();
 
           title.textContent =
             data.country ||
@@ -5527,6 +5603,7 @@ async function loadOccupationSTEXCatalog() {
 
     if (firstCode) {
       selectEl.value = firstCode;
+      currentOccupationCode = firstCode;
       await loadOccupationSTEX(firstCode);
     }
 
@@ -5565,6 +5642,10 @@ document
       const code =
         event.target.value;
 
+      currentOccupationCode = code || null;
+      clearWorkerOutlook();
+      renderWorkerOutlookAvailability();
+
       if (code) {
         await loadOccupationSTEX(code);
       }
@@ -5573,6 +5654,123 @@ document
 
 
 loadOccupationSTEXCatalog();
+
+
+function clearWorkerOutlook() {
+  const card = document.getElementById("worker-outlook-card");
+  const content = document.getElementById("worker-outlook-content");
+  if (card) card.classList.remove("visible");
+  if (content) content.innerHTML = "";
+}
+
+function renderWorkerOutlookAvailability() {
+  const button = document.getElementById("worker-outlook-btn");
+  if (!button) return;
+
+  const ready =
+    currentRegionLatitude !== null &&
+    currentRegionLongitude !== null &&
+    !!currentOccupationCode;
+
+  button.disabled = !ready;
+  button.textContent = ready
+    ? "View Worker Outlook for this region"
+    : "Select a region and an audited occupation";
+}
+
+async function loadWorkerOutlook() {
+  if (
+    currentRegionLatitude === null ||
+    currentRegionLongitude === null ||
+    !currentOccupationCode
+  ) {
+    return;
+  }
+
+  const requestId = ++activeRegionRequestId;
+  const latitude = currentRegionLatitude;
+  const longitude = currentRegionLongitude;
+  const occupationCode = currentOccupationCode;
+
+  const card = document.getElementById("worker-outlook-card");
+  const status = document.getElementById("worker-outlook-status");
+  const content = document.getElementById("worker-outlook-content");
+  if (!card || !status || !content) return;
+
+  card.classList.add("visible");
+  status.textContent = "Loading worker outlook...";
+  content.innerHTML = "";
+
+  try {
+    const endpoint =
+      (window.GVAI_API_BASE || "") +
+      `/api/worker/region-outlook?lat=${encodeURIComponent(latitude)}` +
+      `&lon=${encodeURIComponent(longitude)}` +
+      `&occupation=${encodeURIComponent(occupationCode)}`;
+
+    const response = await fetch(endpoint);
+    const data = await response.json();
+
+    if (requestId !== activeRegionRequestId) return;
+
+    if (!response.ok || !data.ok || !data.supported) {
+      status.textContent =
+        data.reason || "Worker outlook is unavailable for this selection.";
+      content.innerHTML = "";
+      return;
+    }
+
+    const occupation = data.occupation || {};
+    const stex = occupation.stex || {};
+    const employment = occupation.regional_employment || {};
+
+    const facts = [];
+
+    if (stex.status === "known") {
+      const profile = stex.profile || {};
+      facts.push(
+        `Audited STEX structural exposure: ${profile.structural_exposure} (${profile.rubric_version || "STEX"})`
+      );
+    }
+
+    if (employment.status === "known") {
+      facts.push(
+        `Regional employment in this occupation: ${formatCompact(employment.employment)}`
+      );
+    }
+
+    const factsMarkup = facts.length
+      ? `<ul class="worker-outlook-facts">${facts.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+      : "";
+
+    const gaps = Array.isArray(data.constraints) ? data.constraints : [];
+    const gapsMarkup = gaps.length
+      ? `<div class="worker-outlook-summary"><strong>Unavailable / unknown</strong></div><ul class="worker-outlook-gaps">${gaps.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+      : "";
+
+    status.textContent =
+      `${data.occupation_title || data.occupation_code} · ${data.county || "Selected region"} · no composite score`;
+
+    content.innerHTML = `
+      <div class="worker-outlook-summary">${escapeHtml(data.worker_outlook?.summary || "")}</div>
+      ${factsMarkup}
+      ${gapsMarkup}
+    `;
+  } catch (error) {
+    if (requestId !== activeRegionRequestId) return;
+    console.error("Worker outlook load failed:", error);
+    status.textContent = "Worker outlook is temporarily unavailable.";
+    content.innerHTML = "";
+  }
+}
+
+document
+  .getElementById("worker-outlook-btn")
+  .addEventListener("click", () => {
+    void loadWorkerOutlook();
+  });
+
+renderWorkerOutlookAvailability();
 
 
 
