@@ -23,6 +23,7 @@ from gvai.postlabor.region_labor_intelligence import (
     synthesize_region_labor_intelligence,
 )
 from gvai.postlabor.worker_region_outlook import (
+    synthesize_worker_related_occupations,
     synthesize_worker_region_outlook,
 )
 from gvai.postlabor.stex.store import (
@@ -1035,6 +1036,45 @@ def api_worker_region_outlook():
                 "Worker-region outlook synthesis failed.",
             "error_type": type(exc).__name__,
             "error": str(exc),
+        }), 500
+
+
+@app.get("/api/worker/related-occupations")
+def api_worker_related_occupations():
+    occupation_code = (request.args.get("occupation") or "").strip()
+
+    if not occupation_code:
+        return jsonify({
+            "ok": False,
+            "reason": "An O*NET-SOC occupation code is required.",
+            "example": "37-2021.00",
+        }), 400
+
+    try:
+        latitude = float(request.args.get("lat"))
+        longitude = float(request.args.get("lon"))
+    except (TypeError, ValueError):
+        return jsonify({
+            "ok": False,
+            "reason": "Valid lat and lon query parameters are required.",
+        }), 400
+
+    try:
+        result = synthesize_worker_related_occupations(
+            latitude=latitude,
+            longitude=longitude,
+            occupation_code=occupation_code,
+        )
+        return jsonify({"ok": True, **result})
+    except InvalidSTEXOccupationCode as exc:
+        return jsonify({"ok": False, "reason": str(exc)}), 400
+    except Exception:
+        return jsonify({
+            "ok": False,
+            "latitude": latitude,
+            "longitude": longitude,
+            "occupation_code": occupation_code,
+            "reason": "Related occupations synthesis failed.",
         }), 500
 
 

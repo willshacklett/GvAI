@@ -6,9 +6,11 @@ from pathlib import Path
 import gvai.api_service as api_service
 import gvai.postlabor.worker_region_outlook as worker_region_outlook
 from gvai.postlabor.sources.oews import OEWSEmploymentEstimate
+from gvai.postlabor.sources.onet import OnetRelatedOccupation
 from gvai.postlabor.stex.store import STEXProfileNotFound
 from gvai.postlabor.worker_region_outlook import (
     InvalidSTEXOccupationCode,
+    synthesize_worker_related_occupations,
     synthesize_worker_region_outlook,
 )
 
@@ -104,6 +106,23 @@ class _FakeMissingSnapshotOEWSClient:
 
     def fetch_catalog_regional_employment(self, *, area_code, source_year):
         raise RuntimeError("OEWS employment cache has no refreshed data")
+
+
+class _FakeOnetClient:
+    def related_occupations(self, occupation_code):
+        return [
+            OnetRelatedOccupation("53-7062.00", "Laborers", False),
+            OnetRelatedOccupation(
+                "37-2021.00",
+                "Pest Control Workers",
+                True,
+            ),
+        ]
+
+
+class _UnavailableOnetClient:
+    def related_occupations(self, occupation_code):
+        raise RuntimeError("O*NET unavailable")
 
 
 def test_supported_county_and_supported_occupation(monkeypatch):
@@ -280,6 +299,120 @@ def test_no_composite_score_or_geographic_opportunity(monkeypatch):
     assert '"bad"' not in serialized
 
 
+def test_related_occupations_preserve_source_order_and_facts(monkeypatch):
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "synthesize_region_labor_intelligence",
+        lambda *args, **kwargs: _supported_region_payload(),
+    )
+
+    def load_profile(code):
+        if code == "37-2021.00":
+            return _stex_profile()
+        raise STEXProfileNotFound(code)
+
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "load_occupation_stex_profile",
+        load_profile,
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "OEWSClient",
+        _FakeOEWSClient,
+    )
+
+    result = synthesize_worker_related_occupations(
+        36.16,
+        -86.78,
+        "37-2021.00",
+        onet_client=_FakeOnetClient(),
+    )
+
+    items = result["related_occupations"]["items"]
+    assert [item["occupation_code"] for item in items] == [
+        "53-7062.00",
+        "37-2021.00",
+    ]
+    assert items[0]["stex"]["status"] == "unknown"
+    assert items[0]["stex"]["profile"] is None
+    assert items[1]["stex"]["status"] == "known"
+    assert items[0]["regional_employment"]["status"] == "unknown"
+    assert items[0]["regional_employment"]["employment"] is None
+    assert items[1]["regional_employment"]["employment"] == 1250.0
+    assert items[1]["relationship_metadata"] == {
+        "bright_outlook": True,
+    }
+    assert "re-rank" in result["related_occupations"]["explanation"]
+
+    serialized = json.dumps(result).lower()
+    prohibited = (
+        "transition_score",
+        "career_adjacency",
+        "geographic_opportunity",
+        "skill_transferability",
+        "demand_outlook",
+        "wage_retention",
+        "retraining_burden",
+        "automation_displacement_pressure",
+        "confidence",
+        "composite",
+    )
+    assert not any(field in serialized for field in prohibited)
+    assert '"structural_exposure": 0' not in serialized
+
+
+def test_related_occupations_unavailable_is_explicit(monkeypatch):
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "synthesize_region_labor_intelligence",
+        lambda *args, **kwargs: _supported_region_payload(),
+    )
+
+    result = synthesize_worker_related_occupations(
+        36.16,
+        -86.78,
+        "37-2021.00",
+        onet_client=_UnavailableOnetClient(),
+    )
+
+    assert result["related_occupations"]["status"] == "unavailable"
+    assert result["related_occupations"]["items"] == []
+
+
+def test_related_occupations_is_deterministic_with_fixed_sources(monkeypatch):
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "synthesize_region_labor_intelligence",
+        lambda *args, **kwargs: _supported_region_payload(),
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "load_occupation_stex_profile",
+        lambda code: _stex_profile(),
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "OEWSClient",
+        _FakeOEWSClient,
+    )
+
+    first = synthesize_worker_related_occupations(
+        36.16,
+        -86.78,
+        "37-2021.00",
+        onet_client=_FakeOnetClient(),
+    )
+    second = synthesize_worker_related_occupations(
+        36.16,
+        -86.78,
+        "37-2021.00",
+        onet_client=_FakeOnetClient(),
+    )
+
+    assert first == second
+
+
 # --- API endpoint tests -----------------------------------------------
 
 
@@ -353,6 +486,38 @@ def test_api_worker_region_outlook_does_not_mutate_existing_endpoints():
     assert region.status_code in (200, 400, 500)
 
 
+def test_api_related_occupations_validation_and_success(monkeypatch):
+    client = api_service.app.test_client()
+
+    assert client.get(
+        "/api/worker/related-occupations?lat=36.16&lon=-86.78"
+    ).status_code == 400
+    assert client.get(
+        "/api/worker/related-occupations?occupation=37-2021.00"
+    ).status_code == 400
+    assert client.get(
+        "/api/worker/related-occupations?lat=36.16&lon=-86.78"
+        "&occupation=bogus"
+    ).status_code == 400
+
+    monkeypatch.setattr(
+        api_service,
+        "synthesize_worker_related_occupations",
+        lambda **kwargs: {
+            "supported": True,
+            "related_occupations": {"status": "known", "items": []},
+        },
+    )
+
+    response = client.get(
+        "/api/worker/related-occupations?lat=36.16&lon=-86.78"
+        "&occupation=37-2021.00"
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["related_occupations"]["status"] == "known"
+
+
 # --- UI contract tests ---------------------------------------------------
 
 
@@ -424,6 +589,21 @@ def test_main_globe_worker_outlook_clears_on_selection_change():
     # Worker outlook must be cleared both on occupation change and on
     # region change so stale data cannot linger on screen.
     assert html.count("clearWorkerOutlook();") >= 2
+
+
+def test_main_globe_related_occupations_contract_and_order():
+    html = (ROOT / "web/index.html").read_text()
+
+    assert 'id="related-occupations-btn"' in html
+    assert 'id="related-occupations-card"' in html
+    assert "/api/worker/related-occupations?lat=" in html
+    assert "O*NET Related Occupations" in html
+    assert "not recommending a job change" in html
+    assert "does not re-rank the source results" in html
+    assert html.index('id="worker-outlook-card"') < html.index(
+        'id="related-occupations-card"'
+    )
+    assert "clearRelatedOccupations();" in html
 
 
 def test_main_globe_regional_labor_intelligence_contract_still_present():
