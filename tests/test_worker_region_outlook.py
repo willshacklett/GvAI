@@ -380,6 +380,57 @@ def test_related_occupations_unavailable_is_explicit(monkeypatch):
     assert result["related_occupations"]["items"] == []
 
 
+class _HTTPErrorOnetClient:
+    def related_occupations(self, occupation_code):
+        import requests
+
+        response = requests.Response()
+        response.status_code = 503
+        raise requests.HTTPError("upstream failure", response=response)
+
+
+def test_related_occupations_failure_logs_safely_without_leaking_secrets(
+    monkeypatch, caplog
+):
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "synthesize_region_labor_intelligence",
+        lambda *args, **kwargs: _supported_region_payload(),
+    )
+    monkeypatch.setenv("ONET_API_KEY", "super-secret-onet-key")
+
+    with caplog.at_level("WARNING", logger=worker_region_outlook.__name__):
+        result = synthesize_worker_related_occupations(
+            36.16,
+            -86.78,
+            "37-2021.00",
+            onet_client=_HTTPErrorOnetClient(),
+        )
+
+    # Public API response is unchanged and carries no diagnostic details.
+    assert result["related_occupations"]["status"] == "unavailable"
+    assert result["related_occupations"]["items"] == []
+    serialized_result = json.dumps(result)
+    assert "HTTPError" not in serialized_result
+    assert "503" not in serialized_result
+    assert "super-secret-onet-key" not in serialized_result
+
+    # A safe diagnostic log entry was emitted.
+    assert len(caplog.records) == 1
+    log_message = caplog.records[0].getMessage()
+    assert "HTTPError" in log_message
+    assert "api-v2.onetcenter.org" in log_message
+    assert "37-2021.00" in log_message
+    assert "503" in log_message
+
+    # Secrets, headers, and full URLs are never logged.
+    assert "super-secret-onet-key" not in log_message
+    assert "ONET_API_KEY" not in log_message
+    assert "authorization" not in log_message.lower()
+    assert "x-api-key" not in log_message.lower()
+    assert "https://" not in log_message
+
+
 def test_related_occupations_is_deterministic_with_fixed_sources(monkeypatch):
     monkeypatch.setattr(
         worker_region_outlook,
