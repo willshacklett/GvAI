@@ -494,10 +494,30 @@
       color: var(--muted);
     }
 
-    .stex-contributors {
+    .stex-audit-disclosure {
       margin-top: 12px;
       padding-top: 11px;
       border-top: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .stex-audit-disclosure summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 750;
+      letter-spacing: 0.08em;
+      line-height: 1.35;
+      text-transform: uppercase;
+    }
+
+    .stex-audit-disclosure summary:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 4px;
+      border-radius: 6px;
+    }
+
+    .stex-contributors {
+      margin-top: 10px;
     }
 
     .stex-contributors-title {
@@ -1128,25 +1148,13 @@
 
       <div id="stex-note" class="stex-note">
         Structural task exposure under the GVAI STEX methodology.
-        This is not a probability of job loss.
+        This is not a probability of job loss or percent automatable.
       </div>
 
       <div id="stex-status" class="stex-status">
         Loading audited occupation profile…
       </div>
 
-
-      <div class="stex-contributors">
-        <div class="stex-contributors-title">
-          Top task contributors
-        </div>
-
-        <div id="stex-contributors-list">
-          <div class="stex-status">
-            Loading task contributors…
-          </div>
-        </div>
-      </div>
 
       <button
         id="worker-outlook-btn"
@@ -1161,6 +1169,22 @@
       <div id="worker-outlook-status" class="stex-status">Select a region and an audited occupation.</div>
       <div id="worker-outlook-content"></div>
     </div>
+
+    <details id="stex-task-audit" class="stex-audit-disclosure">
+      <summary>View detailed STEX task audit</summary>
+
+      <div class="stex-contributors">
+        <div class="stex-contributors-title">
+          Top task contributors
+        </div>
+
+        <div id="stex-contributors-list">
+          <div class="stex-status">
+            Loading task contributors…
+          </div>
+        </div>
+      </div>
+    </details>
 
 
     <div class="actions">
@@ -5511,7 +5535,7 @@ async function loadOccupationSTEX(
       profile.interpretation ||
       (
         "Structural task exposure under the GVAI STEX methodology. " +
-        "This is not a probability of job loss."
+        "This is not a probability of job loss or percent automatable."
       );
 
     statusEl.textContent =

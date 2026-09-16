@@ -359,12 +359,53 @@ def test_api_worker_region_outlook_does_not_mutate_existing_endpoints():
 def test_main_globe_contains_worker_outlook_contract():
     html = (ROOT / "web/index.html").read_text()
 
+    assert 'id="stex-occupation-select"' in html
     assert 'id="worker-outlook-btn"' in html
     assert 'id="worker-outlook-card"' in html
     assert 'id="worker-outlook-status"' in html
     assert 'id="worker-outlook-content"' in html
     assert "/api/worker/region-outlook?lat=" in html
     assert "no composite score" in html
+
+
+def test_main_globe_worker_outlook_precedes_detailed_stex_audit():
+    html = (ROOT / "web/index.html").read_text()
+
+    assert html.index('id="stex-occupation-name"') < html.index(
+        'id="worker-outlook-btn"'
+    )
+    assert html.index('id="worker-outlook-btn"') < html.index(
+        'id="worker-outlook-card"'
+    )
+    assert html.index('id="worker-outlook-card"') < html.index(
+        'id="stex-task-audit"'
+    )
+    assert html.index('id="stex-task-audit"') < html.index(
+        'id="stex-contributors-list"'
+    )
+
+
+def test_main_globe_detailed_stex_audit_is_collapsible_and_present():
+    html = (ROOT / "web/index.html").read_text()
+
+    assert '<details id="stex-task-audit"' in html
+    assert "<summary>View detailed STEX task audit</summary>" in html
+    assert "Top task contributors" in html
+    assert 'id="stex-contributors-list"' in html
+    assert '<details id="stex-task-audit" class="stex-audit-disclosure">' in html
+    assert '<details id="stex-task-audit" class="stex-audit-disclosure" open>' not in html
+
+
+def test_main_globe_compact_stex_summary_contract():
+    html = (ROOT / "web/index.html").read_text()
+
+    assert 'id="stex-occupation-name"' in html
+    assert 'id="stex-occupation-code"' in html
+    assert 'id="stex-score"' in html
+    assert 'id="stex-rated"' in html
+    assert 'id="stex-source-year"' in html
+    assert "Structural task exposure under the GVAI STEX methodology." in html
+    assert "not a probability of job loss or percent automatable" in html
 
 
 def test_main_globe_worker_outlook_requires_region_and_occupation():
