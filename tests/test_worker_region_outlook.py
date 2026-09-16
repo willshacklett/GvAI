@@ -156,8 +156,47 @@ def test_supported_county_and_supported_occupation(monkeypatch):
     employment = result["occupation"]["regional_employment"]
     assert employment["status"] == "known"
     assert employment["employment"] == 1250.0
+    assert employment["match_specificity"] == "exact"
+    assert employment["oews_occupation_code"] == "37-2021.00"
 
     assert "market" not in result["occupation"]
+
+
+def test_worker_region_outlook_broader_category_employment_is_labeled(
+    monkeypatch,
+):
+    """11-9199.11 (Brownfield Redevelopment Specialists and Site Managers)
+    only has OEWS data for its broader SOC group, 11-9199 Managers, All
+    Other. GVAI must never present that 6,420 as specific to the detailed
+    O*NET occupation."""
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "synthesize_region_labor_intelligence",
+        lambda *args, **kwargs: _supported_region_payload(),
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "load_occupation_stex_profile",
+        _always_missing_stex_profile,
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "OEWSClient",
+        _FakeBrownfieldOEWSClient,
+    )
+
+    result = synthesize_worker_region_outlook(36.16, -86.78, "11-9199.11")
+
+    employment = result["occupation"]["regional_employment"]
+    assert employment["status"] == "known"
+    assert employment["match_specificity"] == "broader_category"
+    assert employment["employment"] == 6420.0
+    assert employment["oews_occupation_code"] == "11-9199.00"
+    assert employment["occupation_title"] == "Managers, All Other"
+
+    summary = result["worker_outlook"]["summary"]
+    assert "broader OEWS category" in summary
+    assert "Managers, All Other" in summary
 
 
 def test_missing_stex_profile_is_unknown_not_zero(monkeypatch):
@@ -584,6 +623,115 @@ def test_related_occupations_known_regional_employment_from_packaged_snapshot(
     # STEX remains unknown for every item since no audited profile exists.
     assert all(item["stex"]["status"] == "unknown" for item in items)
     assert all(item["stex"]["profile"] is None for item in items)
+
+
+class _FakeBrownfieldOEWSClient:
+    """Packaged snapshot only reports the 6-digit SOC "Managers, All Other"."""
+
+    def __init__(self):
+        pass
+
+    def fetch_catalog_regional_employment(self, *, area_code, source_year):
+        return (
+            OEWSEmploymentEstimate(
+                area_code=area_code,
+                occupation_code="00-0000.00",
+                series_id="OEUM003498000000000000001",
+                year=source_year,
+                employment=1099300.0,
+            ),
+            [
+                OEWSEmploymentEstimate(
+                    area_code=area_code,
+                    occupation_code="37-2021.00",
+                    series_id="OEUM003498000000372021001",
+                    year=source_year,
+                    employment=1250.0,
+                    occupation_title="Pest Control Workers",
+                ),
+                OEWSEmploymentEstimate(
+                    area_code=area_code,
+                    occupation_code="11-9199.00",
+                    series_id="OEUM003498000000011919901",
+                    year=source_year,
+                    employment=6420.0,
+                    occupation_title="Managers, All Other",
+                ),
+            ],
+        )
+
+
+class _FakeBrownfieldOnetClient:
+    def related_occupations(self, occupation_code):
+        return [
+            OnetRelatedOccupation(
+                "11-9199.11",
+                "Brownfield Redevelopment Specialists and Site Managers",
+                False,
+            ),
+            OnetRelatedOccupation(
+                "37-2021.00",
+                "Pest Control Workers",
+                True,
+            ),
+        ]
+
+
+def test_related_occupations_broader_category_match_is_labeled(monkeypatch):
+    """11-9199.11 shares OEWS SOC 11-9199 "Managers, All Other" with many
+    other O*NET occupations; OEWS does not publish a number specific to
+    Brownfield Redevelopment Specialists and Site Managers."""
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "synthesize_region_labor_intelligence",
+        lambda *args, **kwargs: _supported_region_payload(),
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "load_occupation_stex_profile",
+        _always_missing_stex_profile,
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "OEWSClient",
+        _FakeBrownfieldOEWSClient,
+    )
+
+    result = synthesize_worker_related_occupations(
+        36.16,
+        -86.78,
+        "37-2021.00",
+        onet_client=_FakeBrownfieldOnetClient(),
+    )
+
+    items = result["related_occupations"]["items"]
+
+    # O*NET source order is preserved exactly.
+    assert [item["occupation_code"] for item in items] == [
+        "11-9199.11",
+        "37-2021.00",
+    ]
+
+    brownfield, pest_control = items[0], items[1]
+
+    # Exact match: O*NET-SOC code and OEWS SOC code are the same occupation.
+    pest_employment = pest_control["regional_employment"]
+    assert pest_employment["status"] == "known"
+    assert pest_employment["match_specificity"] == "exact"
+    assert pest_employment["employment"] == 1250.0
+    assert pest_employment["oews_occupation_code"] == "37-2021.00"
+
+    # Broader-category match: the factual OEWS number is preserved, but it
+    # is explicitly attributed to the broader SOC group, not to the detailed
+    # O*NET occupation.
+    brownfield_employment = brownfield["regional_employment"]
+    assert brownfield_employment["status"] == "known"
+    assert brownfield_employment["match_specificity"] == "broader_category"
+    assert brownfield_employment["employment"] == 6420.0
+    assert brownfield_employment["oews_occupation_code"] == "11-9199.00"
+    assert brownfield_employment["occupation_title"] == "Managers, All Other"
+    assert "broader" in brownfield_employment["explanation"].lower()
+    assert "11-9199.11" in brownfield_employment["explanation"]
 
 
 def test_related_occupations_deduplicates_top_level_constraints(monkeypatch):
