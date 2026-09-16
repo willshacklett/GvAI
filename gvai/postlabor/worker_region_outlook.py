@@ -75,6 +75,14 @@ def _occupation_stex_signal(occupation_code: str) -> Dict[str, Any]:
     }
 
 
+def _onet_soc_suffix(occupation_code: str) -> str:
+    """Return the O*NET-SOC detail suffix, e.g. "11-9199.11" -> "11"."""
+    code = str(occupation_code or "").strip()
+    if "." in code:
+        return code.split(".", 1)[1]
+    return "00"
+
+
 def _occupation_regional_employment_signal(
     oews_area_code: str | None,
     occupation_code: str,
@@ -87,6 +95,8 @@ def _occupation_regional_employment_signal(
             "status": "unknown",
             "employment": None,
             "occupation_title": None,
+            "oews_occupation_code": None,
+            "match_specificity": None,
             "explanation": (
                 "No packaged OEWS labor-market area is available "
                 "for this county, so local employment for this "
@@ -111,6 +121,8 @@ def _occupation_regional_employment_signal(
             "status": "unknown",
             "employment": None,
             "occupation_title": None,
+            "oews_occupation_code": None,
+            "match_specificity": None,
             "explanation": (
                 "Regional OEWS employment data has not been "
                 "refreshed for this area and year, so local "
@@ -135,10 +147,37 @@ def _occupation_regional_employment_signal(
             "status": "unknown",
             "employment": None,
             "occupation_title": None,
+            "oews_occupation_code": None,
+            "match_specificity": None,
             "explanation": (
                 "This occupation is not present in the packaged "
                 "regional OEWS employment snapshot, so local "
                 "employment is unknown."
+            ),
+        }
+
+    # OEWS only publishes employment at the 6-digit SOC level. Any O*NET-SOC
+    # code with a detail suffix other than ".00" is one of several detailed
+    # O*NET occupations sharing a single, broader published SOC group, so the
+    # matched employment number describes that whole SOC group, not this
+    # detailed occupation alone.
+    is_broader_category = _onet_soc_suffix(occupation_code) != "00"
+
+    if is_broader_category:
+        return {
+            "id": "occupation_regional_employment",
+            "status": "known",
+            "employment": match.employment,
+            "occupation_title": match.occupation_title,
+            "oews_occupation_code": normalized_soc,
+            "match_specificity": "broader_category",
+            "source_year": stex_year,
+            "explanation": (
+                f"OEWS does not publish employment specific to "
+                f"{occupation_code}. This figure of {match.employment} is "
+                f"the broader published OEWS category "
+                f'"{match.occupation_title}" ({normalized_soc}) within '
+                f"this labor-market area."
             ),
         }
 
@@ -147,6 +186,8 @@ def _occupation_regional_employment_signal(
         "status": "known",
         "employment": match.employment,
         "occupation_title": match.occupation_title,
+        "oews_occupation_code": normalized_soc,
+        "match_specificity": "exact",
         "source_year": stex_year,
         "explanation": (
             f"Regional employment in this occupation is estimated "
@@ -181,10 +222,18 @@ def _build_worker_outlook_summary(
         )
 
     if employment_signal["status"] == "known":
-        parts.append(
-            "regional employment in this occupation is estimated at "
-            f"{employment_signal['employment']}"
-        )
+        if employment_signal.get("match_specificity") == "broader_category":
+            parts.append(
+                "regional employment for the broader OEWS category "
+                f'"{employment_signal.get("occupation_title")}" is '
+                f"{employment_signal['employment']} (not specific to "
+                "this detailed occupation)"
+            )
+        else:
+            parts.append(
+                "regional employment in this occupation is estimated at "
+                f"{employment_signal['employment']}"
+            )
     else:
         parts.append(
             "regional employment for this occupation is unknown"

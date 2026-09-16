@@ -5801,7 +5801,11 @@ async function loadRelatedOccupations() {
         const employment = item.regional_employment || {};
         const facts = [];
         if (stex.status === "known") facts.push(`Audited STEX: ${stex.profile?.structural_exposure} (${stex.profile?.rubric_version || "STEX"})`);
-        if (employment.status === "known") facts.push(`Regional employment: ${formatCompact(employment.employment)}`);
+        if (employment.status === "known" && employment.match_specificity === "broader_category") {
+          facts.push(`Regional employment for broader OEWS category "${employment.occupation_title || ""}" (${employment.oews_occupation_code || ""}): ${formatCompact(employment.employment)} — not specific to this occupation`);
+        } else if (employment.status === "known") {
+          facts.push(`Regional employment: ${formatCompact(employment.employment)}`);
+        }
         if (!facts.length) facts.push("STEX and regional employment are unavailable.");
         return `<li class="related-occupation-item"><strong>${escapeHtml(item.occupation_title || item.occupation_code)}</strong><br>${escapeHtml(item.occupation_code)}<ul>${facts.map(fact => `<li>${escapeHtml(fact)}</li>`).join("")}</ul></li>`;
       }).join("")}</ul>
@@ -5869,7 +5873,11 @@ async function loadWorkerOutlook() {
       );
     }
 
-    if (employment.status === "known") {
+    if (employment.status === "known" && employment.match_specificity === "broader_category") {
+      facts.push(
+        `Regional employment for broader OEWS category "${employment.occupation_title || ""}" (${employment.oews_occupation_code || ""}): ${formatCompact(employment.employment)} — not specific to this occupation`
+      );
+    } else if (employment.status === "known") {
       facts.push(
         `Regional employment in this occupation: ${formatCompact(employment.employment)}`
       );
