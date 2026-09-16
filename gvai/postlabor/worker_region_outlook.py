@@ -24,9 +24,10 @@ converted to zero or filled in with an invented value.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict
 
-from requests import RequestException
+from requests import HTTPError, RequestException
 
 from gvai.postlabor.region_labor_intelligence import (
     DEFAULT_STEX_SOURCE_YEAR,
@@ -40,6 +41,11 @@ from gvai.postlabor.stex.store import (
     load_occupation_stex_profile,
     normalize_occupation_code,
 )
+
+logger = logging.getLogger(__name__)
+
+# Fixed, non-secret upstream hostname for safe diagnostic logging only.
+ONET_UPSTREAM_HOST = "api-v2.onetcenter.org"
 
 
 def _occupation_stex_signal(occupation_code: str) -> Dict[str, Any]:
@@ -319,7 +325,22 @@ def synthesize_worker_related_occupations(
     try:
         client = onet_client or OnetClient()
         related_occupations = client.related_occupations(normalized_code)
-    except (RuntimeError, RequestException, ValueError, LookupError):
+    except (RuntimeError, RequestException, ValueError, LookupError) as exc:
+        status_code = None
+        if isinstance(exc, HTTPError) and exc.response is not None:
+            status_code = exc.response.status_code
+
+        # Safe diagnostic only: no keys, headers, or URLs are ever logged.
+        logger.warning(
+            "O*NET related_occupations request failed "
+            "(exception_class=%s, upstream_host=%s, "
+            "occupation_code=%s, upstream_status_code=%s)",
+            type(exc).__name__,
+            ONET_UPSTREAM_HOST,
+            normalized_code,
+            status_code,
+        )
+
         return {
             "supported": True,
             "data_available": bool(region.get("data_available")),
