@@ -26,10 +26,13 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+from requests import RequestException
+
 from gvai.postlabor.region_labor_intelligence import (
     DEFAULT_STEX_SOURCE_YEAR,
     synthesize_region_labor_intelligence,
 )
+from gvai.postlabor.sources.onet import OnetClient
 from gvai.postlabor.sources.oews import OEWSClient, normalize_soc_code
 from gvai.postlabor.stex.store import (
     InvalidSTEXOccupationCode,
@@ -283,7 +286,117 @@ def synthesize_worker_region_outlook(
     }
 
 
+def synthesize_worker_related_occupations(
+    latitude: float,
+    longitude: float,
+    occupation_code: str,
+    *,
+    acs_year: int = 2024,
+    stex_year: int = DEFAULT_STEX_SOURCE_YEAR,
+    onet_client: OnetClient | None = None,
+) -> Dict[str, Any]:
+    """Return O*NET related occupations with only available local facts."""
+    normalized_code = normalize_occupation_code(occupation_code)
+    region = synthesize_region_labor_intelligence(
+        latitude,
+        longitude,
+        acs_year=acs_year,
+        stex_year=stex_year,
+    )
+
+    if not region.get("supported"):
+        return {
+            "supported": False,
+            "latitude": latitude,
+            "longitude": longitude,
+            "occupation_code": normalized_code,
+            "reason": region.get(
+                "reason",
+                "No U.S. county resolved for this coordinate.",
+            ),
+        }
+
+    try:
+        client = onet_client or OnetClient()
+        related_occupations = client.related_occupations(normalized_code)
+    except (RuntimeError, RequestException, ValueError, LookupError):
+        return {
+            "supported": True,
+            "data_available": bool(region.get("data_available")),
+            "latitude": latitude,
+            "longitude": longitude,
+            "county": region.get("county"),
+            "occupation_code": normalized_code,
+            "related_occupations": {
+                "status": "unavailable",
+                "items": [],
+                "explanation": (
+                    "O*NET Related Occupations is unavailable for this "
+                    "selection, so no related occupations are shown."
+                ),
+            },
+            "constraints": list(region.get("constraints") or []),
+            "sources": list(region.get("sources") or []),
+        }
+
+    constraints = list(region.get("constraints") or [])
+    items = []
+
+    for related in related_occupations:
+        try:
+            related_code = normalize_occupation_code(
+                related.occupation_code
+            )
+        except InvalidSTEXOccupationCode:
+            continue
+
+        stex_signal = _occupation_stex_signal(related_code)
+        employment_signal = _occupation_regional_employment_signal(
+            region.get("oews_area_code"),
+            related_code,
+            stex_year=stex_year,
+        )
+
+        for signal in (stex_signal, employment_signal):
+            if signal["status"] == "unknown":
+                constraints.append(signal["explanation"])
+
+        items.append({
+            "occupation_code": related_code,
+            "occupation_title": related.title,
+            "relationship_source": "O*NET Related Occupations",
+            "relationship_metadata": {
+                "bright_outlook": related.bright_outlook,
+            },
+            "stex": stex_signal,
+            "regional_employment": employment_signal,
+        })
+
+    sources = list(region.get("sources") or [])
+    sources.append({"name": "O*NET Related Occupations"})
+
+    return {
+        "supported": True,
+        "data_available": bool(region.get("data_available")),
+        "latitude": latitude,
+        "longitude": longitude,
+        "county": region.get("county"),
+        "occupation_code": normalized_code,
+        "related_occupations": {
+            "status": "known",
+            "items": items,
+            "explanation": (
+                "Displayed in O*NET source order. GVAI does not re-rank "
+                "these occupations."
+            ),
+        },
+        "constraints": constraints,
+        "sources": sources,
+    }
+
+
 __all__ = [
     "InvalidSTEXOccupationCode",
+    "synthesize_worker_related_occupations",
     "synthesize_worker_region_outlook",
 ]

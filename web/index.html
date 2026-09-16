@@ -897,6 +897,23 @@
       line-height: 1.5;
     }
 
+    .related-occupations-card {
+      display: none;
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--panel-soft);
+    }
+
+    .related-occupations-card.visible {
+      display: block;
+    }
+
+    .related-occupation-item {
+      margin-top: 10px;
+    }
+
 
     @media (max-width: 900px) {
       .brand-sub {
@@ -1168,6 +1185,16 @@
       <div class="section-title" style="margin-top:0">Worker Outlook</div>
       <div id="worker-outlook-status" class="stex-status">Select a region and an audited occupation.</div>
       <div id="worker-outlook-content"></div>
+    </div>
+
+    <button id="related-occupations-btn" class="worker-outlook-button">
+      View related occupations
+    </button>
+
+    <div id="related-occupations-card" class="related-occupations-card" aria-live="polite">
+      <div class="section-title" style="margin-top:0">Related occupations to investigate</div>
+      <div id="related-occupations-status" class="stex-status">Select a region and an occupation.</div>
+      <div id="related-occupations-content"></div>
     </div>
 
     <details id="stex-task-audit" class="stex-audit-disclosure">
@@ -5685,6 +5712,14 @@ function clearWorkerOutlook() {
   const content = document.getElementById("worker-outlook-content");
   if (card) card.classList.remove("visible");
   if (content) content.innerHTML = "";
+  clearRelatedOccupations();
+}
+
+function clearRelatedOccupations() {
+  const card = document.getElementById("related-occupations-card");
+  const content = document.getElementById("related-occupations-content");
+  if (card) card.classList.remove("visible");
+  if (content) content.innerHTML = "";
 }
 
 function renderWorkerOutlookAvailability() {
@@ -5700,6 +5735,83 @@ function renderWorkerOutlookAvailability() {
   button.textContent = ready
     ? "View Worker Outlook for this region"
     : "Select a region and an audited occupation";
+  renderRelatedOccupationsAvailability();
+}
+
+function renderRelatedOccupationsAvailability() {
+  const button = document.getElementById("related-occupations-btn");
+  if (!button) return;
+
+  const ready =
+    currentRegionLatitude !== null &&
+    currentRegionLongitude !== null &&
+    !!currentOccupationCode;
+
+  button.disabled = !ready;
+  button.textContent = ready
+    ? "View related occupations"
+    : "Select a region and an occupation";
+}
+
+async function loadRelatedOccupations() {
+  if (
+    currentRegionLatitude === null ||
+    currentRegionLongitude === null ||
+    !currentOccupationCode
+  ) {
+    return;
+  }
+
+  const requestId = ++activeRegionRequestId;
+  const latitude = currentRegionLatitude;
+  const longitude = currentRegionLongitude;
+  const occupationCode = currentOccupationCode;
+  const card = document.getElementById("related-occupations-card");
+  const status = document.getElementById("related-occupations-status");
+  const content = document.getElementById("related-occupations-content");
+  if (!card || !status || !content) return;
+
+  card.classList.add("visible");
+  status.textContent = "Loading O*NET related occupations...";
+  content.innerHTML = "";
+
+  try {
+    const endpoint =
+      (window.GVAI_API_BASE || "") +
+      `/api/worker/related-occupations?lat=${encodeURIComponent(latitude)}` +
+      `&lon=${encodeURIComponent(longitude)}` +
+      `&occupation=${encodeURIComponent(occupationCode)}`;
+    const response = await fetch(endpoint);
+    const data = await response.json();
+
+    if (requestId !== activeRegionRequestId) return;
+
+    const related = data.related_occupations || {};
+    if (!response.ok || !data.ok || !data.supported || related.status !== "known") {
+      status.textContent = related.explanation || data.reason || "Related occupations are unavailable for this selection.";
+      return;
+    }
+
+    status.textContent = related.explanation;
+    const items = Array.isArray(related.items) ? related.items : [];
+    content.innerHTML = `
+      <div class="worker-outlook-summary">Occupations come from O*NET Related Occupations. GVAI is not recommending a job change and does not re-rank the source results.</div>
+      <ul class="worker-outlook-facts">${items.map(item => {
+        const stex = item.stex || {};
+        const employment = item.regional_employment || {};
+        const facts = [];
+        if (stex.status === "known") facts.push(`Audited STEX: ${stex.profile?.structural_exposure} (${stex.profile?.rubric_version || "STEX"})`);
+        if (employment.status === "known") facts.push(`Regional employment: ${formatCompact(employment.employment)}`);
+        if (!facts.length) facts.push("STEX and regional employment are unavailable.");
+        return `<li class="related-occupation-item"><strong>${escapeHtml(item.occupation_title || item.occupation_code)}</strong><br>${escapeHtml(item.occupation_code)}<ul>${facts.map(fact => `<li>${escapeHtml(fact)}</li>`).join("")}</ul></li>`;
+      }).join("")}</ul>
+    `;
+  } catch (error) {
+    if (requestId !== activeRegionRequestId) return;
+    console.error("Related occupations load failed:", error);
+    status.textContent = "Related occupations are temporarily unavailable.";
+    content.innerHTML = "";
+  }
 }
 
 async function loadWorkerOutlook() {
@@ -5792,6 +5904,12 @@ document
   .getElementById("worker-outlook-btn")
   .addEventListener("click", () => {
     void loadWorkerOutlook();
+  });
+
+document
+  .getElementById("related-occupations-btn")
+  .addEventListener("click", () => {
+    void loadRelatedOccupations();
   });
 
 renderWorkerOutlookAvailability();
