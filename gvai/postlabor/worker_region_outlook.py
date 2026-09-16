@@ -34,7 +34,7 @@ from gvai.postlabor.region_labor_intelligence import (
     synthesize_region_labor_intelligence,
 )
 from gvai.postlabor.sources.onet import OnetClient
-from gvai.postlabor.sources.oews import OEWSClient, normalize_soc_code
+from gvai.postlabor.sources.oews import OEWSClient, format_oews_soc_code
 from gvai.postlabor.stex.store import (
     InvalidSTEXOccupationCode,
     STEXProfileNotFound,
@@ -95,7 +95,7 @@ def _occupation_regional_employment_signal(
         }
 
     try:
-        normalized_soc = normalize_soc_code(occupation_code)
+        normalized_soc = format_oews_soc_code(occupation_code)
     except ValueError:
         normalized_soc = None
 
@@ -118,14 +118,16 @@ def _occupation_regional_employment_signal(
             ),
         }
 
-    match = next(
-        (
-            row
-            for row in rows
-            if row.occupation_code == normalized_soc
-        ),
-        None,
-    )
+    match = None
+    if normalized_soc is not None:
+        for row in rows:
+            try:
+                row_soc = format_oews_soc_code(row.occupation_code)
+            except ValueError:
+                continue
+            if row_soc == normalized_soc:
+                match = row
+                break
 
     if match is None:
         return {
@@ -379,7 +381,7 @@ def synthesize_worker_related_occupations(
         )
 
         for signal in (stex_signal, employment_signal):
-            if signal["status"] == "unknown":
+            if signal["status"] == "unknown" and signal["explanation"] not in constraints:
                 constraints.append(signal["explanation"])
 
         items.append({

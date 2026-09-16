@@ -431,6 +431,7 @@ def test_related_occupations_failure_logs_safely_without_leaking_secrets(
     assert "https://" not in log_message
 
 
+# --- API endpoint tests -----------------------------------------------
 def test_related_occupations_is_deterministic_with_fixed_sources(monkeypatch):
     monkeypatch.setattr(
         worker_region_outlook,
@@ -462,6 +463,210 @@ def test_related_occupations_is_deterministic_with_fixed_sources(monkeypatch):
     )
 
     assert first == second
+
+
+class _FakeMultiOccupationOEWSClient:
+    """Mirrors the packaged snapshot's dash-dot occupation code format."""
+
+    def __init__(self):
+        pass
+
+    def fetch_catalog_regional_employment(self, *, area_code, source_year):
+        return (
+            OEWSEmploymentEstimate(
+                area_code=area_code,
+                occupation_code="00-0000.00",
+                series_id="OEUM003498000000000000001",
+                year=source_year,
+                employment=1099300.0,
+            ),
+            [
+                OEWSEmploymentEstimate(
+                    area_code=area_code,
+                    occupation_code="37-2021.00",
+                    series_id="OEUM003498000000372021001",
+                    year=source_year,
+                    employment=1250.0,
+                    occupation_title="Pest Control Workers",
+                ),
+                OEWSEmploymentEstimate(
+                    area_code=area_code,
+                    occupation_code="37-3011.00",
+                    series_id="OEUM003498000000373011001",
+                    year=source_year,
+                    employment=4200.0,
+                    occupation_title=(
+                        "Landscaping and Groundskeeping Workers"
+                    ),
+                ),
+            ],
+        )
+
+
+class _FakeMultiOnetClient:
+    def related_occupations(self, occupation_code):
+        return [
+            OnetRelatedOccupation(
+                "37-3012.00",
+                "Pesticide Handlers, Sprayers, and Applicators, Vegetation",
+                False,
+            ),
+            OnetRelatedOccupation(
+                "37-3011.00",
+                "Landscaping and Groundskeeping Workers",
+                True,
+            ),
+            OnetRelatedOccupation(
+                "37-2021.00",
+                "Pest Control Workers",
+                True,
+            ),
+        ]
+
+
+def _always_missing_stex_profile(code):
+    raise STEXProfileNotFound(code)
+
+
+def test_related_occupations_known_regional_employment_from_packaged_snapshot(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "synthesize_region_labor_intelligence",
+        lambda *args, **kwargs: _supported_region_payload(),
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "load_occupation_stex_profile",
+        _always_missing_stex_profile,
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "OEWSClient",
+        _FakeMultiOccupationOEWSClient,
+    )
+
+    result = synthesize_worker_related_occupations(
+        36.16,
+        -86.78,
+        "37-2021.00",
+        onet_client=_FakeMultiOnetClient(),
+    )
+
+    items = result["related_occupations"]["items"]
+
+    # O*NET source order is preserved exactly.
+    assert [item["occupation_code"] for item in items] == [
+        "37-3012.00",
+        "37-3011.00",
+        "37-2021.00",
+    ]
+
+    # Known regional employment matches even though the packaged snapshot
+    # stores dash-dot O*NET-SOC codes rather than bare six-digit codes.
+    landscaping, pest_control = items[1], items[2]
+    assert landscaping["regional_employment"]["status"] == "known"
+    assert landscaping["regional_employment"]["employment"] == 4200.0
+    assert pest_control["regional_employment"]["status"] == "known"
+    assert pest_control["regional_employment"]["employment"] == 1250.0
+
+    # Unknown/null (never zero) when the occupation is absent from the
+    # snapshot.
+    pesticide_handlers = items[0]
+    assert pesticide_handlers["regional_employment"]["status"] == "unknown"
+    assert pesticide_handlers["regional_employment"]["employment"] is None
+
+    serialized = json.dumps(result)
+    assert '"employment": 0' not in serialized
+    assert '"employment": 0.0' not in serialized
+
+    # STEX remains unknown for every item since no audited profile exists.
+    assert all(item["stex"]["status"] == "unknown" for item in items)
+    assert all(item["stex"]["profile"] is None for item in items)
+
+
+def test_related_occupations_deduplicates_top_level_constraints(monkeypatch):
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "synthesize_region_labor_intelligence",
+        lambda *args, **kwargs: _supported_region_payload(),
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "load_occupation_stex_profile",
+        _always_missing_stex_profile,
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "OEWSClient",
+        _FakeMissingSnapshotOEWSClient,
+    )
+
+    result = synthesize_worker_related_occupations(
+        36.16,
+        -86.78,
+        "37-2021.00",
+        onet_client=_FakeMultiOnetClient(),
+    )
+
+    constraints = result["constraints"]
+
+    # Identical missing-data constraints are not repeated once per occupation.
+    assert len(constraints) == len(set(constraints))
+    stex_missing_messages = [
+        c for c in constraints if "No audited STEX profile" in c
+    ]
+    employment_missing_messages = [
+        c
+        for c in constraints
+        if "OEWS employment data has not been refreshed" in c
+    ]
+    assert len(stex_missing_messages) == 1
+    assert len(employment_missing_messages) == 1
+
+    # Each item still carries its own explanation/status for auditability.
+    for item in result["related_occupations"]["items"]:
+        assert item["stex"]["status"] == "unknown"
+        assert item["stex"]["explanation"]
+        assert item["regional_employment"]["status"] == "unknown"
+        assert item["regional_employment"]["explanation"]
+
+
+def test_related_occupations_no_ranking_or_recommendation_fields(monkeypatch):
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "synthesize_region_labor_intelligence",
+        lambda *args, **kwargs: _supported_region_payload(),
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "load_occupation_stex_profile",
+        _always_missing_stex_profile,
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "OEWSClient",
+        _FakeMultiOccupationOEWSClient,
+    )
+
+    result = synthesize_worker_related_occupations(
+        36.16,
+        -86.78,
+        "37-2021.00",
+        onet_client=_FakeMultiOnetClient(),
+    )
+
+    serialized = json.dumps(result).lower()
+    prohibited = (
+        "ranking",
+        "recommendation",
+        "recommend_",
+        "geographic_opportunity",
+        "composite",
+        "gvai_score",
+    )
+    assert not any(field in serialized for field in prohibited)
 
 
 # --- API endpoint tests -----------------------------------------------
