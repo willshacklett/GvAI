@@ -26,6 +26,9 @@ from gvai.postlabor.worker_region_outlook import (
     synthesize_worker_related_occupations,
     synthesize_worker_region_outlook,
 )
+from gvai.postlabor.worker_transition_evidence import (
+    synthesize_worker_transition_evidence,
+)
 from gvai.postlabor.stex.store import (
     InvalidSTEXOccupationCode,
     STEXProfileNotFound,
@@ -1075,6 +1078,41 @@ def api_worker_related_occupations():
             "longitude": longitude,
             "occupation_code": occupation_code,
             "reason": "Related occupations synthesis failed.",
+        }), 500
+
+
+@app.get("/api/worker/transition-evidence")
+def api_worker_transition_evidence():
+    source_code = (request.args.get("source") or "").strip()
+    target_code = (request.args.get("target") or "").strip()
+    source_title = (request.args.get("source_title") or "").strip() or None
+    target_title = (request.args.get("target_title") or "").strip() or None
+
+    if not source_code or not target_code:
+        return jsonify({
+            "ok": False,
+            "reason":
+                "Both source and target O*NET-SOC occupation codes "
+                "are required.",
+            "example": "source=37-2021.00&target=37-3012.00",
+        }), 400
+
+    try:
+        result = synthesize_worker_transition_evidence(
+            source_code,
+            target_code,
+            source_occupation_title=source_title,
+            target_occupation_title=target_title,
+        )
+        return jsonify({"ok": True, **result})
+    except InvalidSTEXOccupationCode as exc:
+        return jsonify({"ok": False, "reason": str(exc)}), 400
+    except Exception:
+        return jsonify({
+            "ok": False,
+            "source": source_code,
+            "target": target_code,
+            "reason": "Career transition evidence synthesis failed.",
         }), 500
 
 
