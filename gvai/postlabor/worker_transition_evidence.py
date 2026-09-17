@@ -79,6 +79,24 @@ def _normalize_activity(item: Any) -> Dict[str, Any]:
     }
 
 
+def _normalize_knowledge(item: Any) -> Dict[str, Any]:
+    return {
+        "id": item.element_id,
+        "name": item.name,
+        "description": item.description,
+        "importance": item.importance,
+    }
+
+
+def _normalize_ability(item: Any) -> Dict[str, Any]:
+    return {
+        "id": item.element_id,
+        "name": item.name,
+        "description": item.description,
+        "importance": item.importance,
+    }
+
+
 def _compare_elements(
     source_items: List[Dict[str, Any]],
     target_items: List[Dict[str, Any]],
@@ -214,9 +232,28 @@ def synthesize_worker_transition_evidence(
         target_code=target_code,
         signal_name="skill",
     )
+    knowledge_comparison = _build_comparison_signal(
+        fetch=client.knowledge,
+        normalize=_normalize_knowledge,
+        source_code=source_code,
+        target_code=target_code,
+        signal_name="knowledge",
+    )
+    ability_comparison = _build_comparison_signal(
+        fetch=client.abilities,
+        normalize=_normalize_ability,
+        source_code=source_code,
+        target_code=target_code,
+        signal_name="ability",
+    )
 
     constraints = []
-    for signal in (work_activity_comparison, skill_comparison):
+    for signal in (
+        work_activity_comparison,
+        skill_comparison,
+        knowledge_comparison,
+        ability_comparison,
+    ):
         if signal["status"] == "unavailable":
             constraints.append(signal["explanation"])
 
@@ -237,6 +274,8 @@ def synthesize_worker_transition_evidence(
         "materiality_threshold": TRANSITION_EVIDENCE_MATERIALITY_THRESHOLD,
         "work_activity_comparison": work_activity_comparison,
         "skill_comparison": skill_comparison,
+        "knowledge_comparison": knowledge_comparison,
+        "ability_comparison": ability_comparison,
         "explanation": (
             "GVAI compares O*NET occupational profiles. This does not "
             "determine whether an individual is qualified for a job "

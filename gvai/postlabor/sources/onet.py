@@ -25,7 +25,7 @@ class OnetWorkActivity:
     element_id: str
     name: str
     description: str
-    importance: float
+    importance: Optional[float]
 
 
 @dataclass(frozen=True)
@@ -42,7 +42,36 @@ class OnetKnowledge:
     element_id: str
     name: str
     description: str
-    importance: float
+    importance: Optional[float]
+
+
+
+@dataclass(frozen=True)
+class OnetAbility:
+    element_id: str
+    name: str
+    description: str
+    importance: Optional[float]
+
+
+
+@dataclass(frozen=True)
+class OnetJobZone:
+    code: Optional[int]
+    title: Optional[str]
+    education: Optional[str]
+    related_experience: Optional[str]
+    job_training: Optional[str]
+    job_zone_examples: Optional[str]
+    svp_range: Optional[str]
+
+
+
+@dataclass(frozen=True)
+class OnetEducationLevel:
+    code: Optional[int]
+    title: str
+    percentage_of_respondents: Optional[float]
 
 
 
@@ -55,6 +84,16 @@ class OnetRelatedOccupation:
 
 
 ONET_BASE_URL = "https://api-v2.onetcenter.org"
+
+
+def _optional_str(value: object) -> Optional[str]:
+    """Preserve a missing/null upstream field as None, never as ''."""
+    return None if value is None else str(value)
+
+
+def _optional_float(value: object) -> Optional[float]:
+    """Preserve a missing/null upstream number as None, never as 0.0."""
+    return None if value is None else float(value)
 
 
 class OnetClient:
@@ -202,9 +241,83 @@ class OnetClient:
                 element_id=str(item.get("id") or ""),
                 name=str(item.get("name") or ""),
                 description=str(item.get("description") or ""),
-                importance=float(item.get("importance") or 0.0),
+                importance=_optional_float(item.get("importance")),
             )
             for item in elements
+        ]
+
+    def abilities(
+        self,
+        occupation_code: str,
+    ) -> List[OnetAbility]:
+        payload = self._get(
+            f"/online/occupations/{occupation_code}/details/abilities",
+            params={
+                "start": 1,
+                "end": 100,
+                "sort": "importance",
+            },
+        )
+
+        elements = payload.get("element") or []
+
+        return [
+            OnetAbility(
+                element_id=str(item.get("id") or ""),
+                name=str(item.get("name") or ""),
+                description=str(item.get("description") or ""),
+                importance=_optional_float(item.get("importance")),
+            )
+            for item in elements
+        ]
+
+    def job_zone(
+        self,
+        occupation_code: str,
+    ) -> OnetJobZone:
+        payload = self._get(
+            f"/online/occupations/{occupation_code}/details/job_zone",
+        )
+
+        return OnetJobZone(
+            code=(
+                int(payload["code"])
+                if payload.get("code") is not None
+                else None
+            ),
+            title=_optional_str(payload.get("title")),
+            education=_optional_str(payload.get("education")),
+            related_experience=_optional_str(payload.get("related_experience")),
+            job_training=_optional_str(payload.get("job_training")),
+            job_zone_examples=_optional_str(payload.get("job_zone_examples")),
+            svp_range=_optional_str(payload.get("svp_range")),
+        )
+
+    def education(
+        self,
+        occupation_code: str,
+    ) -> List[OnetEducationLevel]:
+        payload = self._get(
+            f"/online/occupations/{occupation_code}/details/education",
+        )
+
+        levels = payload.get("response") or []
+
+        return [
+            OnetEducationLevel(
+                code=(
+                    int(item["code"])
+                    if item.get("code") is not None
+                    else None
+                ),
+                title=str(item.get("title") or ""),
+                percentage_of_respondents=(
+                    float(item["percentage_of_respondents"])
+                    if item.get("percentage_of_respondents") is not None
+                    else None
+                ),
+            )
+            for item in levels
         ]
 
     def tasks(
@@ -254,7 +367,7 @@ class OnetClient:
                 element_id=str(item.get("id") or ""),
                 name=str(item.get("name") or ""),
                 description=str(item.get("description") or ""),
-                importance=float(item.get("importance") or 0.0),
+                importance=_optional_float(item.get("importance")),
             )
             for item in elements
         ]
