@@ -5,7 +5,7 @@ from pathlib import Path
 
 import gvai.api_service as api_service
 import gvai.postlabor.worker_region_outlook as worker_region_outlook
-from gvai.postlabor.sources.oews import OEWSEmploymentEstimate
+from gvai.postlabor.sources.oews import OEWSEmploymentEstimate, OEWSWageEstimate
 from gvai.postlabor.sources.onet import OnetRelatedOccupation
 from gvai.postlabor.stex.store import STEXProfileNotFound
 from gvai.postlabor.worker_region_outlook import (
@@ -99,6 +99,20 @@ class _FakeOEWSClient:
             ],
         )
 
+    def fetch_catalog_regional_wages(self, *, area_code, source_year):
+        return [
+            OEWSWageEstimate(
+                area_code=area_code,
+                occupation_code="37-2021.00",
+                year=source_year,
+                median_hourly_wage=21.32,
+                median_annual_wage=44350.0,
+                occupation_title="Pest Control Workers",
+                source="BLS OEWS time-series machine-readable data",
+                catalog_source="BLS OEWS time-series catalog",
+            ),
+        ]
+
 
 class _FakeMissingSnapshotOEWSClient:
     def __init__(self):
@@ -106,6 +120,9 @@ class _FakeMissingSnapshotOEWSClient:
 
     def fetch_catalog_regional_employment(self, *, area_code, source_year):
         raise RuntimeError("OEWS employment cache has no refreshed data")
+
+    def fetch_catalog_regional_wages(self, *, area_code, source_year):
+        raise RuntimeError("OEWS wage cache has no refreshed data")
 
 
 class _FakeOnetClient:
@@ -541,6 +558,28 @@ class _FakeMultiOccupationOEWSClient:
             ],
         )
 
+    def fetch_catalog_regional_wages(self, *, area_code, source_year):
+        return [
+            OEWSWageEstimate(
+                area_code=area_code,
+                occupation_code="37-2021.00",
+                year=source_year,
+                median_hourly_wage=21.32,
+                median_annual_wage=44350.0,
+                occupation_title="Pest Control Workers",
+                source="BLS OEWS time-series machine-readable data",
+            ),
+            OEWSWageEstimate(
+                area_code=area_code,
+                occupation_code="37-3011.00",
+                year=source_year,
+                median_hourly_wage=15.87,
+                median_annual_wage=33010.0,
+                occupation_title="Landscaping and Groundskeeping Workers",
+                source="BLS OEWS time-series machine-readable data",
+            ),
+        ]
+
 
 class _FakeMultiOnetClient:
     def related_occupations(self, occupation_code):
@@ -659,6 +698,28 @@ class _FakeBrownfieldOEWSClient:
                 ),
             ],
         )
+
+    def fetch_catalog_regional_wages(self, *, area_code, source_year):
+        return [
+            OEWSWageEstimate(
+                area_code=area_code,
+                occupation_code="37-2021.00",
+                year=source_year,
+                median_hourly_wage=21.32,
+                median_annual_wage=44350.0,
+                occupation_title="Pest Control Workers",
+                source="BLS OEWS time-series machine-readable data",
+            ),
+            OEWSWageEstimate(
+                area_code=area_code,
+                occupation_code="11-9199.00",
+                year=source_year,
+                median_hourly_wage=45.87,
+                median_annual_wage=95410.0,
+                occupation_title="Managers, All Other",
+                source="BLS OEWS time-series machine-readable data",
+            ),
+        ]
 
 
 class _FakeBrownfieldOnetClient:
@@ -982,6 +1043,275 @@ def test_api_related_occupations_validation_and_success(monkeypatch):
     assert response.get_json()["related_occupations"]["status"] == "known"
 
 
+# --- Regional wage evidence tests -----------------------------------------
+
+
+class _FakeSuppressedWageOEWSClient:
+    """Wage matches the occupation but BLS suppressed both figures."""
+
+    def __init__(self):
+        pass
+
+    def fetch_catalog_regional_employment(self, *, area_code, source_year):
+        return (
+            OEWSEmploymentEstimate(
+                area_code=area_code,
+                occupation_code="00-0000.00",
+                series_id="OEUM003498000000000000001",
+                year=source_year,
+                employment=1099300.0,
+            ),
+            [
+                OEWSEmploymentEstimate(
+                    area_code=area_code,
+                    occupation_code="37-2021.00",
+                    series_id="OEUM003498000000372021001",
+                    year=source_year,
+                    employment=1250.0,
+                    occupation_title="Pest Control Workers",
+                ),
+            ],
+        )
+
+    def fetch_catalog_regional_wages(self, *, area_code, source_year):
+        return [
+            OEWSWageEstimate(
+                area_code=area_code,
+                occupation_code="37-2021.00",
+                year=source_year,
+                median_hourly_wage=None,
+                median_annual_wage=None,
+                occupation_title="Pest Control Workers",
+                source="BLS OEWS time-series machine-readable data",
+            ),
+        ]
+
+
+class _FakeNoWageSnapshotOEWSClient:
+    """Employment is packaged, but no wage snapshot has been built yet."""
+
+    def __init__(self):
+        pass
+
+    def fetch_catalog_regional_employment(self, *, area_code, source_year):
+        return (
+            OEWSEmploymentEstimate(
+                area_code=area_code,
+                occupation_code="00-0000.00",
+                series_id="OEUM003498000000000000001",
+                year=source_year,
+                employment=1099300.0,
+            ),
+            [
+                OEWSEmploymentEstimate(
+                    area_code=area_code,
+                    occupation_code="37-2021.00",
+                    series_id="OEUM003498000000372021001",
+                    year=source_year,
+                    employment=1250.0,
+                    occupation_title="Pest Control Workers",
+                ),
+            ],
+        )
+
+    def fetch_catalog_regional_wages(self, *, area_code, source_year):
+        raise RuntimeError("OEWS wage cache is missing")
+
+
+def test_worker_outlook_exact_wage_match_reports_median_wage(monkeypatch):
+    """Nashville OEWS area 0034980, Pest Control Workers 37-2021.00, 2025:
+    hourly median wage 21.32, annual median wage 44350."""
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "synthesize_region_labor_intelligence",
+        lambda *args, **kwargs: _supported_region_payload(),
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "load_occupation_stex_profile",
+        _always_missing_stex_profile,
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "OEWSClient",
+        _FakeOEWSClient,
+    )
+
+    result = synthesize_worker_region_outlook(36.16, -86.78, "37-2021.00")
+
+    wage = result["occupation"]["regional_wage"]
+    assert wage["status"] == "known"
+    assert wage["match_specificity"] == "exact"
+    assert wage["median_hourly_wage"] == 21.32
+    assert wage["median_annual_wage"] == 44350.0
+    assert wage["year"] == 2025
+    assert wage["oews_occupation_code"] == "37-2021.00"
+    assert wage["occupation_title"] == "Pest Control Workers"
+    assert wage["source"] == "BLS OEWS time-series machine-readable data"
+    assert "regional OEWS median wage" in result["worker_outlook"]["summary"]
+
+    serialized = json.dumps(result)
+    assert '"median_hourly_wage": 0' not in serialized
+    assert '"median_annual_wage": 0' not in serialized
+
+
+def test_related_occupations_broader_category_wage_is_labeled(monkeypatch):
+    """11-9199.11 shares OEWS SOC 11-9199 "Managers, All Other" with many
+    other O*NET occupations; the packaged median wage is not specific to
+    Brownfield Redevelopment Specialists and Site Managers."""
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "synthesize_region_labor_intelligence",
+        lambda *args, **kwargs: _supported_region_payload(),
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "load_occupation_stex_profile",
+        _always_missing_stex_profile,
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "OEWSClient",
+        _FakeBrownfieldOEWSClient,
+    )
+
+    result = synthesize_worker_related_occupations(
+        36.16,
+        -86.78,
+        "37-2021.00",
+        onet_client=_FakeBrownfieldOnetClient(),
+    )
+
+    items = result["related_occupations"]["items"]
+    brownfield, pest_control = items[0], items[1]
+
+    exact_wage = pest_control["regional_wage"]
+    assert exact_wage["status"] == "known"
+    assert exact_wage["match_specificity"] == "exact"
+    assert exact_wage["median_hourly_wage"] == 21.32
+    assert exact_wage["median_annual_wage"] == 44350.0
+
+    broader_wage = brownfield["regional_wage"]
+    assert broader_wage["status"] == "known"
+    assert broader_wage["match_specificity"] == "broader_category"
+    assert broader_wage["median_hourly_wage"] == 45.87
+    assert broader_wage["median_annual_wage"] == 95410.0
+    assert broader_wage["oews_occupation_code"] == "11-9199.00"
+    assert broader_wage["occupation_title"] == "Managers, All Other"
+    assert "broader" in broader_wage["explanation"].lower()
+    assert "11-9199.11" in broader_wage["explanation"]
+
+
+def test_wage_suppressed_is_unavailable_not_zero(monkeypatch):
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "synthesize_region_labor_intelligence",
+        lambda *args, **kwargs: _supported_region_payload(),
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "load_occupation_stex_profile",
+        _always_missing_stex_profile,
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "OEWSClient",
+        _FakeSuppressedWageOEWSClient,
+    )
+
+    result = synthesize_worker_region_outlook(36.16, -86.78, "37-2021.00")
+
+    wage = result["occupation"]["regional_wage"]
+    assert wage["status"] == "suppressed"
+    assert wage["median_hourly_wage"] is None
+    assert wage["median_annual_wage"] is None
+    assert "not zero" in wage["explanation"]
+
+    serialized = json.dumps(result)
+    assert '"median_hourly_wage": 0' not in serialized
+    assert '"median_annual_wage": 0' not in serialized
+    assert any(
+        "suppressed" in constraint.lower()
+        for constraint in result["constraints"]
+    )
+
+
+def test_wage_unknown_when_no_packaged_wage_snapshot(monkeypatch):
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "synthesize_region_labor_intelligence",
+        lambda *args, **kwargs: _supported_region_payload(),
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "load_occupation_stex_profile",
+        _always_missing_stex_profile,
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "OEWSClient",
+        _FakeNoWageSnapshotOEWSClient,
+    )
+
+    result = synthesize_worker_region_outlook(36.16, -86.78, "37-2021.00")
+
+    wage = result["occupation"]["regional_wage"]
+    assert wage["status"] == "unknown"
+    assert wage["median_hourly_wage"] is None
+    assert wage["median_annual_wage"] is None
+    # Employment remains available even though wage is not.
+    assert result["occupation"]["regional_employment"]["status"] == "known"
+
+
+def test_wage_unknown_when_occupation_absent_from_wage_snapshot(monkeypatch):
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "synthesize_region_labor_intelligence",
+        lambda *args, **kwargs: _supported_region_payload(),
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "load_occupation_stex_profile",
+        _always_missing_stex_profile,
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "OEWSClient",
+        _FakeMultiOccupationOEWSClient,
+    )
+
+    result = synthesize_worker_region_outlook(36.16, -86.78, "37-3012.00")
+
+    wage = result["occupation"]["regional_wage"]
+    assert wage["status"] == "unknown"
+    assert wage["median_hourly_wage"] is None
+    assert wage["median_annual_wage"] is None
+
+
+def test_wage_no_score_or_recommendation_fields(monkeypatch):
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "synthesize_region_labor_intelligence",
+        lambda *args, **kwargs: _supported_region_payload(),
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "load_occupation_stex_profile",
+        _always_missing_stex_profile,
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "OEWSClient",
+        _FakeOEWSClient,
+    )
+
+    result = synthesize_worker_region_outlook(36.16, -86.78, "37-2021.00")
+    wage = result["occupation"]["regional_wage"]
+
+    for banned in ("affordable", "score", "rank", "recommend"):
+        assert banned not in json.dumps(wage).lower()
+
+
 # --- UI contract tests ---------------------------------------------------
 
 
@@ -1165,3 +1495,48 @@ def test_main_globe_regional_stex_contract_still_present():
     assert 'id="regional-stex-card"' in html
     assert "loadRegionalSTEX" in html
     assert "/api/stex/regional?area=" in html
+
+
+def test_main_globe_regional_wage_contract_present():
+    html = (ROOT / "web/index.html").read_text()
+
+    assert "function compactRelatedWageFact" in html
+    assert "regional_wage" in html
+    assert '"related-occupation-wage"' in html
+    assert "Broader OEWS category median wage:" in html
+    assert "Regional median wage:" in html
+    assert "suppressed by BLS" in html
+    assert "median_hourly_wage" in html
+    assert "median_annual_wage" in html
+
+
+def test_main_globe_worker_outlook_shows_exact_vs_broader_wage_language():
+    html = (ROOT / "web/index.html").read_text()
+    outlook_section = html[
+        html.index("async function loadWorkerOutlook"):
+        html.index("async function loadRelatedOccupationDrilldown")
+    ]
+
+    assert "Regional OEWS median wage in this occupation:" in outlook_section
+    assert (
+        'Regional median wage for broader OEWS category "${wage.occupation_title'
+        in outlook_section
+    )
+    assert "not specific to this occupation" in outlook_section
+    assert "suppressed by BLS (unavailable, not zero)" in outlook_section
+
+    # No wage score, ranking, or recommendation vocabulary.
+    for banned in ("wage score", "recommend", "afford", "rank"):
+        assert banned not in outlook_section.lower()
+
+
+def test_main_globe_occupation_drilldown_shows_wage_language():
+    html = (ROOT / "web/index.html").read_text()
+    drilldown_section = html[
+        html.index("async function loadRelatedOccupationDrilldown"):
+        html.index("async function loadRelatedOccupationDrilldown") + 5000
+    ]
+
+    assert "Regional OEWS median wage in this occupation:" in drilldown_section
+    assert "Regional median wage for this occupation is unknown." in drilldown_section
+    assert "suppressed by BLS (unavailable, not zero)" in drilldown_section

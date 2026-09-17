@@ -921,6 +921,13 @@
       line-height: 1.4;
     }
 
+    .related-occupation-wage {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
     .related-occupations-toggle {
       margin-top: 12px;
       font-size: 11px;
@@ -5828,6 +5835,47 @@ function compactRelatedEmploymentFact(item) {
   return `Regional employment: ${formatCompact(employment.employment)}`;
 }
 
+function formatHourlyWage(value) {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+
+  return new Intl.NumberFormat(
+    "en-US",
+    {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }
+  ).format(value);
+}
+
+function formatWageText(wage) {
+  const bits = [];
+  if (wage.median_hourly_wage !== null && wage.median_hourly_wage !== undefined) {
+    bits.push(`${formatHourlyWage(wage.median_hourly_wage)}/hr`);
+  }
+  if (wage.median_annual_wage !== null && wage.median_annual_wage !== undefined) {
+    bits.push(`${formatMoney(wage.median_annual_wage)}/yr`);
+  }
+  return bits.length ? bits.join(" · ") : "unavailable";
+}
+
+function compactRelatedWageFact(item) {
+  const wage = item.regional_wage || {};
+  if (wage.status === "suppressed") {
+    return "Regional median wage: suppressed by BLS (unavailable, not zero).";
+  }
+  if (wage.status !== "known") {
+    return "Regional median wage unavailable.";
+  }
+  if (wage.match_specificity === "broader_category") {
+    return `Broader OEWS category median wage: ${formatWageText(wage)}`;
+  }
+  return `Regional median wage: ${formatWageText(wage)}`;
+}
+
 function renderRelatedOccupationItems() {
   const content = document.getElementById("related-occupations-content");
   if (!content) return;
@@ -5846,6 +5894,7 @@ function renderRelatedOccupationItems() {
         <strong>${escapeHtml(item.occupation_title || item.occupation_code)}</strong><br>
         ${escapeHtml(item.occupation_code)}
         <div class="related-occupation-employment">${escapeHtml(compactRelatedEmploymentFact(item))}</div>
+        <div class="related-occupation-wage">${escapeHtml(compactRelatedWageFact(item))}</div>
         <button type="button" class="worker-outlook-button view-occupation-btn" data-code="${escapeHtml(item.occupation_code)}" data-title="${escapeHtml(item.occupation_title || item.occupation_code)}">View occupation</button>
       </li>
     `).join("")}</ul>
@@ -5949,6 +5998,7 @@ async function loadWorkerOutlook() {
     const occupation = data.occupation || {};
     const stex = occupation.stex || {};
     const employment = occupation.regional_employment || {};
+    const wage = occupation.regional_wage || {};
 
     const facts = [];
 
@@ -5966,6 +6016,20 @@ async function loadWorkerOutlook() {
     } else if (employment.status === "known") {
       facts.push(
         `Regional employment in this occupation: ${formatCompact(employment.employment)}`
+      );
+    }
+
+    if (wage.status === "known" && wage.match_specificity === "broader_category") {
+      facts.push(
+        `Regional median wage for broader OEWS category "${wage.occupation_title || ""}" (${wage.oews_occupation_code || ""}): ${formatWageText(wage)} — not specific to this occupation`
+      );
+    } else if (wage.status === "known") {
+      facts.push(
+        `Regional OEWS median wage in this occupation: ${formatWageText(wage)}`
+      );
+    } else if (wage.status === "suppressed") {
+      facts.push(
+        "Regional median wage for this occupation is suppressed by BLS (unavailable, not zero)."
       );
     }
 
@@ -6046,6 +6110,7 @@ async function loadRelatedOccupationDrilldown(occupationCode, occupationTitle) {
     const occupation = data.occupation || {};
     const stex = occupation.stex || {};
     const employment = occupation.regional_employment || {};
+    const wage = occupation.regional_wage || {};
 
     const facts = [];
 
@@ -6068,6 +6133,22 @@ async function loadRelatedOccupationDrilldown(occupationCode, occupationTitle) {
       );
     } else {
       facts.push("Regional employment for this occupation is unknown.");
+    }
+
+    if (wage.status === "known" && wage.match_specificity === "broader_category") {
+      facts.push(
+        `Regional median wage for broader OEWS category "${wage.occupation_title || ""}" (${wage.oews_occupation_code || ""}): ${formatWageText(wage)} — not specific to this occupation`
+      );
+    } else if (wage.status === "known") {
+      facts.push(
+        `Regional OEWS median wage in this occupation: ${formatWageText(wage)}`
+      );
+    } else if (wage.status === "suppressed") {
+      facts.push(
+        "Regional median wage for this occupation is suppressed by BLS (unavailable, not zero)."
+      );
+    } else {
+      facts.push("Regional median wage for this occupation is unknown.");
     }
 
     const factsMarkup = `<ul class="worker-outlook-facts">${facts.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
