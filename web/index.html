@@ -914,6 +914,34 @@
       margin-top: 10px;
     }
 
+    .view-occupation-btn {
+      margin-top: 6px;
+      font-size: 11px;
+      padding: 4px 10px;
+      width: auto;
+    }
+
+    .occupation-drilldown-card {
+      display: none;
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent, var(--border));
+      border-radius: 14px;
+      background: var(--panel-soft);
+    }
+
+    .occupation-drilldown-card.visible {
+      display: block;
+    }
+
+    .occupation-drilldown-close {
+      margin-top: 10px;
+      width: auto;
+      font-size: 11px;
+      padding: 4px 10px;
+    }
+
 
     @media (max-width: 900px) {
       .brand-sub {
@@ -1195,6 +1223,13 @@
       <div class="section-title" style="margin-top:0">Related occupations to investigate</div>
       <div id="related-occupations-status" class="stex-status">Select a region and an occupation.</div>
       <div id="related-occupations-content"></div>
+    </div>
+
+    <div id="occupation-drilldown-card" class="occupation-drilldown-card" aria-live="polite">
+      <div class="section-title" style="margin-top:0">Occupation being investigated</div>
+      <div id="occupation-drilldown-status" class="stex-status"></div>
+      <div id="occupation-drilldown-content"></div>
+      <button id="occupation-drilldown-close" type="button" class="worker-outlook-button occupation-drilldown-close">Close</button>
     </div>
 
     <details id="stex-task-audit" class="stex-audit-disclosure">
@@ -1709,6 +1744,7 @@ let activeRegionRequestId = 0;
 let currentRegionLatitude = null;
 let currentRegionLongitude = null;
 let currentOccupationCode = null;
+let currentDrilldownCode = null;
 
 async function loadSelectedCountyBoundary(
   stateFips,
@@ -5720,6 +5756,17 @@ function clearRelatedOccupations() {
   const content = document.getElementById("related-occupations-content");
   if (card) card.classList.remove("visible");
   if (content) content.innerHTML = "";
+  clearOccupationDrilldown();
+}
+
+function clearOccupationDrilldown() {
+  const card = document.getElementById("occupation-drilldown-card");
+  const status = document.getElementById("occupation-drilldown-status");
+  const content = document.getElementById("occupation-drilldown-content");
+  if (card) card.classList.remove("visible");
+  if (status) status.textContent = "";
+  if (content) content.innerHTML = "";
+  currentDrilldownCode = null;
 }
 
 function renderWorkerOutlookAvailability() {
@@ -5807,7 +5854,7 @@ async function loadRelatedOccupations() {
           facts.push(`Regional employment: ${formatCompact(employment.employment)}`);
         }
         if (!facts.length) facts.push("STEX and regional employment are unavailable.");
-        return `<li class="related-occupation-item"><strong>${escapeHtml(item.occupation_title || item.occupation_code)}</strong><br>${escapeHtml(item.occupation_code)}<ul>${facts.map(fact => `<li>${escapeHtml(fact)}</li>`).join("")}</ul></li>`;
+        return `<li class="related-occupation-item" data-occupation-code="${escapeHtml(item.occupation_code)}"><strong>${escapeHtml(item.occupation_title || item.occupation_code)}</strong><br>${escapeHtml(item.occupation_code)}<ul>${facts.map(fact => `<li>${escapeHtml(fact)}</li>`).join("")}</ul><button type="button" class="worker-outlook-button view-occupation-btn" data-code="${escapeHtml(item.occupation_code)}" data-title="${escapeHtml(item.occupation_title || item.occupation_code)}">View occupation</button></li>`;
       }).join("")}</ul>
     `;
   } catch (error) {
@@ -5908,6 +5955,103 @@ async function loadWorkerOutlook() {
   }
 }
 
+async function loadRelatedOccupationDrilldown(occupationCode, occupationTitle) {
+  if (
+    currentRegionLatitude === null ||
+    currentRegionLongitude === null ||
+    !occupationCode
+  ) {
+    return;
+  }
+
+  currentDrilldownCode = occupationCode;
+
+  const requestId = ++activeRegionRequestId;
+  const latitude = currentRegionLatitude;
+  const longitude = currentRegionLongitude;
+
+  const card = document.getElementById("occupation-drilldown-card");
+  const status = document.getElementById("occupation-drilldown-status");
+  const content = document.getElementById("occupation-drilldown-content");
+  if (!card || !status || !content) return;
+
+  card.classList.add("visible");
+  status.textContent = `Loading evidence for ${occupationTitle || occupationCode}...`;
+  content.innerHTML = "";
+
+  try {
+    const endpoint =
+      (window.GVAI_API_BASE || "") +
+      `/api/worker/region-outlook?lat=${encodeURIComponent(latitude)}` +
+      `&lon=${encodeURIComponent(longitude)}` +
+      `&occupation=${encodeURIComponent(occupationCode)}`;
+
+    const response = await fetch(endpoint);
+    const data = await response.json();
+
+    if (
+      requestId !== activeRegionRequestId ||
+      currentDrilldownCode !== occupationCode
+    ) {
+      return;
+    }
+
+    if (!response.ok || !data.ok || !data.supported) {
+      status.textContent =
+        data.reason || "Occupation evidence is unavailable for this selection.";
+      content.innerHTML = "";
+      return;
+    }
+
+    const occupation = data.occupation || {};
+    const stex = occupation.stex || {};
+    const employment = occupation.regional_employment || {};
+
+    const facts = [];
+
+    if (stex.status === "known") {
+      const profile = stex.profile || {};
+      facts.push(
+        `Audited STEX structural exposure: ${profile.structural_exposure} (${profile.rubric_version || "STEX"})`
+      );
+    } else {
+      facts.push("No audited STEX profile exists yet for this occupation.");
+    }
+
+    if (employment.status === "known" && employment.match_specificity === "broader_category") {
+      facts.push(
+        `Regional employment for broader OEWS category "${employment.occupation_title || ""}" (${employment.oews_occupation_code || ""}): ${formatCompact(employment.employment)} — not specific to this occupation`
+      );
+    } else if (employment.status === "known") {
+      facts.push(
+        `Regional employment in this occupation: ${formatCompact(employment.employment)}`
+      );
+    } else {
+      facts.push("Regional employment for this occupation is unknown.");
+    }
+
+    const factsMarkup = `<ul class="worker-outlook-facts">${facts.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+
+    status.textContent =
+      `Related occupation (O*NET Related Occupations) · not your current occupation · ${data.county || "Selected region"} · no composite score`;
+
+    content.innerHTML = `
+      <div class="worker-outlook-summary"><strong>${escapeHtml(data.occupation_title || data.occupation_code)}</strong> (${escapeHtml(data.occupation_code)}) — occupation being investigated</div>
+      ${factsMarkup}
+    `;
+  } catch (error) {
+    if (
+      requestId !== activeRegionRequestId ||
+      currentDrilldownCode !== occupationCode
+    ) {
+      return;
+    }
+    console.error("Occupation drill-down load failed:", error);
+    status.textContent = "Occupation evidence is temporarily unavailable.";
+    content.innerHTML = "";
+  }
+}
+
 document
   .getElementById("worker-outlook-btn")
   .addEventListener("click", () => {
@@ -5918,6 +6062,22 @@ document
   .getElementById("related-occupations-btn")
   .addEventListener("click", () => {
     void loadRelatedOccupations();
+  });
+
+document
+  .getElementById("related-occupations-content")
+  .addEventListener("click", (event) => {
+    const button = event.target.closest(".view-occupation-btn");
+    if (!button) return;
+    const code = button.dataset.code;
+    const title = button.dataset.title;
+    if (code) void loadRelatedOccupationDrilldown(code, title);
+  });
+
+document
+  .getElementById("occupation-drilldown-close")
+  .addEventListener("click", () => {
+    clearOccupationDrilldown();
   });
 
 renderWorkerOutlookAvailability();

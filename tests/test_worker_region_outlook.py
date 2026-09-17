@@ -734,6 +734,66 @@ def test_related_occupations_broader_category_match_is_labeled(monkeypatch):
     assert "11-9199.11" in brownfield_employment["explanation"]
 
 
+def test_drilldown_reuses_region_outlook_with_same_region_for_related_occupation(
+    monkeypatch,
+):
+    """The drill-down calls the existing single-occupation synthesis
+    function with the SAME lat/lon used for the related-occupations list,
+    for a related occupation's code, without touching the worker's
+    original occupation. It must reflect the same evidence rules: exact vs
+    broader-category employment and explicit unaudited STEX."""
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "synthesize_region_labor_intelligence",
+        lambda *args, **kwargs: _supported_region_payload(),
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "load_occupation_stex_profile",
+        _always_missing_stex_profile,
+    )
+    monkeypatch.setattr(
+        worker_region_outlook,
+        "OEWSClient",
+        _FakeBrownfieldOEWSClient,
+    )
+
+    latitude, longitude = 36.16, -86.78
+    current_occupation_code = "37-2021.00"
+
+    related = synthesize_worker_related_occupations(
+        latitude,
+        longitude,
+        current_occupation_code,
+        onet_client=_FakeBrownfieldOnetClient(),
+    )
+    related_code = related["related_occupations"]["items"][0]["occupation_code"]
+    assert related_code == "11-9199.11"
+
+    # Drilling into a related occupation must not mutate/replace the
+    # worker's current occupation -- it is a separate synthesis call.
+    drilldown = synthesize_worker_region_outlook(
+        latitude,
+        longitude,
+        related_code,
+    )
+
+    assert drilldown["occupation_code"] == "11-9199.11"
+    assert drilldown["occupation_code"] != current_occupation_code
+    assert drilldown["county"] == related["county"]
+
+    employment = drilldown["occupation"]["regional_employment"]
+    assert employment["status"] == "known"
+    assert employment["match_specificity"] == "broader_category"
+    assert employment["employment"] == 6420.0
+    assert employment["oews_occupation_code"] == "11-9199.00"
+
+    stex = drilldown["occupation"]["stex"]
+    assert stex["status"] == "unknown"
+    assert "No audited STEX profile" in stex["explanation"]
+    assert stex["profile"] is None
+
+
 def test_related_occupations_deduplicates_top_level_constraints(monkeypatch):
     monkeypatch.setattr(
         worker_region_outlook,
@@ -1008,6 +1068,46 @@ def test_main_globe_related_occupations_contract_and_order():
         'id="related-occupations-card"'
     )
     assert "clearRelatedOccupations();" in html
+
+
+def test_main_globe_related_occupation_drilldown_contract():
+    html = (ROOT / "web/index.html").read_text()
+
+    # Each related occupation exposes a "View occupation" action.
+    assert "view-occupation-btn" in html
+    assert "View occupation" in html
+    assert "data-code=\"${escapeHtml(item.occupation_code)}\"" in html
+
+    # The drill-down reuses the existing region-outlook endpoint and the
+    # same region context, rather than inventing a new backend API.
+    assert 'id="occupation-drilldown-card"' in html
+    assert "loadRelatedOccupationDrilldown" in html
+    # Both the main outlook and the drill-down reuse the same endpoint.
+    assert html.count("/api/worker/region-outlook?lat=") == 2
+    assert "currentRegionLatitude" in html.split("loadRelatedOccupationDrilldown")[1][:400]
+
+    # Drill-down language distinguishes investigation from the current
+    # occupation, and never implies a recommendation.
+    assert "Occupation being investigated" in html
+    assert "not your current occupation" in html
+    assert "occupation being investigated" in html
+
+    # Drill-down state resets when the current occupation or region changes.
+    assert "clearOccupationDrilldown" in html
+    assert "clearRelatedOccupations();" in html.split("function clearOccupationDrilldown")[0]
+
+    # No ranking/recommendation/scoring vocabulary anywhere in the drill-down.
+    drilldown_section = html[
+        html.index("function loadRelatedOccupationDrilldown"):
+        html.index("function loadRelatedOccupationDrilldown") + 3500
+    ]
+    for banned in ("best job", "recommend", "geographic_opportunity", "transition_score", "rank"):
+        assert banned not in drilldown_section.lower()
+
+    # Selecting a related occupation must never overwrite the worker's
+    # current occupation state.
+    assert "currentOccupationCode =" not in drilldown_section
+    assert "currentOccupationCode" not in drilldown_section
 
 
 def test_main_globe_regional_labor_intelligence_contract_still_present():
