@@ -1062,12 +1062,49 @@ def test_main_globe_related_occupations_contract_and_order():
     assert 'id="related-occupations-card"' in html
     assert "/api/worker/related-occupations?lat=" in html
     assert "O*NET Related Occupations" in html
-    assert "not recommending a job change" in html
-    assert "does not re-rank the source results" in html
+    assert "Shown in O*NET source order." in html
     assert html.index('id="worker-outlook-card"') < html.index(
         'id="related-occupations-card"'
     )
     assert "clearRelatedOccupations();" in html
+
+
+def test_main_globe_related_occupations_are_compact_and_collapsible():
+    html = (ROOT / "web/index.html").read_text()
+    renderer = html[
+        html.index("function compactRelatedEmploymentFact"):
+        html.index("async function loadRelatedOccupations")
+    ]
+
+    assert "RELATED_OCCUPATIONS_DEFAULT_COUNT = 5" in html
+    assert ".slice(0, RELATED_OCCUPATIONS_DEFAULT_COUNT)" in renderer
+    assert "relatedOccupationItems" in renderer
+    assert "Show all ${relatedOccupationItems.length} related occupations" in renderer
+    assert '"Show fewer"' in renderer
+    assert "relatedOccupationsExpanded = !relatedOccupationsExpanded" in html
+    assert "Regional employment: ${formatCompact(employment.employment)}" in renderer
+    assert "Broader OEWS category employment:" in renderer
+    assert "Regional employment unavailable." in renderer
+    assert "Audited STEX:" not in renderer
+    assert "No audited STEX profile exists" not in renderer
+    assert "View occupation" in renderer
+
+
+def test_main_globe_related_occupations_reset_only_with_context():
+    html = (ROOT / "web/index.html").read_text()
+    related_clear = html[
+        html.index("function clearRelatedOccupations"):
+        html.index("function clearOccupationDrilldown")
+    ]
+    drilldown_clear = html[
+        html.index("function clearOccupationDrilldown"):
+        html.index("function renderWorkerOutlookAvailability")
+    ]
+
+    assert "relatedOccupationsExpanded = false" in related_clear
+    assert "relatedOccupationItems = []" in related_clear
+    assert "relatedOccupationsExpanded" not in drilldown_clear
+    assert "relatedOccupationItems" not in drilldown_clear
 
 
 def test_main_globe_related_occupation_drilldown_contract():
@@ -1081,7 +1118,11 @@ def test_main_globe_related_occupation_drilldown_contract():
     # The drill-down reuses the existing region-outlook endpoint and the
     # same region context, rather than inventing a new backend API.
     assert 'id="occupation-drilldown-card"' in html
+    assert html.index('id="occupation-drilldown-card"') < html.index(
+        'id="related-occupations-card"'
+    )
     assert "loadRelatedOccupationDrilldown" in html
+    assert 'card.scrollIntoView({ behavior: "smooth", block: "nearest" });' in html
     # Both the main outlook and the drill-down reuse the same endpoint.
     assert html.count("/api/worker/region-outlook?lat=") == 2
     assert "currentRegionLatitude" in html.split("loadRelatedOccupationDrilldown")[1][:400]

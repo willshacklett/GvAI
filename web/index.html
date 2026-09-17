@@ -914,6 +914,18 @@
       margin-top: 10px;
     }
 
+    .related-occupation-employment {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .related-occupations-toggle {
+      margin-top: 12px;
+      font-size: 11px;
+    }
+
     .view-occupation-btn {
       margin-top: 6px;
       font-size: 11px;
@@ -1215,6 +1227,13 @@
       <div id="worker-outlook-content"></div>
     </div>
 
+    <div id="occupation-drilldown-card" class="occupation-drilldown-card" aria-live="polite">
+      <div class="section-title" style="margin-top:0">Occupation being investigated</div>
+      <div id="occupation-drilldown-status" class="stex-status"></div>
+      <div id="occupation-drilldown-content"></div>
+      <button id="occupation-drilldown-close" type="button" class="worker-outlook-button occupation-drilldown-close">Close</button>
+    </div>
+
     <button id="related-occupations-btn" class="worker-outlook-button">
       View related occupations
     </button>
@@ -1223,13 +1242,6 @@
       <div class="section-title" style="margin-top:0">Related occupations to investigate</div>
       <div id="related-occupations-status" class="stex-status">Select a region and an occupation.</div>
       <div id="related-occupations-content"></div>
-    </div>
-
-    <div id="occupation-drilldown-card" class="occupation-drilldown-card" aria-live="polite">
-      <div class="section-title" style="margin-top:0">Occupation being investigated</div>
-      <div id="occupation-drilldown-status" class="stex-status"></div>
-      <div id="occupation-drilldown-content"></div>
-      <button id="occupation-drilldown-close" type="button" class="worker-outlook-button occupation-drilldown-close">Close</button>
     </div>
 
     <details id="stex-task-audit" class="stex-audit-disclosure">
@@ -1745,6 +1757,9 @@ let currentRegionLatitude = null;
 let currentRegionLongitude = null;
 let currentOccupationCode = null;
 let currentDrilldownCode = null;
+const RELATED_OCCUPATIONS_DEFAULT_COUNT = 5;
+let relatedOccupationsExpanded = false;
+let relatedOccupationItems = [];
 
 async function loadSelectedCountyBoundary(
   stateFips,
@@ -5756,6 +5771,8 @@ function clearRelatedOccupations() {
   const content = document.getElementById("related-occupations-content");
   if (card) card.classList.remove("visible");
   if (content) content.innerHTML = "";
+  relatedOccupationsExpanded = false;
+  relatedOccupationItems = [];
   clearOccupationDrilldown();
 }
 
@@ -5800,6 +5817,42 @@ function renderRelatedOccupationsAvailability() {
     : "Select a region and an occupation";
 }
 
+function compactRelatedEmploymentFact(item) {
+  const employment = item.regional_employment || {};
+  if (employment.status !== "known") {
+    return "Regional employment unavailable.";
+  }
+  if (employment.match_specificity === "broader_category") {
+    return `Broader OEWS category employment: ${formatCompact(employment.employment)}`;
+  }
+  return `Regional employment: ${formatCompact(employment.employment)}`;
+}
+
+function renderRelatedOccupationItems() {
+  const content = document.getElementById("related-occupations-content");
+  if (!content) return;
+
+  const visibleItems = relatedOccupationsExpanded
+    ? relatedOccupationItems
+    : relatedOccupationItems.slice(0, RELATED_OCCUPATIONS_DEFAULT_COUNT);
+  const toggleMarkup = relatedOccupationItems.length > RELATED_OCCUPATIONS_DEFAULT_COUNT
+    ? `<button type="button" class="worker-outlook-button related-occupations-toggle">${relatedOccupationsExpanded ? "Show fewer" : `Show all ${relatedOccupationItems.length} related occupations`}</button>`
+    : "";
+
+  content.innerHTML = `
+    <div class="worker-outlook-summary">Shown in O*NET source order.</div>
+    <ul class="worker-outlook-facts">${visibleItems.map(item => `
+      <li class="related-occupation-item" data-occupation-code="${escapeHtml(item.occupation_code)}">
+        <strong>${escapeHtml(item.occupation_title || item.occupation_code)}</strong><br>
+        ${escapeHtml(item.occupation_code)}
+        <div class="related-occupation-employment">${escapeHtml(compactRelatedEmploymentFact(item))}</div>
+        <button type="button" class="worker-outlook-button view-occupation-btn" data-code="${escapeHtml(item.occupation_code)}" data-title="${escapeHtml(item.occupation_title || item.occupation_code)}">View occupation</button>
+      </li>
+    `).join("")}</ul>
+    ${toggleMarkup}
+  `;
+}
+
 async function loadRelatedOccupations() {
   if (
     currentRegionLatitude === null ||
@@ -5839,24 +5892,10 @@ async function loadRelatedOccupations() {
       return;
     }
 
-    status.textContent = related.explanation;
     const items = Array.isArray(related.items) ? related.items : [];
-    content.innerHTML = `
-      <div class="worker-outlook-summary">Occupations come from O*NET Related Occupations. GVAI is not recommending a job change and does not re-rank the source results.</div>
-      <ul class="worker-outlook-facts">${items.map(item => {
-        const stex = item.stex || {};
-        const employment = item.regional_employment || {};
-        const facts = [];
-        if (stex.status === "known") facts.push(`Audited STEX: ${stex.profile?.structural_exposure} (${stex.profile?.rubric_version || "STEX"})`);
-        if (employment.status === "known" && employment.match_specificity === "broader_category") {
-          facts.push(`Regional employment for broader OEWS category "${employment.occupation_title || ""}" (${employment.oews_occupation_code || ""}): ${formatCompact(employment.employment)} — not specific to this occupation`);
-        } else if (employment.status === "known") {
-          facts.push(`Regional employment: ${formatCompact(employment.employment)}`);
-        }
-        if (!facts.length) facts.push("STEX and regional employment are unavailable.");
-        return `<li class="related-occupation-item" data-occupation-code="${escapeHtml(item.occupation_code)}"><strong>${escapeHtml(item.occupation_title || item.occupation_code)}</strong><br>${escapeHtml(item.occupation_code)}<ul>${facts.map(fact => `<li>${escapeHtml(fact)}</li>`).join("")}</ul><button type="button" class="worker-outlook-button view-occupation-btn" data-code="${escapeHtml(item.occupation_code)}" data-title="${escapeHtml(item.occupation_title || item.occupation_code)}">View occupation</button></li>`;
-      }).join("")}</ul>
-    `;
+    status.textContent = `${items.length} occupations from O*NET Related Occupations.`;
+    relatedOccupationItems = items;
+    renderRelatedOccupationItems();
   } catch (error) {
     if (requestId !== activeRegionRequestId) return;
     console.error("Related occupations load failed:", error);
@@ -5976,6 +6015,7 @@ async function loadRelatedOccupationDrilldown(occupationCode, occupationTitle) {
   if (!card || !status || !content) return;
 
   card.classList.add("visible");
+  card.scrollIntoView({ behavior: "smooth", block: "nearest" });
   status.textContent = `Loading evidence for ${occupationTitle || occupationCode}...`;
   content.innerHTML = "";
 
@@ -6067,6 +6107,12 @@ document
 document
   .getElementById("related-occupations-content")
   .addEventListener("click", (event) => {
+    const toggle = event.target.closest(".related-occupations-toggle");
+    if (toggle) {
+      relatedOccupationsExpanded = !relatedOccupationsExpanded;
+      renderRelatedOccupationItems();
+      return;
+    }
     const button = event.target.closest(".view-occupation-btn");
     if (!button) return;
     const code = button.dataset.code;
