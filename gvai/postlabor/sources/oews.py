@@ -14,6 +14,8 @@ from gvai.postlabor.sources.bls import (
 
 
 OEWS_EMPLOYMENT_DATATYPE = "01"
+OEWS_HOURLY_MEDIAN_WAGE_DATATYPE = "08"
+OEWS_ANNUAL_MEDIAN_WAGE_DATATYPE = "13"
 OEWS_TOTAL_INDUSTRY = "000000"
 OEWS_ALL_OCCUPATIONS = "00-0000.00"
 OEWS_SOURCE = "BLS Public Data API v2"
@@ -27,17 +29,27 @@ OEWS_CATALOG_MIRROR_BASE_URL = (
 OEWS_API_BATCH_SIZE = 50
 OEWS_CATALOG_CACHE_SCHEMA_VERSION = 2
 OEWS_EMPLOYMENT_CACHE_SCHEMA_VERSION = 2
+OEWS_WAGE_CACHE_SCHEMA_VERSION = 1
 OEWS_DEFAULT_CACHE_PATH = Path(
     "data/oews/catalog_index.json"
 )
 OEWS_DEFAULT_EMPLOYMENT_CACHE_PATH = Path(
     "data/oews/employment_index.json"
 )
+OEWS_DEFAULT_WAGE_CACHE_PATH = Path(
+    "data/oews/wage_index.json"
+)
 OEWS_PACKAGED_EMPLOYMENT_CACHE_PATH = (
     Path(__file__).resolve().parents[1]
     / "snapshots"
     / "oews"
     / "employment_index.json"
+)
+OEWS_PACKAGED_WAGE_CACHE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "snapshots"
+    / "oews"
+    / "wage_index.json"
 )
 
 
@@ -214,6 +226,30 @@ class OEWSEmploymentEstimate:
 
 
 @dataclass(frozen=True)
+class OEWSWageEstimate:
+    area_code: str
+    occupation_code: str
+    year: int
+    median_hourly_wage: Optional[float] = None
+    median_annual_wage: Optional[float] = None
+    occupation_title: Optional[str] = None
+    source: str = OEWS_SOURCE
+    catalog_source: Optional[str] = None
+
+    def to_dict(self):
+        return {
+            "area_code": self.area_code,
+            "occupation_code": self.occupation_code,
+            "year": self.year,
+            "median_hourly_wage": self.median_hourly_wage,
+            "median_annual_wage": self.median_annual_wage,
+            "occupation_title": self.occupation_title,
+            "source": self.source,
+            "catalog_source": self.catalog_source,
+        }
+
+
+@dataclass(frozen=True)
 class OEWSOccupationSeries:
     area_code: str
     occupation_code: str
@@ -255,6 +291,7 @@ class OEWSClient:
         catalog_timeout: int = 30,
         catalog_cache_path: Path | str = OEWS_DEFAULT_CACHE_PATH,
         employment_cache_path: Path | str | None = None,
+        wage_cache_path: Path | str | None = None,
     ) -> None:
         self.bls_client = (
             bls_client
@@ -265,6 +302,9 @@ class OEWSClient:
         self.catalog_cache_path = Path(catalog_cache_path)
         self.employment_cache_path = self._resolve_employment_cache_path(
             employment_cache_path
+        )
+        self.wage_cache_path = self._resolve_wage_cache_path(
+            wage_cache_path
         )
 
     @staticmethod
@@ -279,6 +319,19 @@ class OEWSClient:
         if OEWS_PACKAGED_EMPLOYMENT_CACHE_PATH.is_file():
             return OEWS_PACKAGED_EMPLOYMENT_CACHE_PATH
         return OEWS_DEFAULT_EMPLOYMENT_CACHE_PATH
+
+    @staticmethod
+    def _resolve_wage_cache_path(
+        explicit_path: Path | str | None,
+    ) -> Path:
+        if explicit_path is not None:
+            return Path(explicit_path)
+        env_path = os.getenv("GVAI_OEWS_WAGE_CACHE")
+        if env_path:
+            return Path(env_path)
+        if OEWS_PACKAGED_WAGE_CACHE_PATH.is_file():
+            return OEWS_PACKAGED_WAGE_CACHE_PATH
+        return OEWS_DEFAULT_WAGE_CACHE_PATH
 
     def fetch_total_employment(
         self,
@@ -672,6 +725,85 @@ class OEWSClient:
             employment=float(item["employment"]),
             source=str(item.get("source") or OEWS_SOURCE),
             occupation_title=item.get("occupation_title"),
+            catalog_source=item.get("catalog_source"),
+        )
+
+    def fetch_catalog_regional_wages(
+        self,
+        *,
+        area_code: str,
+        source_year: Optional[int] = None,
+    ) -> List[OEWSWageEstimate]:
+        """Read packaged official median wage observations for an area/year.
+
+        Missing or suppressed wages are represented as None fields on the
+        estimate, never as zero. Runtime never calls BLS directly here; the
+        wage snapshot must be refreshed explicitly via the wage snapshot
+        builder.
+        """
+        area = normalize_area_code(area_code)
+        cache = self._load_wage_cache()
+        year = source_year
+        if year is None:
+            years = {
+                int(item["year"])
+                for item in cache["observations"]
+                if item["area_code"] == area
+            }
+            year = max(years) if years else None
+        if year is None:
+            raise RuntimeError(
+                "OEWS wage cache has no refreshed data for area "
+                f"{area}; run the wage snapshot builder."
+            )
+        return [
+            self._wage_estimate_from_cache(item)
+            for item in cache["observations"]
+            if item["area_code"] == area
+            and int(item["year"]) == year
+        ]
+
+    def _load_wage_cache(self) -> Mapping[str, object]:
+        if not self.wage_cache_path.exists():
+            raise RuntimeError(
+                "OEWS wage cache is missing; run the wage snapshot "
+                "builder explicitly."
+            )
+        try:
+            payload = json.loads(
+                self.wage_cache_path.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError(
+                "OEWS wage cache is unreadable; refresh it explicitly."
+            ) from exc
+        if payload.get("schema_version") != OEWS_WAGE_CACHE_SCHEMA_VERSION:
+            raise RuntimeError(
+                "OEWS wage cache is stale or incompatible; refresh it "
+                "explicitly."
+            )
+        if not isinstance(payload.get("observations"), list):
+            raise RuntimeError(
+                "OEWS wage cache is invalid; refresh it explicitly."
+            )
+        return payload
+
+    @staticmethod
+    def _wage_estimate_from_cache(item: Mapping[str, object]):
+        hourly = item.get("median_hourly_wage")
+        annual = item.get("median_annual_wage")
+        return OEWSWageEstimate(
+            area_code=str(item["area_code"]),
+            occupation_code=str(item["occupation_code"]),
+            year=int(item["year"]),
+            median_hourly_wage=(
+                float(hourly) if hourly is not None else None
+            ),
+            median_annual_wage=(
+                float(annual) if annual is not None else None
+            ),
+            occupation_title=item.get("occupation_title"),
+            source=str(item.get("source") or OEWS_SOURCE),
             catalog_source=item.get("catalog_source"),
         )
 

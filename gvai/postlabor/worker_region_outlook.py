@@ -196,6 +196,137 @@ def _occupation_regional_employment_signal(
     }
 
 
+def _occupation_regional_wage_signal(
+    oews_area_code: str | None,
+    occupation_code: str,
+    *,
+    wage_year: int,
+) -> Dict[str, Any]:
+    """Return the packaged official OEWS median wage evidence, if any.
+
+    Reads only the packaged local wage snapshot. Suppressed or missing
+    wage figures remain None -- they are never reported as zero or
+    replaced with a placeholder.
+    """
+    unknown_base = {
+        "id": "occupation_regional_wage",
+        "status": "unknown",
+        "median_hourly_wage": None,
+        "median_annual_wage": None,
+        "year": None,
+        "source": None,
+        "occupation_title": None,
+        "oews_occupation_code": None,
+        "match_specificity": None,
+    }
+
+    if not oews_area_code:
+        return {
+            **unknown_base,
+            "explanation": (
+                "No packaged OEWS labor-market area is available "
+                "for this county, so regional median wage for this "
+                "occupation is unknown."
+            ),
+        }
+
+    try:
+        normalized_soc = format_oews_soc_code(occupation_code)
+    except ValueError:
+        normalized_soc = None
+
+    try:
+        client = OEWSClient()
+        rows = client.fetch_catalog_regional_wages(
+            area_code=oews_area_code,
+            source_year=wage_year,
+        )
+    except RuntimeError:
+        return {
+            **unknown_base,
+            "explanation": (
+                "Regional OEWS median wage data has not been "
+                "packaged for this area and year, so it is unknown."
+            ),
+        }
+
+    match = None
+    if normalized_soc is not None:
+        for row in rows:
+            try:
+                row_soc = format_oews_soc_code(row.occupation_code)
+            except ValueError:
+                continue
+            if row_soc == normalized_soc:
+                match = row
+                break
+
+    if match is None:
+        return {
+            **unknown_base,
+            "explanation": (
+                "This occupation is not present in the packaged "
+                "regional OEWS median wage snapshot, so its wage is "
+                "unknown."
+            ),
+        }
+
+    is_broader_category = _onet_soc_suffix(occupation_code) != "00"
+    both_missing = (
+        match.median_hourly_wage is None and match.median_annual_wage is None
+    )
+
+    known_fields = {
+        "median_hourly_wage": match.median_hourly_wage,
+        "median_annual_wage": match.median_annual_wage,
+        "year": wage_year,
+        "source": match.source,
+        "occupation_title": match.occupation_title,
+        "oews_occupation_code": normalized_soc,
+        "match_specificity": (
+            "broader_category" if is_broader_category else "exact"
+        ),
+    }
+
+    if both_missing:
+        broader_note = (
+            f' for the broader OEWS category "{match.occupation_title}" '
+            f"({normalized_soc})"
+            if is_broader_category
+            else ""
+        )
+        return {
+            "id": "occupation_regional_wage",
+            "status": "suppressed",
+            **known_fields,
+            "explanation": (
+                "BLS suppressed or did not publish a median wage"
+                f"{broader_note} for this area and year, so the wage "
+                "is unavailable, not zero."
+            ),
+        }
+
+    if is_broader_category:
+        explanation = (
+            f"OEWS does not publish a median wage specific to "
+            f"{occupation_code}. This wage is the broader published "
+            f'OEWS category "{match.occupation_title}" ({normalized_soc}) '
+            "within this labor-market area, not this detailed occupation."
+        )
+    else:
+        explanation = (
+            "This is the occupation's regional OEWS median wage within "
+            "this labor-market area."
+        )
+
+    return {
+        "id": "occupation_regional_wage",
+        "status": "known",
+        **known_fields,
+        "explanation": explanation,
+    }
+
+
 def _build_worker_outlook_summary(
     *,
     region: Dict[str, Any],
@@ -203,6 +334,7 @@ def _build_worker_outlook_summary(
     occupation_title: str | None,
     stex_signal: Dict[str, Any],
     employment_signal: Dict[str, Any],
+    wage_signal: Dict[str, Any],
 ) -> str:
     title = occupation_title or occupation_code
     county = region.get("county") or "this region"
@@ -237,6 +369,33 @@ def _build_worker_outlook_summary(
     else:
         parts.append(
             "regional employment for this occupation is unknown"
+        )
+
+    if wage_signal["status"] == "known":
+        wage_bits = []
+        if wage_signal.get("median_hourly_wage") is not None:
+            wage_bits.append(f"${wage_signal['median_hourly_wage']}/hr")
+        if wage_signal.get("median_annual_wage") is not None:
+            wage_bits.append(f"${wage_signal['median_annual_wage']}/yr")
+        wage_text = " and ".join(wage_bits) if wage_bits else "unavailable"
+        if wage_signal.get("match_specificity") == "broader_category":
+            parts.append(
+                "regional median wage for the broader OEWS category "
+                f'"{wage_signal.get("occupation_title")}" is {wage_text} '
+                "(not specific to this detailed occupation)"
+            )
+        else:
+            parts.append(
+                f"the occupation's regional OEWS median wage is {wage_text}"
+            )
+    elif wage_signal["status"] == "suppressed":
+        parts.append(
+            "regional median wage for this occupation is suppressed by "
+            "BLS, not zero"
+        )
+    else:
+        parts.append(
+            "regional median wage for this occupation is unknown"
         )
 
     return "; ".join(parts) + "."
@@ -287,16 +446,22 @@ def synthesize_worker_region_outlook(
         normalized_code,
         stex_year=stex_year,
     )
+    wage_signal = _occupation_regional_wage_signal(
+        region.get("oews_area_code"),
+        normalized_code,
+        wage_year=stex_year,
+    )
 
     occupation_title = (
         (stex_signal.get("profile") or {}).get("occupation_title")
         or employment_signal.get("occupation_title")
+        or wage_signal.get("occupation_title")
     )
 
     constraints = list(region.get("constraints") or [])
 
-    for signal in (stex_signal, employment_signal):
-        if signal["status"] == "unknown":
+    for signal in (stex_signal, employment_signal, wage_signal):
+        if signal["status"] in ("unknown", "suppressed"):
             constraints.append(signal["explanation"])
 
     summary = _build_worker_outlook_summary(
@@ -305,6 +470,7 @@ def synthesize_worker_region_outlook(
         occupation_title=occupation_title,
         stex_signal=stex_signal,
         employment_signal=employment_signal,
+        wage_signal=wage_signal,
     )
 
     sources = list(region.get("sources") or [])
@@ -334,6 +500,7 @@ def synthesize_worker_region_outlook(
         "occupation": {
             "stex": stex_signal,
             "regional_employment": employment_signal,
+            "regional_wage": wage_signal,
         },
         "worker_outlook": {
             "summary": summary,
@@ -428,9 +595,14 @@ def synthesize_worker_related_occupations(
             related_code,
             stex_year=stex_year,
         )
+        wage_signal = _occupation_regional_wage_signal(
+            region.get("oews_area_code"),
+            related_code,
+            wage_year=stex_year,
+        )
 
-        for signal in (stex_signal, employment_signal):
-            if signal["status"] == "unknown" and signal["explanation"] not in constraints:
+        for signal in (stex_signal, employment_signal, wage_signal):
+            if signal["status"] in ("unknown", "suppressed") and signal["explanation"] not in constraints:
                 constraints.append(signal["explanation"])
 
         items.append({
@@ -442,6 +614,7 @@ def synthesize_worker_related_occupations(
             },
             "stex": stex_signal,
             "regional_employment": employment_signal,
+            "regional_wage": wage_signal,
         })
 
     sources = list(region.get("sources") or [])
