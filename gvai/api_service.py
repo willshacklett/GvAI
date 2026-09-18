@@ -39,6 +39,9 @@ from gvai.postlabor.worker_profile import (
     WorkerProfileValidationError,
     validate_worker_profile,
 )
+from gvai.postlabor.worker_personal_comparison import (
+    synthesize_worker_personal_comparison,
+)
 from gvai.postlabor.stex.store import (
     InvalidSTEXOccupationCode,
     STEXProfileNotFound,
@@ -1218,6 +1221,63 @@ def api_worker_profile_validate():
         return jsonify({"ok": True, "profile": validate_worker_profile(payload)})
     except WorkerProfileValidationError as exc:
         return jsonify({"ok": False, "errors": exc.errors}), 400
+
+
+@app.post("/api/worker/personal-comparison")
+def api_worker_personal_comparison():
+    """
+    Compare a self-reported Worker Profile with published evidence for
+    one investigated occupation. Profile data is accepted only in the
+    POST body (never query parameters), is never persisted or logged,
+    and is never sent to an LLM or unrelated third-party service. Only
+    an occupation code and region coordinates are used for O*NET/BLS
+    evidence calls.
+    """
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"ok": False, "reason": "A JSON request body is required."}), 400
+
+    target_code = (payload.get("target_occupation_code") or "").strip()
+    if not target_code:
+        return jsonify({
+            "ok": False,
+            "reason": "target_occupation_code is required.",
+        }), 400
+
+    lat = payload.get("lat")
+    lon = payload.get("lon")
+    if (lat is None) != (lon is None):
+        return jsonify({
+            "ok": False,
+            "reason": "lat and lon must be provided together.",
+        }), 400
+
+    try:
+        latitude = float(lat) if lat is not None else None
+        longitude = float(lon) if lon is not None else None
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "reason": "lat and lon must be numeric."}), 400
+
+    try:
+        profile = validate_worker_profile(payload.get("profile"))
+    except WorkerProfileValidationError as exc:
+        return jsonify({"ok": False, "errors": exc.errors}), 400
+
+    try:
+        result = synthesize_worker_personal_comparison(
+            profile,
+            target_code,
+            latitude=latitude,
+            longitude=longitude,
+        )
+        return jsonify({"ok": True, **result})
+    except (InvalidSTEXOccupationCode, ValueError) as exc:
+        return jsonify({"ok": False, "reason": str(exc)}), 400
+    except Exception:
+        return jsonify({
+            "ok": False,
+            "reason": "Personal comparison synthesis failed.",
+        }), 500
 
 
 def build_gv_runtime_policy(user_message=""):

@@ -1466,6 +1466,17 @@
         <div id="transition-action-plan-content"></div>
       </div>
 
+      <div class="transition-evidence-section" id="personal-comparison-section">
+        <div class="section-title" style="margin-top:0">How This Compares With Your Profile</div>
+        <div class="transition-evidence-note">
+          Facts you reported are shown beside published occupational and
+          regional evidence. GVAI does not compute a match score and does
+          not tell you whether to pursue this occupation.
+        </div>
+        <div id="personal-comparison-status" class="stex-status"></div>
+        <div id="personal-comparison-content"></div>
+      </div>
+
       <button id="occupation-drilldown-close" type="button" class="worker-outlook-button occupation-drilldown-close">Close</button>
     </div>
 
@@ -5792,6 +5803,7 @@ document.getElementById("clear-worker-profile-btn").addEventListener("click", ()
   document.getElementById("worker-profile-form").reset();
   workerProfileField("worker-profile-occupation-code").value = "";
   workerProfileField("worker-profile-status").textContent = "Profile cleared from this browser.";
+  clearPersonalComparison();
 });
 const initialWorkerProfile = storedWorkerProfile();
 if (initialWorkerProfile) {
@@ -6125,6 +6137,7 @@ function clearOccupationDrilldown() {
   if (content) content.innerHTML = "";
   currentDrilldownCode = null;
   clearTransitionEvidence();
+  clearPersonalComparison();
 }
 
 function clearTransitionEvidence() {
@@ -6437,6 +6450,7 @@ async function loadRelatedOccupationDrilldown(occupationCode, occupationTitle) {
   void loadTransitionEvidence(occupationCode, occupationTitle);
   void loadTransitionPreparation(occupationCode, occupationTitle);
   void loadTransitionActionPlan(occupationCode, occupationTitle);
+  void loadPersonalComparison(occupationCode, occupationTitle);
 
   const requestId = ++activeRegionRequestId;
   const latitude = currentRegionLatitude;
@@ -6835,22 +6849,196 @@ async function loadTransitionPreparation(targetCode, targetTitle) {
 function renderTransitionActionPlan(actions, profileAvailable = false) {
   return `<ul class="transition-action-plan-list">${actions.map(action => {
     const facts = Array.isArray(action.supporting_facts) ? action.supporting_facts : [];
-    const personalProfilePrompt = profileAvailable && action.action_id === "compare_personal_background_separately"
+    const isPersonalCompare = action.action_id === "compare_personal_background_separately";
+    const personalProfilePrompt = profileAvailable && isPersonalCompare
       ? "Worker Profile available for personal comparison."
       : action.explanation;
     const detail = [personalProfilePrompt, ...facts, action.limitation]
       .filter(Boolean)
       .map(item => `<div>${escapeHtml(item)}</div>`)
       .join("");
+    const link = profileAvailable && isPersonalCompare
+      ? `<div><a href="#personal-comparison-section" class="personal-comparison-link">View "How This Compares With Your Profile"</a></div>`
+      : "";
     return `
       <li class="transition-action-plan-item">
         <details>
           <summary><input type="checkbox" disabled aria-label="Checklist item">${escapeHtml(action.title || action.action_id)}</summary>
-          <div class="transition-action-plan-detail">${detail}</div>
+          <div class="transition-action-plan-detail">${detail}${link}</div>
         </details>
       </li>
     `;
   }).join("")}</ul>`;
+}
+
+let activePersonalComparisonRequestId = 0;
+
+function clearPersonalComparison() {
+  const status = document.getElementById("personal-comparison-status");
+  const content = document.getElementById("personal-comparison-content");
+  activePersonalComparisonRequestId += 1;
+  if (status) status.textContent = "";
+  if (content) content.innerHTML = "";
+}
+
+function personalComparisonWorkerLines(comparison) {
+  const wf = comparison.worker_fact || {};
+  switch (comparison.comparison_id) {
+    case "wage": {
+      if (wf.status !== "known") return ["Not provided."];
+      const lines = [];
+      if (wf.minimum_annual !== null && wf.minimum_annual !== undefined) lines.push(`You reported a minimum annual wage of ${formatMoney(wf.minimum_annual)}.`);
+      if (wf.minimum_hourly !== null && wf.minimum_hourly !== undefined) lines.push(`You reported a minimum hourly wage of ${formatHourlyWage(wf.minimum_hourly)}.`);
+      return lines.length ? lines : ["Not provided."];
+    }
+    case "mobility": {
+      if (wf.status !== "known") return ["Not provided."];
+      const lines = [];
+      if (wf.radius_miles !== null && wf.radius_miles !== undefined) lines.push(`You reported a mobility radius of ${wf.radius_miles} miles.`);
+      if (wf.willing_to_relocate !== null && wf.willing_to_relocate !== undefined) lines.push(`You reported that you are ${wf.willing_to_relocate ? "" : "not "}willing to relocate.`);
+      if (wf.remote_preference) lines.push(`You reported a remote-work preference of "${wf.remote_preference.replace(/_/g, " ")}".`);
+      return lines.length ? lines : ["Not provided."];
+    }
+    case "education":
+      return wf.status === "known" ? [`You reported: ${wf.highest_level}.`] : ["Not provided."];
+    case "credentials":
+      return wf.status === "known" && wf.items.length ? ["You reported:", ...wf.items] : ["None reported."];
+    case "skills":
+      return wf.status === "known" && wf.items.length ? ["Skills you reported:", ...wf.items] : ["None reported."];
+    case "experience": {
+      if (wf.status !== "known") return ["Not provided."];
+      const lines = [];
+      if (wf.years_in_current_occupation !== null && wf.years_in_current_occupation !== undefined) lines.push(`You reported ${wf.years_in_current_occupation} years in your current occupation.`);
+      if (wf.total_years_work_experience !== null && wf.total_years_work_experience !== undefined) lines.push(`You reported ${wf.total_years_work_experience} total years of work experience.`);
+      return lines.length ? lines : ["Not provided."];
+    }
+    default:
+      return [];
+  }
+}
+
+function personalComparisonEvidenceLines(comparison) {
+  const ev = comparison.occupational_evidence || {};
+  switch (comparison.comparison_id) {
+    case "wage": {
+      if (ev.status === "known") {
+        const bits = [];
+        if (ev.median_hourly_wage !== null && ev.median_hourly_wage !== undefined) bits.push(`${formatHourlyWage(ev.median_hourly_wage)}/hr`);
+        if (ev.median_annual_wage !== null && ev.median_annual_wage !== undefined) bits.push(`${formatMoney(ev.median_annual_wage)}/yr`);
+        const prefix = ev.match_specificity === "broader_category"
+          ? "BLS reports a broader-category regional median wage of"
+          : "BLS reports a regional median wage of";
+        return [`${prefix} ${bits.length ? bits.join(" · ") : "unavailable"} for this occupation.`];
+      }
+      if (ev.status === "suppressed") return ["Regional median wage is suppressed by BLS (unavailable, not zero)."];
+      return ["Regional wage evidence is unavailable."];
+    }
+    case "mobility":
+      return [ev.explanation || "GVAI does not have geographic or remote-availability evidence for this occupation."];
+    case "education": {
+      const lines = [];
+      const jobZone = ev.job_zone || {};
+      if (jobZone.status === "known") {
+        lines.push(`O*NET Job Zone: ${jobZone.title || jobZone.job_zone_code}.`);
+        if (jobZone.education) lines.push(`Typical education: ${jobZone.education}`);
+      }
+      const survey = ev.education_survey || {};
+      const levels = Array.isArray(survey.levels) ? survey.levels : [];
+      if (survey.status === "known" && levels.length) {
+        const top = levels[0];
+        if (top.percentage_of_respondents !== null && top.percentage_of_respondents !== undefined) {
+          lines.push(`O*NET reports that ${top.percentage_of_respondents}% of surveyed workers in this occupation reported ${top.title}.`);
+        }
+      }
+      return lines.length ? lines : ["Occupational preparation evidence is unavailable."];
+    }
+    case "credentials":
+      return [ev.explanation || "GVAI cannot currently determine whether these credentials satisfy this occupation's requirements."];
+    case "skills": {
+      const items = Array.isArray(ev.items) ? ev.items : [];
+      if (ev.status !== "known" || !items.length) return ["Target occupation skill evidence is unavailable."];
+      return ["This occupation emphasizes:", ...items.map(item => item.name)];
+    }
+    case "experience":
+      return [ev.related_experience
+        ? `O*NET describes related experience for this occupation as: ${ev.related_experience}`
+        : (ev.explanation || "Related-experience evidence is unavailable.")];
+    default:
+      return [];
+  }
+}
+
+function renderPersonalComparison(data) {
+  const comparisons = Array.isArray(data.comparisons) ? data.comparisons : [];
+  const sourceOcc = data.source_occupation || {};
+  const targetOcc = data.target_occupation || {};
+  const header = `
+    <div class="worker-outlook-summary">
+      Current occupation: ${escapeHtml(sourceOcc.occupation_title || sourceOcc.occupation_code || "Not set")}<br>
+      Investigated occupation: ${escapeHtml(targetOcc.occupation_title || targetOcc.occupation_code || "")}
+    </div>
+  `;
+  const sameNotice = data.source_equals_target
+    ? `<div class="worker-outlook-summary">You are investigating your saved current occupation.</div>`
+    : "";
+  const sections = comparisons.map(comparison => {
+    const workerLines = personalComparisonWorkerLines(comparison);
+    const evidenceLines = personalComparisonEvidenceLines(comparison);
+    return `
+      <div class="transition-evidence-subtitle">${escapeHtml(comparison.title)}</div>
+      <ul class="worker-outlook-facts">${workerLines.map(line => `<li>${escapeHtml(line)}</li>`).join("")}</ul>
+      <ul class="worker-outlook-facts">${evidenceLines.map(line => `<li>${escapeHtml(line)}</li>`).join("")}</ul>
+      ${comparison.limitation ? `<div class="worker-outlook-summary">${escapeHtml(comparison.limitation)}</div>` : ""}
+    `;
+  }).join("");
+  return `${header}${sameNotice}${sections}<div class="worker-outlook-summary">${escapeHtml(data.explanation || "")}</div>`;
+}
+
+async function loadPersonalComparison(targetCode, targetTitle) {
+  const status = document.getElementById("personal-comparison-status");
+  const content = document.getElementById("personal-comparison-content");
+  if (!status || !content) return;
+
+  const requestId = ++activePersonalComparisonRequestId;
+  const profile = storedWorkerProfile();
+  if (!profile) {
+    status.textContent = "";
+    content.innerHTML = `<div class="worker-outlook-summary">Create a Worker Profile above to compare your self-reported facts with this occupation's published evidence.</div>`;
+    return;
+  }
+  if (!targetCode) return;
+
+  status.textContent = `Comparing your Worker Profile with ${targetTitle || targetCode}...`;
+  content.innerHTML = "";
+
+  try {
+    const body = { profile, target_occupation_code: targetCode };
+    if (currentRegionLatitude !== null && currentRegionLongitude !== null) {
+      body.lat = currentRegionLatitude;
+      body.lon = currentRegionLongitude;
+    }
+    const response = await fetch((window.GVAI_API_BASE || "") + "/api/worker/personal-comparison", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const data = await response.json();
+
+    if (requestId !== activePersonalComparisonRequestId || currentDrilldownCode !== targetCode) return;
+    if (!response.ok || !data.ok || !data.supported) {
+      status.textContent = data.reason || "Personal comparison is unavailable for this selection.";
+      content.innerHTML = "";
+      return;
+    }
+
+    status.textContent = "Facts you reported beside published evidence · no match score.";
+    content.innerHTML = renderPersonalComparison(data);
+  } catch (error) {
+    if (requestId !== activePersonalComparisonRequestId || currentDrilldownCode !== targetCode) return;
+    console.error("Personal comparison load failed:", error);
+    status.textContent = "Personal comparison is temporarily unavailable.";
+    content.innerHTML = "";
+  }
 }
 
 async function loadTransitionActionPlan(targetCode, targetTitle) {
