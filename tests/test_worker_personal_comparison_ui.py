@@ -20,7 +20,7 @@ def test_personal_comparison_section_exists():
 
 def test_personal_comparison_invitation_state_present_without_profile():
     html = _html()
-    assert "Create a Worker Profile above to compare your self-reported facts" in html
+    assert "Start with your current occupation above to compare your self-reported facts" in html
 
 
 def test_personal_comparison_uses_post_not_query_params():

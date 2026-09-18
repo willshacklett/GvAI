@@ -205,6 +205,6 @@ def test_main_globe_action_plan_contract_and_clearing():
 
     assert 'id="transition-action-plan-status"' in html
     assert 'id="transition-action-plan-content"' in html
-    assert "Next Steps to Investigate" in html
+    assert "Next steps to investigate" in html
     assert "/api/worker/transition-action-plan?source=" in html
     assert "clearTransitionActionPlan" in html

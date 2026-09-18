@@ -421,6 +421,13 @@
       font-size: 12px;
     }
 
+    .occupation-select-label {
+      display: block;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
     .occupation-select:focus {
       border-color: var(--accent);
     }
@@ -431,6 +438,115 @@
       border: 1px solid var(--border);
       border-radius: 8px;
       background: var(--panel-soft);
+    }
+
+    .worker-journey {
+      margin-top: 14px;
+      padding: 16px;
+      border: 1px solid rgba(101, 211, 255, 0.28);
+      border-radius: 14px;
+      background: linear-gradient(145deg, rgba(14, 44, 66, 0.94), rgba(8, 22, 37, 0.94));
+    }
+
+    .worker-journey h2 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.2;
+    }
+
+    .worker-journey p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .worker-steps {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 6px;
+      margin: 14px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .worker-step {
+      padding: 7px 6px;
+      border-top: 2px solid rgba(255,255,255,0.16);
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.25;
+    }
+
+    .worker-step.active {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    .worker-journey-action {
+      margin-top: 12px;
+      width: 100%;
+    }
+
+    .worker-context {
+      margin: 14px 0 0;
+      padding: 10px 12px;
+      border-left: 3px solid var(--accent);
+      background: rgba(101, 211, 255, 0.06);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .worker-context strong {
+      display: block;
+      color: var(--accent);
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .worker-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .worker-summary-item {
+      min-width: 0;
+      padding: 9px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: rgba(255,255,255,0.03);
+    }
+
+    .worker-summary-label {
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .worker-summary-value {
+      margin-top: 4px;
+      font-size: 14px;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+
+    .worker-profile-card[hidden] {
+      display: none;
+    }
+
+    .worker-deep-evidence {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .worker-deep-evidence > summary {
+      cursor: pointer;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
     }
 
     .worker-profile-card p,
@@ -480,6 +596,10 @@
     @media (max-width: 520px) {
       .worker-profile-grid { grid-template-columns: 1fr; }
       .worker-profile-grid .worker-profile-wide { grid-column: auto; }
+      .worker-steps { grid-template-columns: 1fr; gap: 2px; }
+      .worker-step { padding: 5px 0 5px 8px; border-top: 0; border-left: 2px solid rgba(255,255,255,0.16); }
+      .worker-step.active { border-left-color: var(--accent); }
+      .worker-summary-grid { grid-template-columns: 1fr; }
     }
 
 
@@ -1148,7 +1268,7 @@
         right: 14px;
         bottom: 14px;
         width: auto;
-        max-height: 44vh;
+        max-height: 70vh;
       }
 
       .legend {
@@ -1158,7 +1278,7 @@
       .layer-bar {
         left: 14px;
         right: 14px;
-        bottom: calc(44vh + 24px);
+        bottom: calc(70vh + 24px);
         max-width: none;
       }
 
@@ -1327,7 +1447,21 @@
       </div>
     </div>
 
-    <div class="section-title">Occupation exposure pilot</div>
+    <section class="worker-journey" aria-labelledby="worker-journey-title">
+      <h2 id="worker-journey-title">Explore your work options</h2>
+      <p id="worker-journey-copy">Start with your current occupation. GVAI uses your occupation and region to show local labor evidence and careers you may want to investigate.</p>
+      <ol class="worker-steps" aria-label="Worker journey">
+        <li class="worker-step active">1. Tell us about your work</li>
+        <li class="worker-step">2. See your local outlook</li>
+        <li class="worker-step">3. Explore other occupations</li>
+        <li class="worker-step">4. Investigate one option</li>
+        <li class="worker-step">5. Decide what to investigate next</li>
+      </ol>
+      <button id="start-worker-profile-btn" type="button" class="primary worker-journey-action">Start with my current occupation</button>
+      <div id="worker-context" class="worker-context" hidden></div>
+    </section>
+
+    <div class="section-title">Your work and local outlook</div>
 
     <div id="regional-stex-card" class="regional-stex-card" aria-live="polite">
       <div class="section-title" style="margin-top:0">Regional STEX Coverage</div>
@@ -1341,19 +1475,14 @@
       <div id="regional-labor-intel-content"></div>
     </div>
 
-    <select
-      id="stex-occupation-select"
-      class="occupation-select"
-      aria-label="Select audited occupation"
-    >
-      <option value="">
-        Loading audited occupations…
-      </option>
+    <label class="occupation-select-label" for="stex-occupation-select">Current occupation</label>
+    <select id="stex-occupation-select" class="occupation-select" aria-label="Select current occupation">
+      <option value="">Loading occupations…</option>
     </select>
 
-    <section id="worker-profile-card" class="worker-profile-card" aria-labelledby="worker-profile-title">
-      <div id="worker-profile-title" class="section-title" style="margin-top:0">Your Worker Profile</div>
-      <p>Tell GVAI a few facts about your work background so future occupation comparisons can distinguish occupational evidence from facts you report about yourself.</p>
+    <section id="worker-profile-card" class="worker-profile-card" aria-labelledby="worker-profile-title" hidden>
+      <div id="worker-profile-title" class="section-title" style="margin-top:0">Tell us about your work</div>
+      <p>A few self-reported facts help keep your background separate from published occupation evidence. You can save a partial profile and add more later.</p>
       <p>Your Worker Profile is stored only in this browser on this device. GVAI does not need your name, email, or street address for this profile.</p>
       <form id="worker-profile-form">
         <div class="worker-profile-grid">
@@ -1378,6 +1507,7 @@
 
 
     <div class="occupation-card">
+      <div class="worker-context"><strong>Your current work</strong><span id="current-occupation-context">Pest Control Workers</span></div>
       <div class="occupation-head">
         <div>
           <div id="stex-occupation-name" class="occupation-name">
@@ -1390,7 +1520,7 @@
 
         <div>
           <div id="stex-score" class="stex-score">—</div>
-          <div class="stex-label">STEX v0.1</div>
+          <div class="stex-label">Career exposure</div>
         </div>
       </div>
 
@@ -1425,18 +1555,20 @@
     </div>
 
     <div id="worker-outlook-card" class="worker-outlook-card" aria-live="polite">
-      <div class="section-title" style="margin-top:0">Worker Outlook</div>
+      <div class="section-title" style="margin-top:0">Your local outlook</div>
       <div id="worker-outlook-status" class="stex-status">Select a region and an audited occupation.</div>
       <div id="worker-outlook-content"></div>
     </div>
 
     <div id="occupation-drilldown-card" class="occupation-drilldown-card" aria-live="polite">
-      <div class="section-title" style="margin-top:0">Occupation being investigated</div>
+      <div class="worker-context"><strong>You're investigating</strong><span id="investigated-occupation-context"></span></div>
+      <div class="section-title" style="margin-top:12px">Occupation details</div>
       <div id="occupation-drilldown-status" class="stex-status"></div>
       <div id="occupation-drilldown-content"></div>
 
-      <div class="transition-evidence-section">
-        <div class="section-title" style="margin-top:0">Career Transition Evidence</div>
+      <details class="worker-deep-evidence">
+        <summary>How the work differs</summary>
+        <div class="transition-evidence-section">
         <div class="transition-evidence-note">
           GVAI compares O*NET occupational profiles. This does not determine
           whether an individual is qualified for a job or personally
@@ -1444,10 +1576,12 @@
         </div>
         <div id="transition-evidence-status" class="stex-status"></div>
         <div id="transition-evidence-content"></div>
-      </div>
+        </div>
+      </details>
 
-      <div class="transition-evidence-section">
-        <div class="section-title" style="margin-top:0">Transition Preparation Evidence</div>
+      <details class="worker-deep-evidence">
+        <summary>Typical preparation</summary>
+        <div class="transition-evidence-section">
         <div class="transition-evidence-note">
           O*NET's published preparation profile for each occupation. This
           describes the occupation, not whether you personally already have
@@ -1455,19 +1589,23 @@
         </div>
         <div id="transition-preparation-status" class="stex-status"></div>
         <div id="transition-preparation-content"></div>
-      </div>
+        </div>
+      </details>
 
-      <div class="transition-evidence-section">
-        <div class="section-title" style="margin-top:0">Next Steps to Investigate</div>
+      <details class="worker-deep-evidence" open>
+        <summary>Next steps to investigate</summary>
+        <div class="transition-evidence-section">
         <div class="transition-evidence-note">
           Occupational and regional evidence only. Your personal background is not assessed here.
         </div>
         <div id="transition-action-plan-status" class="stex-status"></div>
         <div id="transition-action-plan-content"></div>
-      </div>
+        </div>
+      </details>
 
-      <div class="transition-evidence-section" id="personal-comparison-section">
-        <div class="section-title" style="margin-top:0">How This Compares With Your Profile</div>
+      <details class="worker-deep-evidence" id="personal-comparison-section">
+        <summary>How this compares with your profile</summary>
+        <div class="transition-evidence-section">
         <div class="transition-evidence-note">
           Facts you reported are shown beside published occupational and
           regional evidence. GVAI does not compute a match score and does
@@ -1475,7 +1613,8 @@
         </div>
         <div id="personal-comparison-status" class="stex-status"></div>
         <div id="personal-comparison-content"></div>
-      </div>
+        </div>
+      </details>
 
       <button id="occupation-drilldown-close" type="button" class="worker-outlook-button occupation-drilldown-close">Close</button>
     </div>
@@ -1485,7 +1624,7 @@
     </button>
 
     <div id="related-occupations-card" class="related-occupations-card" aria-live="polite">
-      <div class="section-title" style="margin-top:0">Related occupations to investigate</div>
+      <div class="section-title" style="margin-top:0">Other occupations to investigate</div>
       <div id="related-occupations-status" class="stex-status">Select a region and an occupation.</div>
       <div id="related-occupations-content"></div>
     </div>
@@ -2004,6 +2143,11 @@ let currentRegionLongitude = null;
 let currentOccupationCode = null;
 let currentOccupationTitle = null;
 let currentDrilldownCode = null;
+let activeWorkerOutlookRequestId = 0;
+let activeRelatedOccupationsRequestId = 0;
+let activeDrilldownRequestId = 0;
+let activeTransitionEvidenceRequestId = 0;
+let activeTransitionPreparationRequestId = 0;
 let activeTransitionActionPlanRequestId = 0;
 const RELATED_OCCUPATIONS_DEFAULT_COUNT = 5;
 let relatedOccupationsExpanded = false;
@@ -5783,6 +5927,30 @@ function storedWorkerProfile() {
   } catch (error) { return null; }
 }
 
+function renderWorkerJourneyState(profile) {
+  const card = document.getElementById("worker-profile-card");
+  const startButton = document.getElementById("start-worker-profile-btn");
+  const context = document.getElementById("worker-context");
+  const title = profile?.current_occupation?.occupation_title || currentOccupationTitle || "your current occupation";
+  if (!card || !startButton || !context) return;
+
+  card.hidden = !profile;
+  startButton.textContent = profile ? "Edit my work profile" : "Start with my current occupation";
+  context.hidden = !profile;
+  context.innerHTML = profile
+    ? `<strong>Your current work</strong>${escapeHtml(title)}`
+    : "";
+  const currentContext = document.getElementById("current-occupation-context");
+  if (currentContext) currentContext.textContent = title;
+  setWorkerJourneyStep(profile ? 2 : 1);
+}
+
+function setWorkerJourneyStep(step) {
+  document.querySelectorAll(".worker-step").forEach((item, index) => {
+    item.classList.toggle("active", index === step - 1);
+  });
+}
+
 function useSelectedOccupationForWorkerProfile() {
   if (!currentOccupationCode || !currentOccupationTitle) return;
   workerProfileField("worker-profile-occupation-code").value = currentOccupationCode;
@@ -5795,6 +5963,13 @@ document.getElementById("worker-profile-form").addEventListener("submit", event 
   const profile = workerProfileFromForm();
   localStorage.setItem(WORKER_PROFILE_STORAGE_KEY, JSON.stringify(profile));
   workerProfileField("worker-profile-status").textContent = "Profile saved in this browser only. Facts are self-reported and not independently verified.";
+  renderWorkerJourneyState(profile);
+});
+document.getElementById("start-worker-profile-btn").addEventListener("click", () => {
+  const card = document.getElementById("worker-profile-card");
+  card.hidden = false;
+  workerProfileField("worker-profile-occupation-title").focus();
+  document.getElementById("start-worker-profile-btn").textContent = "Save my work profile below";
 });
 document.getElementById("use-selected-occupation-btn").addEventListener("click", useSelectedOccupationForWorkerProfile);
 document.getElementById("edit-worker-profile-btn").addEventListener("click", () => workerProfileField("worker-profile-occupation-title").focus());
@@ -5804,12 +5979,14 @@ document.getElementById("clear-worker-profile-btn").addEventListener("click", ()
   workerProfileField("worker-profile-occupation-code").value = "";
   workerProfileField("worker-profile-status").textContent = "Profile cleared from this browser.";
   clearPersonalComparison();
+  renderWorkerJourneyState(null);
 });
 const initialWorkerProfile = storedWorkerProfile();
 if (initialWorkerProfile) {
   populateWorkerProfile(initialWorkerProfile);
   workerProfileField("worker-profile-status").textContent = "Saved self-reported profile loaded from this browser.";
 }
+renderWorkerJourneyState(initialWorkerProfile);
 
 async function loadOccupationSTEXTasks(code) {
   const container =
@@ -5925,6 +6102,7 @@ async function loadOccupationSTEX(
     const profile = data.profile || {};
 
     currentOccupationTitle = profile.occupation_title || null;
+    renderWorkerJourneyState(storedWorkerProfile());
 
     document.getElementById(
       "stex-occupation-name"
@@ -6052,8 +6230,10 @@ async function loadOccupationSTEXCatalog() {
       selectEl.appendChild(option);
     }
 
-    const firstCode =
-      profiles[0]?.occupation_code;
+    const savedCode = storedWorkerProfile()?.current_occupation?.occupation_code;
+    const firstCode = profiles.some(profile => profile.occupation_code === savedCode)
+      ? savedCode
+      : profiles[0]?.occupation_code;
 
     if (firstCode) {
       selectEl.value = firstCode;
@@ -6096,6 +6276,15 @@ document
       const code =
         event.target.value;
 
+      const savedProfile = storedWorkerProfile();
+      const savedCode = savedProfile?.current_occupation?.occupation_code;
+      if (savedCode && code !== savedCode) {
+        event.target.value = savedCode;
+        workerProfileField("worker-profile-status").textContent =
+          "Your saved profile remains your current occupation. Use a related occupation below to investigate another option.";
+        return;
+      }
+
       currentOccupationCode = code || null;
       clearWorkerOutlook();
       renderWorkerOutlookAvailability();
@@ -6111,6 +6300,7 @@ loadOccupationSTEXCatalog();
 
 
 function clearWorkerOutlook() {
+  activeWorkerOutlookRequestId += 1;
   const card = document.getElementById("worker-outlook-card");
   const content = document.getElementById("worker-outlook-content");
   if (card) card.classList.remove("visible");
@@ -6129,6 +6319,7 @@ function clearRelatedOccupations() {
 }
 
 function clearOccupationDrilldown() {
+  activeDrilldownRequestId += 1;
   const card = document.getElementById("occupation-drilldown-card");
   const status = document.getElementById("occupation-drilldown-status");
   const content = document.getElementById("occupation-drilldown-content");
@@ -6141,6 +6332,7 @@ function clearOccupationDrilldown() {
 }
 
 function clearTransitionEvidence() {
+  activeTransitionEvidenceRequestId += 1;
   const status = document.getElementById("transition-evidence-status");
   const content = document.getElementById("transition-evidence-content");
   if (status) status.textContent = "";
@@ -6157,6 +6349,7 @@ function clearTransitionEvidence() {
 }
 
 function clearTransitionPreparation() {
+  activeTransitionPreparationRequestId += 1;
   const status = document.getElementById("transition-preparation-status");
   const content = document.getElementById("transition-preparation-content");
   if (status) status.textContent = "";
@@ -6290,7 +6483,7 @@ async function loadRelatedOccupations() {
     return;
   }
 
-  const requestId = ++activeRegionRequestId;
+  const requestId = ++activeRelatedOccupationsRequestId;
   const latitude = currentRegionLatitude;
   const longitude = currentRegionLongitude;
   const occupationCode = currentOccupationCode;
@@ -6300,6 +6493,7 @@ async function loadRelatedOccupations() {
   if (!card || !status || !content) return;
 
   card.classList.add("visible");
+  setWorkerJourneyStep(3);
   status.textContent = "Loading O*NET related occupations...";
   content.innerHTML = "";
 
@@ -6312,7 +6506,7 @@ async function loadRelatedOccupations() {
     const response = await fetch(endpoint);
     const data = await response.json();
 
-    if (requestId !== activeRegionRequestId) return;
+    if (requestId !== activeRelatedOccupationsRequestId) return;
 
     const related = data.related_occupations || {};
     if (!response.ok || !data.ok || !data.supported || related.status !== "known") {
@@ -6325,7 +6519,7 @@ async function loadRelatedOccupations() {
     relatedOccupationItems = items;
     renderRelatedOccupationItems();
   } catch (error) {
-    if (requestId !== activeRegionRequestId) return;
+    if (requestId !== activeRelatedOccupationsRequestId) return;
     console.error("Related occupations load failed:", error);
     status.textContent = "Related occupations are temporarily unavailable.";
     content.innerHTML = "";
@@ -6341,7 +6535,7 @@ async function loadWorkerOutlook() {
     return;
   }
 
-  const requestId = ++activeRegionRequestId;
+  const requestId = ++activeWorkerOutlookRequestId;
   const latitude = currentRegionLatitude;
   const longitude = currentRegionLongitude;
   const occupationCode = currentOccupationCode;
@@ -6352,6 +6546,7 @@ async function loadWorkerOutlook() {
   if (!card || !status || !content) return;
 
   card.classList.add("visible");
+  setWorkerJourneyStep(2);
   status.textContent = "Loading worker outlook...";
   content.innerHTML = "";
 
@@ -6365,7 +6560,7 @@ async function loadWorkerOutlook() {
     const response = await fetch(endpoint);
     const data = await response.json();
 
-    if (requestId !== activeRegionRequestId) return;
+    if (requestId !== activeWorkerOutlookRequestId) return;
 
     if (!response.ok || !data.ok || !data.supported) {
       status.textContent =
@@ -6430,7 +6625,7 @@ async function loadWorkerOutlook() {
       ${gapsMarkup}
     `;
   } catch (error) {
-    if (requestId !== activeRegionRequestId) return;
+    if (requestId !== activeWorkerOutlookRequestId) return;
     console.error("Worker outlook load failed:", error);
     status.textContent = "Worker outlook is temporarily unavailable.";
     content.innerHTML = "";
@@ -6452,7 +6647,7 @@ async function loadRelatedOccupationDrilldown(occupationCode, occupationTitle) {
   void loadTransitionActionPlan(occupationCode, occupationTitle);
   void loadPersonalComparison(occupationCode, occupationTitle);
 
-  const requestId = ++activeRegionRequestId;
+  const requestId = ++activeDrilldownRequestId;
   const latitude = currentRegionLatitude;
   const longitude = currentRegionLongitude;
 
@@ -6462,6 +6657,7 @@ async function loadRelatedOccupationDrilldown(occupationCode, occupationTitle) {
   if (!card || !status || !content) return;
 
   card.classList.add("visible");
+  setWorkerJourneyStep(4);
   card.scrollIntoView({ behavior: "smooth", block: "nearest" });
   status.textContent = `Loading evidence for ${occupationTitle || occupationCode}...`;
   content.innerHTML = "";
@@ -6477,7 +6673,7 @@ async function loadRelatedOccupationDrilldown(occupationCode, occupationTitle) {
     const data = await response.json();
 
     if (
-      requestId !== activeRegionRequestId ||
+      requestId !== activeDrilldownRequestId ||
       currentDrilldownCode !== occupationCode
     ) {
       return;
@@ -6534,7 +6730,18 @@ async function loadRelatedOccupationDrilldown(occupationCode, occupationTitle) {
       facts.push("Regional median wage for this occupation is unknown.");
     }
 
-    const factsMarkup = `<ul class="worker-outlook-facts">${facts.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+    const wageFact = facts.find(item => item.toLowerCase().includes("wage")) || "Unavailable";
+    const employmentFact = facts.find(item => item.toLowerCase().includes("employment")) || "Unavailable";
+    const stexFact = facts.find(item => item.toLowerCase().includes("stex")) || "Unavailable";
+    const factsMarkup = `<div class="worker-summary-grid">
+      <div class="worker-summary-item"><div class="worker-summary-label">Typical local pay</div><div class="worker-summary-value">${escapeHtml(wageFact)}</div></div>
+      <div class="worker-summary-item"><div class="worker-summary-label">Jobs in your area</div><div class="worker-summary-value">${escapeHtml(employmentFact)}</div></div>
+      <div class="worker-summary-item"><div class="worker-summary-label">Career exposure</div><div class="worker-summary-value">${escapeHtml(stexFact)}</div></div>
+      <div class="worker-summary-item"><div class="worker-summary-label">Typical preparation</div><div class="worker-summary-value">Open below for O*NET evidence</div></div>
+    </div>`;
+
+    const investigatedContext = document.getElementById("investigated-occupation-context");
+    if (investigatedContext) investigatedContext.textContent = data.occupation_title || data.occupation_code;
 
     status.textContent =
       `Related occupation (O*NET Related Occupations) · not your current occupation · ${data.county || "Selected region"} · no composite score`;
@@ -6545,7 +6752,7 @@ async function loadRelatedOccupationDrilldown(occupationCode, occupationTitle) {
     `;
   } catch (error) {
     if (
-      requestId !== activeRegionRequestId ||
+      requestId !== activeDrilldownRequestId ||
       currentDrilldownCode !== occupationCode
     ) {
       return;
@@ -6664,7 +6871,7 @@ function renderTransitionEvidenceContent() {
 async function loadTransitionEvidence(targetCode, targetTitle) {
   if (!currentOccupationCode || !targetCode) return;
 
-  const requestId = ++activeRegionRequestId;
+  const requestId = ++activeTransitionEvidenceRequestId;
   const sourceCode = currentOccupationCode;
   const sourceTitle = currentOccupationTitle;
 
@@ -6695,7 +6902,7 @@ async function loadTransitionEvidence(targetCode, targetTitle) {
     const data = await response.json();
 
     if (
-      requestId !== activeRegionRequestId ||
+      requestId !== activeTransitionEvidenceRequestId ||
       currentDrilldownCode !== targetCode
     ) {
       return;
@@ -6729,7 +6936,7 @@ async function loadTransitionEvidence(targetCode, targetTitle) {
     renderTransitionEvidenceContent();
   } catch (error) {
     if (
-      requestId !== activeRegionRequestId ||
+      requestId !== activeTransitionEvidenceRequestId ||
       currentDrilldownCode !== targetCode
     ) {
       return;
@@ -6792,7 +6999,7 @@ function renderPreparationFacts(title, preparation) {
 async function loadTransitionPreparation(targetCode, targetTitle) {
   if (!currentOccupationCode || !targetCode) return;
 
-  const requestId = ++activeRegionRequestId;
+  const requestId = ++activeTransitionPreparationRequestId;
   const sourceCode = currentOccupationCode;
   const sourceTitle = currentOccupationTitle;
 
@@ -6815,7 +7022,7 @@ async function loadTransitionPreparation(targetCode, targetTitle) {
     const data = await response.json();
 
     if (
-      requestId !== activeRegionRequestId ||
+      requestId !== activeTransitionPreparationRequestId ||
       currentDrilldownCode !== targetCode
     ) {
       return;
@@ -6835,7 +7042,7 @@ async function loadTransitionPreparation(targetCode, targetTitle) {
       renderPreparationFacts("Occupation being investigated", data.target_preparation || {});
   } catch (error) {
     if (
-      requestId !== activeRegionRequestId ||
+      requestId !== activeTransitionPreparationRequestId ||
       currentDrilldownCode !== targetCode
     ) {
       return;
@@ -7003,7 +7210,7 @@ async function loadPersonalComparison(targetCode, targetTitle) {
   const profile = storedWorkerProfile();
   if (!profile) {
     status.textContent = "";
-    content.innerHTML = `<div class="worker-outlook-summary">Create a Worker Profile above to compare your self-reported facts with this occupation's published evidence.</div>`;
+    content.innerHTML = `<div class="worker-outlook-summary">Start with your current occupation above to compare your self-reported facts with this occupation's published evidence.</div>`;
     return;
   }
   if (!targetCode) return;
@@ -7074,6 +7281,7 @@ async function loadTransitionActionPlan(targetCode, targetTitle) {
     const actions = Array.isArray(data.actions) ? data.actions : [];
     status.textContent = `${actions.length} factual next steps for ${data.target_occupation_title || targetCode}.`;
     content.innerHTML = renderTransitionActionPlan(actions, !!storedWorkerProfile());
+    setWorkerJourneyStep(5);
   } catch (error) {
     if (requestId !== activeTransitionActionPlanRequestId || currentDrilldownCode !== targetCode) return;
     console.error("Transition action plan load failed:", error);
@@ -7114,6 +7322,14 @@ document
   .getElementById("occupation-drilldown-close")
   .addEventListener("click", () => {
     clearOccupationDrilldown();
+  });
+
+document
+  .getElementById("occupation-drilldown-card")
+  .addEventListener("click", event => {
+    const link = event.target.closest(".personal-comparison-link");
+    if (!link) return;
+    document.getElementById("personal-comparison-section").open = true;
   });
 
 renderWorkerOutlookAvailability();
