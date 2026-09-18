@@ -425,6 +425,63 @@
       border-color: var(--accent);
     }
 
+    .worker-profile-card {
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel-soft);
+    }
+
+    .worker-profile-card p,
+    .worker-profile-card label,
+    .worker-profile-status {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .worker-profile-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .worker-profile-grid label {
+      display: grid;
+      gap: 4px;
+    }
+
+    .worker-profile-grid .worker-profile-wide { grid-column: 1 / -1; }
+
+    .worker-profile-card input,
+    .worker-profile-card select,
+    .worker-profile-card textarea {
+      box-sizing: border-box;
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: rgba(4, 14, 24, 0.82);
+      color: var(--text);
+      padding: 8px;
+      font: inherit;
+    }
+
+    .worker-profile-card textarea { min-height: 54px; resize: vertical; }
+
+    .worker-profile-actions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 520px) {
+      .worker-profile-grid { grid-template-columns: 1fr; }
+      .worker-profile-grid .worker-profile-wide { grid-column: auto; }
+    }
+
 
     .occupation-name {
       font-size: 16px;
@@ -1293,6 +1350,31 @@
         Loading audited occupations…
       </option>
     </select>
+
+    <section id="worker-profile-card" class="worker-profile-card" aria-labelledby="worker-profile-title">
+      <div id="worker-profile-title" class="section-title" style="margin-top:0">Your Worker Profile</div>
+      <p>Tell GVAI a few facts about your work background so future occupation comparisons can distinguish occupational evidence from facts you report about yourself.</p>
+      <p>Your Worker Profile is stored only in this browser on this device. GVAI does not need your name, email, or street address for this profile.</p>
+      <form id="worker-profile-form">
+        <div class="worker-profile-grid">
+          <label class="worker-profile-wide">Current occupation<input id="worker-profile-occupation-title" maxlength="160" autocomplete="off"></label>
+          <input id="worker-profile-occupation-code" type="hidden">
+          <label>Years in current occupation<input id="worker-profile-years" type="number" min="0" max="80" step="0.1"></label>
+          <label>Education<input id="worker-profile-education" maxlength="160" autocomplete="off"></label>
+          <label class="worker-profile-wide">Licenses/certifications you entered<textarea id="worker-profile-credentials" maxlength="2000" placeholder="One per line"></textarea></label>
+          <label class="worker-profile-wide">Skills you entered<textarea id="worker-profile-skills" maxlength="2000" placeholder="One per line"></textarea></label>
+          <label>Current annual wage<input id="worker-profile-current-annual" type="number" min="0" max="2000000" step="1"></label>
+          <label>Minimum desired annual wage<input id="worker-profile-minimum-annual" type="number" min="0" max="2000000" step="1"></label>
+          <label>Mobility radius (miles)<input id="worker-profile-radius" type="number" min="0" max="1000" step="1"></label>
+          <label>Remote-work preference<select id="worker-profile-remote"><option value="">Unknown</option><option value="no_preference">No preference</option><option value="prefer_remote">Prefer remote</option><option value="remote_required">Remote required</option><option value="prefer_on_site">Prefer on-site</option></select></label>
+          <label>Willing to relocate<select id="worker-profile-relocate"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
+          <label class="worker-profile-wide">Constraints or preferences you reported<textarea id="worker-profile-notes" maxlength="1000"></textarea></label>
+        </div>
+        <button id="use-selected-occupation-btn" type="button" class="worker-outlook-button">Use as my current occupation</button>
+        <div class="worker-profile-actions"><button type="submit">Save Profile</button><button id="edit-worker-profile-btn" type="button">Edit Profile</button><button id="clear-worker-profile-btn" type="button">Clear Profile</button></div>
+        <div id="worker-profile-status" class="worker-profile-status" aria-live="polite"></div>
+      </form>
+    </section>
 
 
     <div class="occupation-card">
@@ -5625,6 +5707,98 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+const WORKER_PROFILE_STORAGE_KEY = "gvai.workerProfile.v1";
+const WORKER_PROFILE_VERSION = "v1";
+
+function workerProfileField(id) { return document.getElementById(id); }
+
+function profileNumber(id, maximum) {
+  const value = workerProfileField(id).value.trim();
+  if (!value) return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 && number <= maximum ? number : null;
+}
+
+function profileList(id) {
+  const seen = new Set();
+  return workerProfileField(id).value.split(/\n|,/).map(value => value.trim()).filter(value => {
+    const key = value.toLowerCase();
+    if (!value || value.length > 120 || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 50);
+}
+
+function workerProfileFromForm() {
+  const relocate = workerProfileField("worker-profile-relocate").value;
+  return {
+    profile_version: WORKER_PROFILE_VERSION,
+    current_occupation: { occupation_code: workerProfileField("worker-profile-occupation-code").value.trim() || null, occupation_title: workerProfileField("worker-profile-occupation-title").value.trim() || null },
+    experience: { years_in_current_occupation: profileNumber("worker-profile-years", 80), total_years_work_experience: null },
+    education: { highest_level: workerProfileField("worker-profile-education").value.trim() || null, field_of_study: null },
+    credentials: profileList("worker-profile-credentials"),
+    skills: profileList("worker-profile-skills"),
+    wage: { current_hourly: null, current_annual: profileNumber("worker-profile-current-annual", 2000000), minimum_hourly: null, minimum_annual: profileNumber("worker-profile-minimum-annual", 2000000) },
+    mobility: { radius_miles: profileNumber("worker-profile-radius", 1000), willing_to_relocate: relocate === "" ? null : relocate === "true", remote_preference: workerProfileField("worker-profile-remote").value || null },
+    preferences: { notes: workerProfileField("worker-profile-notes").value.trim() || null }
+  };
+}
+
+function isWorkerProfileV1(profile) {
+  return profile && typeof profile === "object" && profile.profile_version === WORKER_PROFILE_VERSION && profile.current_occupation && profile.experience && profile.education && Array.isArray(profile.credentials) && Array.isArray(profile.skills) && profile.wage && profile.mobility && profile.preferences;
+}
+
+function populateWorkerProfile(profile) {
+  if (!isWorkerProfileV1(profile)) return false;
+  workerProfileField("worker-profile-occupation-code").value = profile.current_occupation.occupation_code || "";
+  workerProfileField("worker-profile-occupation-title").value = profile.current_occupation.occupation_title || "";
+  workerProfileField("worker-profile-years").value = profile.experience.years_in_current_occupation ?? "";
+  workerProfileField("worker-profile-education").value = profile.education.highest_level || "";
+  workerProfileField("worker-profile-credentials").value = profile.credentials.join("\n");
+  workerProfileField("worker-profile-skills").value = profile.skills.join("\n");
+  workerProfileField("worker-profile-current-annual").value = profile.wage.current_annual ?? "";
+  workerProfileField("worker-profile-minimum-annual").value = profile.wage.minimum_annual ?? "";
+  workerProfileField("worker-profile-radius").value = profile.mobility.radius_miles ?? "";
+  workerProfileField("worker-profile-relocate").value = profile.mobility.willing_to_relocate === null ? "" : String(profile.mobility.willing_to_relocate);
+  workerProfileField("worker-profile-remote").value = profile.mobility.remote_preference || "";
+  workerProfileField("worker-profile-notes").value = profile.preferences.notes || "";
+  return true;
+}
+
+function storedWorkerProfile() {
+  try {
+    const profile = JSON.parse(localStorage.getItem(WORKER_PROFILE_STORAGE_KEY));
+    return isWorkerProfileV1(profile) ? profile : null;
+  } catch (error) { return null; }
+}
+
+function useSelectedOccupationForWorkerProfile() {
+  if (!currentOccupationCode || !currentOccupationTitle) return;
+  workerProfileField("worker-profile-occupation-code").value = currentOccupationCode;
+  workerProfileField("worker-profile-occupation-title").value = currentOccupationTitle;
+  workerProfileField("worker-profile-status").textContent = "Selected occupation added to your unsaved self-reported profile.";
+}
+
+document.getElementById("worker-profile-form").addEventListener("submit", event => {
+  event.preventDefault();
+  const profile = workerProfileFromForm();
+  localStorage.setItem(WORKER_PROFILE_STORAGE_KEY, JSON.stringify(profile));
+  workerProfileField("worker-profile-status").textContent = "Profile saved in this browser only. Facts are self-reported and not independently verified.";
+});
+document.getElementById("use-selected-occupation-btn").addEventListener("click", useSelectedOccupationForWorkerProfile);
+document.getElementById("edit-worker-profile-btn").addEventListener("click", () => workerProfileField("worker-profile-occupation-title").focus());
+document.getElementById("clear-worker-profile-btn").addEventListener("click", () => {
+  localStorage.removeItem(WORKER_PROFILE_STORAGE_KEY);
+  document.getElementById("worker-profile-form").reset();
+  workerProfileField("worker-profile-occupation-code").value = "";
+  workerProfileField("worker-profile-status").textContent = "Profile cleared from this browser.";
+});
+const initialWorkerProfile = storedWorkerProfile();
+if (initialWorkerProfile) {
+  populateWorkerProfile(initialWorkerProfile);
+  workerProfileField("worker-profile-status").textContent = "Saved self-reported profile loaded from this browser.";
+}
+
 async function loadOccupationSTEXTasks(code) {
   const container =
     document.getElementById(
@@ -6658,10 +6832,13 @@ async function loadTransitionPreparation(targetCode, targetTitle) {
   }
 }
 
-function renderTransitionActionPlan(actions) {
+function renderTransitionActionPlan(actions, profileAvailable = false) {
   return `<ul class="transition-action-plan-list">${actions.map(action => {
     const facts = Array.isArray(action.supporting_facts) ? action.supporting_facts : [];
-    const detail = [action.explanation, ...facts, action.limitation]
+    const personalProfilePrompt = profileAvailable && action.action_id === "compare_personal_background_separately"
+      ? "Worker Profile available for personal comparison."
+      : action.explanation;
+    const detail = [personalProfilePrompt, ...facts, action.limitation]
       .filter(Boolean)
       .map(item => `<div>${escapeHtml(item)}</div>`)
       .join("");
@@ -6708,7 +6885,7 @@ async function loadTransitionActionPlan(targetCode, targetTitle) {
 
     const actions = Array.isArray(data.actions) ? data.actions : [];
     status.textContent = `${actions.length} factual next steps for ${data.target_occupation_title || targetCode}.`;
-    content.innerHTML = renderTransitionActionPlan(actions);
+    content.innerHTML = renderTransitionActionPlan(actions, !!storedWorkerProfile());
   } catch (error) {
     if (requestId !== activeTransitionActionPlanRequestId || currentDrilldownCode !== targetCode) return;
     console.error("Transition action plan load failed:", error);

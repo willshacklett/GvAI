@@ -35,6 +35,10 @@ from gvai.postlabor.worker_transition_preparation import (
 from gvai.postlabor.worker_transition_action_plan import (
     synthesize_worker_transition_action_plan,
 )
+from gvai.postlabor.worker_profile import (
+    WorkerProfileValidationError,
+    validate_worker_profile,
+)
 from gvai.postlabor.stex.store import (
     InvalidSTEXOccupationCode,
     STEXProfileNotFound,
@@ -1202,6 +1206,18 @@ def api_worker_transition_action_plan():
             "target": target_code,
             "reason": "Transition action-plan synthesis failed.",
         }), 500
+
+
+@app.post("/api/worker/profile/validate")
+def api_worker_profile_validate():
+    """Validate only; Worker Profile data is never stored server-side."""
+    payload = request.get_json(silent=True)
+    if payload is None:
+        return jsonify({"ok": False, "errors": ["profile"]}), 400
+    try:
+        return jsonify({"ok": True, "profile": validate_worker_profile(payload)})
+    except WorkerProfileValidationError as exc:
+        return jsonify({"ok": False, "errors": exc.errors}), 400
 
 
 def build_gv_runtime_policy(user_message=""):
