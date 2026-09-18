@@ -32,6 +32,9 @@ from gvai.postlabor.worker_transition_evidence import (
 from gvai.postlabor.worker_transition_preparation import (
     synthesize_worker_transition_preparation_evidence,
 )
+from gvai.postlabor.worker_transition_action_plan import (
+    synthesize_worker_transition_action_plan,
+)
 from gvai.postlabor.stex.store import (
     InvalidSTEXOccupationCode,
     STEXProfileNotFound,
@@ -1151,6 +1154,53 @@ def api_worker_transition_preparation():
             "source": source_code,
             "target": target_code,
             "reason": "Transition preparation evidence synthesis failed.",
+        }), 500
+
+
+@app.get("/api/worker/transition-action-plan")
+def api_worker_transition_action_plan():
+    source_code = (request.args.get("source") or "").strip()
+    target_code = (request.args.get("target") or "").strip()
+    lat = request.args.get("lat")
+    lon = request.args.get("lon")
+
+    if not source_code or not target_code:
+        return jsonify({
+            "ok": False,
+            "reason": "Both source and target O*NET-SOC occupation codes are required.",
+            "example": "source=37-2021.00&target=37-3012.00",
+        }), 400
+    if (lat is None) != (lon is None):
+        return jsonify({
+            "ok": False,
+            "reason": "lat and lon query parameters must be provided together.",
+        }), 400
+
+    try:
+        latitude = float(lat) if lat is not None else None
+        longitude = float(lon) if lon is not None else None
+    except ValueError:
+        return jsonify({
+            "ok": False,
+            "reason": "Valid lat and lon query parameters are required.",
+        }), 400
+
+    try:
+        result = synthesize_worker_transition_action_plan(
+            source_code,
+            target_code,
+            latitude=latitude,
+            longitude=longitude,
+        )
+        return jsonify({"ok": True, **result})
+    except (InvalidSTEXOccupationCode, ValueError) as exc:
+        return jsonify({"ok": False, "reason": str(exc)}), 400
+    except Exception:
+        return jsonify({
+            "ok": False,
+            "source": source_code,
+            "target": target_code,
+            "reason": "Transition action-plan synthesis failed.",
         }), 500
 
 
