@@ -33,6 +33,13 @@ compensation, published remote/hybrid information, posting date, retrieval
 time, source attribution, and original apply URL. Unknown upstream values are
 null.
 
+`gvai.postlabor.live_jobs.LiveJobsRegistry` distinguishes
+`available_with_results`, `available_zero_results`, `provider_unavailable`,
+`unsupported_country`, and `provider_failure`. It validates adapter output and
+deduplicates by provider and provider job ID. The worker API accepts only
+public occupation and geographic search context; it never accepts a Worker
+Profile.
+
 ## Compatibility And Limits
 
 Existing callers default to `country_code=US`; U.S. O*NET/OEWS/STEX behavior

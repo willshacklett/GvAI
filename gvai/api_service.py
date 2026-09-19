@@ -43,8 +43,13 @@ from gvai.postlabor.worker_personal_comparison import (
     synthesize_worker_personal_comparison,
 )
 from gvai.postlabor.labor_providers import (
+    OccupationReference,
     provider_for_country,
     unavailable_evidence,
+)
+from gvai.postlabor.live_jobs import (
+    DEFAULT_LIVE_JOBS_REGISTRY,
+    PublicJobSearchContext,
 )
 from gvai.postlabor.stex.store import (
     InvalidSTEXOccupationCode,
@@ -1132,6 +1137,61 @@ def api_worker_related_occupations():
             "occupation_code": occupation_code,
             "reason": "Related occupations synthesis failed.",
         }), 500
+
+
+@app.get("/api/worker/live-jobs")
+def api_worker_live_jobs():
+    """List public job openings without accepting Worker Profile data."""
+    country_code = (request.args.get("country") or request.args.get("country_code") or "US").strip().upper()
+    occupation_code = (request.args.get("occupation") or request.args.get("occupation_code") or "").strip() or None
+    occupation_title = (request.args.get("occupation_title") or "").strip() or None
+    location = (request.args.get("location") or "").strip() or None
+
+    try:
+        latitude = float(request.args["lat"]) if request.args.get("lat") else None
+        longitude = float(request.args["lon"]) if request.args.get("lon") else None
+        radius = float(request.args["radius"]) if request.args.get("radius") else None
+    except (TypeError, ValueError):
+        return jsonify({
+            "ok": False,
+            "reason": "lat, lon, and radius must be numeric when provided.",
+        }), 400
+
+    try:
+        context = PublicJobSearchContext(
+            country_code=country_code,
+            occupation_code=occupation_code,
+            location=location,
+            latitude=latitude,
+            longitude=longitude,
+            radius=radius,
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "reason": str(exc)}), 400
+
+    occupation = None
+    metadata = provider_for_country(context.country_code)
+    if occupation_code and occupation_title and metadata:
+        occupation = OccupationReference(
+            country_code=context.country_code,
+            provider=metadata.provider,
+            provider_occupation_code=occupation_code,
+            title=occupation_title,
+        )
+
+    result = DEFAULT_LIVE_JOBS_REGISTRY.search(context, occupation=occupation)
+    payload = result.to_dict()
+    payload.update({
+        "ok": True,
+        "capability": "live_job_openings",
+        "provider_configured": result.provider_registered,
+        "provenance": {
+            "provider": result.provider,
+            "attribution": result.attribution,
+            "country_code": result.country_code,
+        },
+    })
+    return jsonify(payload)
 
 
 @app.get("/api/worker/transition-evidence")

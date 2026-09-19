@@ -91,6 +91,18 @@ def test_laborers_workspace_has_worker_facing_journey_map_and_actions():
     assert "void loadRelatedOccupations();" in html
 
 
+def test_laborers_workspace_has_truthful_live_jobs_stage_and_source_navigation():
+    html = _html()
+    assert 'data-worker-stage-target="live-jobs"' in html
+    assert 'data-worker-stage="live-jobs"' in html
+    assert 'id="live-jobs-btn"' in html
+    assert 'data-worker-stage-load="live-jobs"' in html
+    assert 'href="${escapeHtml(opening.apply_url)}"' in html
+    assert "Apply at source" in html
+    assert "Live job openings are not available from a configured provider for this region yet." in html
+    assert "Worker Profile" not in html[html.index("async function loadLiveJobs"):html.index("async function loadRelatedOccupationDrilldown")]
+
+
 def test_background_next_steps_load_does_not_steal_investigation_stage():
     html = _html()
     action_plan = html[html.index("async function loadTransitionActionPlan"):html.index('document\n  .getElementById("worker-outlook-btn")')]

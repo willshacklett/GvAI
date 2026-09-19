@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Literal, Protocol, Sequence
+from typing import Any, Literal, Mapping, Protocol, Sequence
 
 
 EvidenceCapability = Literal[
@@ -151,6 +151,8 @@ class NormalizedJobOpening:
 
     def to_dict(self) -> dict[str, object]:
         result = asdict(self)
+        result["retrieved_at"] = self.retrieved_at.isoformat()
+        result["posted_at"] = self.posted_at.isoformat() if self.posted_at else None
         result["occupation"] = (
             self.occupation.to_dict() if self.occupation else None
         )
@@ -167,4 +169,8 @@ class LiveJobsProvider(Protocol):
         *,
         occupation: OccupationReference | None = None,
         country_code: str | None = None,
-    ) -> Sequence[NormalizedJobOpening]: ...
+        location: str | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+        radius: float | None = None,
+    ) -> Sequence[NormalizedJobOpening | Mapping[str, Any]]: ...
