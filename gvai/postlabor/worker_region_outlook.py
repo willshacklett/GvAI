@@ -29,6 +29,11 @@ from typing import Any, Dict
 
 from requests import HTTPError, RequestException
 
+from gvai.postlabor.labor_providers import (
+    OccupationReference,
+    provider_for_country,
+    unavailable_evidence,
+)
 from gvai.postlabor.region_labor_intelligence import (
     DEFAULT_STEX_SOURCE_YEAR,
     synthesize_region_labor_intelligence,
@@ -408,6 +413,7 @@ def synthesize_worker_region_outlook(
     *,
     acs_year: int = 2024,
     stex_year: int = DEFAULT_STEX_SOURCE_YEAR,
+    country_code: str = "US",
 ) -> Dict[str, Any]:
     """
     Deterministically combine existing regional labor intelligence
@@ -418,6 +424,26 @@ def synthesize_worker_region_outlook(
     valid O*NET-SOC code. Never invents a composite score or a
     geographic opportunity score.
     """
+
+    provider = provider_for_country(country_code)
+    if provider is None:
+        return {
+            "supported": False,
+            "country_code": str(country_code).strip().upper(),
+            "occupation_code": occupation_code,
+            "reason": unavailable_evidence(
+                "occupation_profiles", country_code
+            )["reason"],
+            "occupation": {
+                "stex": unavailable_evidence(
+                    "structural_exposure", country_code
+                ),
+                "regional_employment": unavailable_evidence(
+                    "employment", country_code
+                ),
+                "regional_wage": unavailable_evidence("wages", country_code),
+            },
+        }
 
     normalized_code = normalize_occupation_code(occupation_code)
 
@@ -488,6 +514,8 @@ def synthesize_worker_region_outlook(
         "data_available": bool(region.get("data_available")),
         "latitude": latitude,
         "longitude": longitude,
+        "country_code": provider.country_code,
+        "provider": provider.to_dict(),
         "state": region.get("state"),
         "county": region.get("county"),
         "state_fips": region.get("state_fips"),
@@ -496,6 +524,16 @@ def synthesize_worker_region_outlook(
         "oews_area_code": region.get("oews_area_code"),
         "occupation_code": normalized_code,
         "occupation_title": occupation_title,
+        "occupation_reference": (
+            OccupationReference(
+                country_code=provider.country_code,
+                provider=provider.provider,
+                provider_occupation_code=normalized_code,
+                title=occupation_title,
+            ).to_dict()
+            if occupation_title
+            else None
+        ),
         "region": region,
         "occupation": {
             "stex": stex_signal,
@@ -518,8 +556,26 @@ def synthesize_worker_related_occupations(
     acs_year: int = 2024,
     stex_year: int = DEFAULT_STEX_SOURCE_YEAR,
     onet_client: OnetClient | None = None,
+    country_code: str = "US",
 ) -> Dict[str, Any]:
     """Return O*NET related occupations with only available local facts."""
+    provider = provider_for_country(country_code)
+    if provider is None:
+        return {
+            "supported": False,
+            "country_code": str(country_code).strip().upper(),
+            "occupation_code": occupation_code,
+            "reason": unavailable_evidence(
+                "occupation_profiles", country_code
+            )["reason"],
+            "related_occupations": {
+                "status": "unavailable",
+                "items": [],
+                "explanation": unavailable_evidence(
+                    "occupation_profiles", country_code
+                )["reason"],
+            },
+        }
     normalized_code = normalize_occupation_code(occupation_code)
     region = synthesize_region_labor_intelligence(
         latitude,
@@ -625,6 +681,8 @@ def synthesize_worker_related_occupations(
         "data_available": bool(region.get("data_available")),
         "latitude": latitude,
         "longitude": longitude,
+        "country_code": provider.country_code,
+        "provider": provider.to_dict(),
         "county": region.get("county"),
         "occupation_code": normalized_code,
         "related_occupations": {

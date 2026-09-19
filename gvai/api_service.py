@@ -42,6 +42,10 @@ from gvai.postlabor.worker_profile import (
 from gvai.postlabor.worker_personal_comparison import (
     synthesize_worker_personal_comparison,
 )
+from gvai.postlabor.labor_providers import (
+    provider_for_country,
+    unavailable_evidence,
+)
 from gvai.postlabor.stex.store import (
     InvalidSTEXOccupationCode,
     STEXProfileNotFound,
@@ -68,6 +72,30 @@ app = Flask(__name__)
 
 register_conscience_routes(app)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+
+def _unsupported_worker_country_response(country_code):
+    normalized = str(country_code or "US").strip().upper()
+    if provider_for_country(normalized) is not None:
+        return None
+    evidence = {
+        capability: unavailable_evidence(capability, normalized)
+        for capability in (
+            "occupation_profiles",
+            "employment",
+            "wages",
+            "preparation",
+            "structural_exposure",
+            "live_job_openings",
+        )
+    }
+    return {
+        "ok": True,
+        "supported": False,
+        "country_code": normalized,
+        "reason": evidence["occupation_profiles"]["reason"],
+        "evidence": evidence,
+    }
 
 
 def needs_live_search(message: str) -> bool:
@@ -1014,6 +1042,11 @@ def api_worker_region_outlook():
             "example": "37-2021.00",
         }), 400
 
+    country_code = request.args.get("country_code") or "US"
+    unsupported = _unsupported_worker_country_response(country_code)
+    if unsupported:
+        return jsonify(unsupported)
+
     try:
         latitude = float(request.args.get("lat"))
         longitude = float(request.args.get("lon"))
@@ -1029,6 +1062,7 @@ def api_worker_region_outlook():
             latitude=latitude,
             longitude=longitude,
             occupation_code=occupation_code,
+            country_code=country_code,
         )
 
         return jsonify({
@@ -1066,6 +1100,11 @@ def api_worker_related_occupations():
             "example": "37-2021.00",
         }), 400
 
+    country_code = request.args.get("country_code") or "US"
+    unsupported = _unsupported_worker_country_response(country_code)
+    if unsupported:
+        return jsonify(unsupported)
+
     try:
         latitude = float(request.args.get("lat"))
         longitude = float(request.args.get("lon"))
@@ -1080,6 +1119,7 @@ def api_worker_related_occupations():
             latitude=latitude,
             longitude=longitude,
             occupation_code=occupation_code,
+            country_code=country_code,
         )
         return jsonify({"ok": True, **result})
     except InvalidSTEXOccupationCode as exc:
@@ -1109,6 +1149,12 @@ def api_worker_transition_evidence():
                 "are required.",
             "example": "source=37-2021.00&target=37-3012.00",
         }), 400
+
+    unsupported = _unsupported_worker_country_response(
+        request.args.get("country_code") or "US"
+    )
+    if unsupported:
+        return jsonify(unsupported)
 
     try:
         result = synthesize_worker_transition_evidence(
@@ -1145,6 +1191,12 @@ def api_worker_transition_preparation():
             "example": "source=37-2021.00&target=37-3012.00",
         }), 400
 
+    unsupported = _unsupported_worker_country_response(
+        request.args.get("country_code") or "US"
+    )
+    if unsupported:
+        return jsonify(unsupported)
+
     try:
         result = synthesize_worker_transition_preparation_evidence(
             source_code,
@@ -1177,6 +1229,12 @@ def api_worker_transition_action_plan():
             "reason": "Both source and target O*NET-SOC occupation codes are required.",
             "example": "source=37-2021.00&target=37-3012.00",
         }), 400
+
+    unsupported = _unsupported_worker_country_response(
+        request.args.get("country_code") or "US"
+    )
+    if unsupported:
+        return jsonify(unsupported)
     if (lat is None) != (lon is None):
         return jsonify({
             "ok": False,
