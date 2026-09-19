@@ -73,6 +73,33 @@ def test_laborers_workspace_has_worker_journey_stages():
     assert "Back to globe" in html
 
 
+def test_laborers_workspace_has_worker_facing_journey_map_and_actions():
+    html = _html()
+    assert 'class="laborers-journey-map" aria-label="Laborers worker journey"' in html
+    for prompt in (
+        "Where am I now?",
+        "What is local?",
+        "What can I inspect?",
+        "What changes?",
+        "What did I learn?",
+    ):
+        assert prompt in html
+    assert 'data-worker-stage-load="worker-outlook"' in html
+    assert 'data-worker-stage-load="related-occupations"' in html
+    assert "function handleWorkerStageAction" in html
+    assert "void loadWorkerOutlook();" in html
+    assert "void loadRelatedOccupations();" in html
+
+
+def test_background_next_steps_load_does_not_steal_investigation_stage():
+    html = _html()
+    action_plan = html[html.index("async function loadTransitionActionPlan"):html.index('document\n  .getElementById("worker-outlook-btn")')]
+    assert 'setWorkerWorkspaceStage("next-investigation")' not in action_plan
+    assert 'id="open-next-investigation-btn"' in html
+    next_button = html[html.index('id="open-next-investigation-btn"'):html.index('id="open-investigation-summary-btn"')]
+    assert "Open factual next steps" in next_button
+
+
 def test_investigation_summary_reuses_existing_investigation_evidence():
     html = _html()
     assert 'id="investigation-summary-content"' in html

@@ -537,6 +537,56 @@
       overflow-wrap: anywhere;
     }
 
+    .laborers-journey-map {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .laborers-journey-step {
+      min-width: 0;
+      padding: 9px 10px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.03);
+    }
+
+    .laborers-journey-step.active {
+      border-color: rgba(101, 211, 255, 0.48);
+      background: rgba(101, 211, 255, 0.10);
+    }
+
+    .laborers-journey-label {
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .laborers-journey-value {
+      margin-top: 4px;
+      font-size: 11px;
+      font-weight: 750;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .worker-stage-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .worker-stage-actions .worker-outlook-button {
+      width: auto;
+      margin-top: 0;
+      font-size: 11px;
+      padding: 7px 12px;
+    }
+
     .laborers-stage-nav {
       display: grid;
       grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -1554,8 +1604,14 @@
       }
 
       .laborers-context-grid,
+      .laborers-journey-map,
       .laborers-stage-nav {
         grid-template-columns: 1fr;
+      }
+
+      .worker-stage-actions .worker-outlook-button {
+        width: 100%;
+        min-height: 44px;
       }
 
       .laborers-workspace-shell {
@@ -1868,6 +1924,28 @@
             <div id="workspace-stage-context" class="laborers-context-value">My Work</div>
           </div>
         </div>
+        <div class="laborers-journey-map" aria-label="Laborers worker journey">
+          <div class="laborers-journey-step" data-journey-step="my-work">
+            <div class="laborers-journey-label">1. Where am I now?</div>
+            <div class="laborers-journey-value">Current work and private profile</div>
+          </div>
+          <div class="laborers-journey-step" data-journey-step="local-outlook">
+            <div class="laborers-journey-label">2. What is local?</div>
+            <div class="laborers-journey-value">Employment, wage, and STEX evidence</div>
+          </div>
+          <div class="laborers-journey-step" data-journey-step="explore-occupations">
+            <div class="laborers-journey-label">3. What can I inspect?</div>
+            <div class="laborers-journey-value">Related occupations in source order</div>
+          </div>
+          <div class="laborers-journey-step" data-journey-step="investigate">
+            <div class="laborers-journey-label">4. What changes?</div>
+            <div class="laborers-journey-value">Local facts, work differences, preparation</div>
+          </div>
+          <div class="laborers-journey-step" data-journey-step="investigation-summary">
+            <div class="laborers-journey-label">5. What did I learn?</div>
+            <div class="laborers-journey-value">Saved occupations, next checks, summary</div>
+          </div>
+        </div>
       </div>
       <button id="close-laborers-workspace-btn" type="button" class="laborers-workspace-close">Back to globe</button>
     </div>
@@ -1960,6 +2038,10 @@
             </div>
           </div>
         </div>
+        <div class="worker-stage-actions" aria-label="Current work next actions">
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="local-outlook" data-worker-stage-load="worker-outlook">View local outlook</button>
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="explore-occupations" data-worker-stage-load="related-occupations">Explore occupations</button>
+        </div>
       </section>
 
       <section id="worker-stage-local-outlook" class="laborers-stage" data-worker-stage="local-outlook" aria-labelledby="worker-stage-local-outlook-title">
@@ -1974,6 +2056,10 @@
           <div class="section-title" style="margin-top:0">Your local outlook</div>
           <div id="worker-outlook-status" class="stex-status">Select a region and an audited occupation.</div>
           <div id="worker-outlook-content"></div>
+        </div>
+        <div class="worker-stage-actions" aria-label="Local outlook next actions">
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="explore-occupations" data-worker-stage-load="related-occupations">Find occupations to investigate</button>
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="my-work">Update my work profile</button>
         </div>
       </section>
 
@@ -1990,6 +2076,10 @@
           <div id="related-occupations-status" class="stex-status">Select a region and an occupation.</div>
           <div id="related-occupations-content"></div>
         </div>
+        <div class="worker-stage-actions" aria-label="Explore occupations next actions">
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="saved-occupations">Review saved occupations</button>
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="local-outlook">Return to local outlook</button>
+        </div>
       </section>
 
       <section id="worker-stage-saved-occupations" class="laborers-stage" data-worker-stage="saved-occupations" aria-labelledby="worker-stage-saved-occupations-title">
@@ -2003,6 +2093,10 @@
           <div id="saved-occupations-status" class="stex-status"></div>
           <div id="saved-occupations-content"></div>
           <button id="clear-saved-occupations-btn" type="button" class="worker-outlook-button clear-saved-occupations-btn" hidden>Clear saved occupations</button>
+        </div>
+        <div class="worker-stage-actions" aria-label="Saved occupations next actions">
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="explore-occupations">Explore more occupations</button>
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="investigation-summary">Open Investigation Summary</button>
         </div>
       </section>
 
@@ -2061,6 +2155,7 @@
           </details>
 
           <button id="occupation-drilldown-close" type="button" class="worker-outlook-button occupation-drilldown-close">Close investigation</button>
+          <button id="open-next-investigation-btn" type="button" class="worker-outlook-button occupation-drilldown-close">Open factual next steps</button>
           <button id="open-investigation-summary-btn" type="button" class="worker-outlook-button occupation-drilldown-close">Open Investigation Summary</button>
         </div>
       </section>
@@ -2076,6 +2171,10 @@
           </div>
         </div>
         <div id="investigation-summary-content" class="investigation-summary" aria-live="polite"></div>
+        <div class="worker-stage-actions" aria-label="Investigation summary next actions">
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="saved-occupations">Review saved occupations</button>
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="next-investigation">Review factual next steps</button>
+        </div>
       </section>
 
       <section id="worker-stage-next-investigation" class="laborers-stage" data-worker-stage="next-investigation" aria-labelledby="worker-stage-next-investigation-title">
@@ -2091,6 +2190,10 @@
           </div>
           <div id="transition-action-plan-status" class="stex-status"></div>
           <div id="transition-action-plan-content"></div>
+        </div>
+        <div class="worker-stage-actions" aria-label="Next investigation actions">
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="investigation-summary">Open clean summary</button>
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="saved-occupations">Review saved occupations</button>
         </div>
       </section>
     </div>
@@ -2629,6 +2732,19 @@ function renderWorkerWorkspaceContext() {
   if (current) current.textContent = currentTitle;
   if (investigated) investigated.textContent = investigatedTitle || "Choose an occupation to investigate";
   if (stage) stage.textContent = WORKER_WORKSPACE_STAGE_LABELS[activeWorkerWorkspaceStage] || "My Work";
+  renderWorkerJourneyMap();
+}
+
+function journeyStepForStage(stage) {
+  if (stage === "saved-occupations" || stage === "next-investigation") return "investigation-summary";
+  return stage;
+}
+
+function renderWorkerJourneyMap() {
+  const activeStep = journeyStepForStage(activeWorkerWorkspaceStage);
+  document.querySelectorAll(".laborers-journey-step").forEach(step => {
+    step.classList.toggle("active", step.dataset.journeyStep === activeStep);
+  });
 }
 
 function setWorkerWorkspaceStage(stage, scroll = false) {
@@ -2639,6 +2755,21 @@ function setWorkerWorkspaceStage(stage, scroll = false) {
   renderWorkerWorkspaceContext();
   const target = document.querySelector(`[data-worker-stage="${stage}"]`);
   if (scroll && target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function handleWorkerStageAction(button) {
+  const stage = button.dataset.workerStageAction;
+  if (!stage) return;
+  const load = button.dataset.workerStageLoad;
+  if (load === "worker-outlook") {
+    void loadWorkerOutlook();
+    return;
+  }
+  if (load === "related-occupations") {
+    void loadRelatedOccupations();
+    return;
+  }
+  setWorkerWorkspaceStage(stage, true);
 }
 
 function openLaborersWorkspace(stage = "my-work") {
@@ -6616,6 +6747,9 @@ document.getElementById("close-laborers-workspace-btn").addEventListener("click"
 document.querySelectorAll(".laborers-stage-link").forEach(button => {
   button.addEventListener("click", () => setWorkerWorkspaceStage(button.dataset.workerStageTarget, true));
 });
+document.querySelectorAll("[data-worker-stage-action]").forEach(button => {
+  button.addEventListener("click", () => handleWorkerStageAction(button));
+});
 document.getElementById("use-selected-occupation-btn").addEventListener("click", useSelectedOccupationForWorkerProfile);
 document.getElementById("edit-worker-profile-btn").addEventListener("click", () => workerProfileField("worker-profile-occupation-title").focus());
 document.getElementById("clear-worker-profile-btn").addEventListener("click", () => {
@@ -8137,7 +8271,6 @@ async function loadTransitionActionPlan(targetCode, targetTitle) {
     investigationSummaryState.actionPlan = data;
     content.innerHTML = renderTransitionActionPlan(actions, !!storedWorkerProfile());
     renderInvestigationSummary();
-    setWorkerWorkspaceStage("next-investigation");
     setWorkerJourneyStep(5);
   } catch (error) {
     if (requestId !== activeTransitionActionPlanRequestId || currentDrilldownCode !== targetCode) return;
@@ -8187,6 +8320,13 @@ document
   .addEventListener("click", () => {
     renderInvestigationSummary();
     setWorkerWorkspaceStage("investigation-summary", true);
+  });
+
+document
+  .getElementById("open-next-investigation-btn")
+  .addEventListener("click", () => {
+    setWorkerWorkspaceStage("next-investigation", true);
+    setWorkerJourneyStep(5);
   });
 
 document
