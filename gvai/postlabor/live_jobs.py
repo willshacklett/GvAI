@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Mapping, Sequence
+import os
 
 from gvai.postlabor.labor_providers import (
     LiveJobsProvider,
@@ -12,7 +13,7 @@ from gvai.postlabor.labor_providers import (
     OccupationReference,
     ProviderMetadata,
     PublishedCompensation,
-    provider_for_country,
+    live_jobs_provider_for_country,
 )
 
 
@@ -23,6 +24,7 @@ LIVE_JOB_STATUSES = (
     "unsupported_country",
     "provider_failure",
 )
+DEFAULT_RESULT_LIMIT = 25
 
 
 @dataclass(frozen=True)
@@ -140,7 +142,7 @@ class LiveJobsRegistry:
         *,
         occupation: OccupationReference | None = None,
     ) -> LiveJobsResult:
-        metadata = provider_for_country(context.country_code)
+        metadata = live_jobs_provider_for_country(context.country_code)
         if metadata is None:
             return LiveJobsResult(
                 status="unsupported_country",
@@ -160,7 +162,17 @@ class LiveJobsRegistry:
                 provider_registered=False,
                 reason="Live job openings are not available from a configured provider for this region yet.",
             )
+        if hasattr(provider, "configured") and not provider.configured:
+            return LiveJobsResult(
+                status="provider_unavailable",
+                country_code=context.country_code,
+                provider=provider.metadata.provider,
+                attribution=provider.metadata.attribution,
+                provider_registered=False,
+                reason="Live job openings are not available from a configured provider for this region yet.",
+            )
 
+        malformed_records = 0
         try:
             raw_openings = provider.list_openings(
                 occupation=occupation,
@@ -172,16 +184,25 @@ class LiveJobsRegistry:
             )
             openings = []
             seen = set()
+            result_limit = max(1, min(int(os.getenv("GVAI_LIVE_JOBS_RESULT_LIMIT", str(DEFAULT_RESULT_LIMIT))), 100))
             for raw_opening in raw_openings:
-                normalized = normalize_provider_opening(
-                    raw_opening,
-                    metadata=provider.metadata,
-                    context=context,
-                )
+                try:
+                    normalized = normalize_provider_opening(
+                        raw_opening,
+                        metadata=provider.metadata,
+                        context=context,
+                    )
+                except (TypeError, ValueError):
+                    malformed_records += 1
+                    continue
                 key = (normalized.provider, normalized.provider_job_id)
                 if key not in seen:
                     seen.add(key)
                     openings.append(normalized)
+                    if len(openings) >= result_limit:
+                        break
+            if malformed_records and not openings:
+                raise ValueError("provider returned only malformed job records")
         except Exception as exc:
             return LiveJobsResult(
                 status="provider_failure",
@@ -203,4 +224,10 @@ class LiveJobsRegistry:
         )
 
 
-DEFAULT_LIVE_JOBS_REGISTRY = LiveJobsRegistry()
+from gvai.postlabor.usajobs_provider import configured_usajobs_provider
+
+
+_configured_provider = configured_usajobs_provider()
+DEFAULT_LIVE_JOBS_REGISTRY = LiveJobsRegistry(
+    [_configured_provider] if _configured_provider is not None else []
+)

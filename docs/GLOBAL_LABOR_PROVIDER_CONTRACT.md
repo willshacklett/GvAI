@@ -43,7 +43,23 @@ Profile.
 ## Compatibility And Limits
 
 Existing callers default to `country_code=US`; U.S. O*NET/OEWS/STEX behavior
-continues through the compatibility boundary. No live-jobs integration is
-configured in V1. This work adds no scraping, LLM inference, semantic matching,
-crosswalk guessing, ranking, recommendation, fit score, credential equivalence,
-or synthetic labor-market data.
+continues through the compatibility boundary. Provider #1 is the optional
+USAJOBS API adapter in `gvai.postlabor.usajobs_provider`. It is registered only
+when both `USAJOBS_API_KEY` and `USAJOBS_USER_AGENT` are configured. The
+worker's occupation title is sent as `Keyword` with `mapping_type=search_query`;
+it is not treated as a USAJOBS occupation mapping. Optional
+`USAJOBS_TIMEOUT_SECONDS`, `USAJOBS_RESULT_LIMIT`, and
+`GVAI_LIVE_JOBS_RESULT_LIMIT` settings are bounded by the adapter/registry.
+Missing configuration remains `provider_unavailable`; no scraping or fallback
+to another country's evidence occurs.
+
+The adapter preserves USAJOBS job IDs, titles, employer/location fields,
+published schedule/telework/date fields when supplied, the original apply URL,
+retrieval time, and USAJOBS attribution. It sends only public occupation and
+location search context and never accepts Worker Profile fields. Public job
+retrieval and opening the source URL remain ordinary reads/navigation; no
+application submission or employer contact is governed or claimed.
+
+This work adds no LLM inference, semantic matching, crosswalk guessing,
+ranking, recommendation, fit score, credential equivalence, or synthetic
+labor-market data.
