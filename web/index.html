@@ -1941,8 +1941,12 @@
             <div class="laborers-journey-label">4. What changes?</div>
             <div class="laborers-journey-value">Local facts, work differences, preparation</div>
           </div>
+          <div class="laborers-journey-step" data-journey-step="live-jobs">
+            <div class="laborers-journey-label">5. What is open now?</div>
+            <div class="laborers-journey-value">Current openings from a configured source</div>
+          </div>
           <div class="laborers-journey-step" data-journey-step="investigation-summary">
-            <div class="laborers-journey-label">5. What did I learn?</div>
+            <div class="laborers-journey-label">6. What did I learn?</div>
             <div class="laborers-journey-value">Saved occupations, next checks, summary</div>
           </div>
         </div>
@@ -1957,6 +1961,7 @@
         <button type="button" class="laborers-stage-link" data-worker-stage-target="explore-occupations">Explore Occupations</button>
         <button type="button" class="laborers-stage-link" data-worker-stage-target="saved-occupations">Saved Occupations</button>
         <button type="button" class="laborers-stage-link" data-worker-stage-target="investigate">Investigate</button>
+        <button type="button" class="laborers-stage-link" data-worker-stage-target="live-jobs">Live Jobs</button>
         <button type="button" class="laborers-stage-link" data-worker-stage-target="investigation-summary">Investigation Summary</button>
         <button type="button" class="laborers-stage-link" data-worker-stage-target="next-investigation">What To Investigate Next</button>
       </nav>
@@ -2155,8 +2160,27 @@
           </details>
 
           <button id="occupation-drilldown-close" type="button" class="worker-outlook-button occupation-drilldown-close">Close investigation</button>
+          <button id="open-live-jobs-btn" type="button" class="worker-outlook-button occupation-drilldown-close" data-worker-stage-action="live-jobs" data-worker-stage-load="live-jobs">View live jobs</button>
           <button id="open-next-investigation-btn" type="button" class="worker-outlook-button occupation-drilldown-close">Open factual next steps</button>
           <button id="open-investigation-summary-btn" type="button" class="worker-outlook-button occupation-drilldown-close">Open Investigation Summary</button>
+        </div>
+      </section>
+
+      <section id="worker-stage-live-jobs" class="laborers-stage" data-worker-stage="live-jobs" aria-labelledby="worker-stage-live-jobs-title">
+        <div class="laborers-stage-head">
+          <div>
+            <div id="worker-stage-live-jobs-title" class="laborers-stage-title">Live Jobs</div>
+            <div class="laborers-stage-note">Current openings retrieved from an authorized provider for the occupation and region you are investigating.</div>
+          </div>
+          <button id="live-jobs-btn" type="button" class="worker-outlook-button">Refresh live jobs</button>
+        </div>
+        <div id="live-jobs-card" class="related-occupations-card visible" aria-live="polite">
+          <div id="live-jobs-status" class="stex-status">Live job openings are not available from a configured provider for this region yet.</div>
+          <div id="live-jobs-content"></div>
+        </div>
+        <div class="worker-stage-actions" aria-label="Live jobs next actions">
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="investigate">Return to investigation</button>
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="investigation-summary">Open Investigation Summary</button>
         </div>
       </section>
 
@@ -2691,6 +2715,7 @@ let activeDrilldownRequestId = 0;
 let activeTransitionEvidenceRequestId = 0;
 let activeTransitionPreparationRequestId = 0;
 let activeTransitionActionPlanRequestId = 0;
+let activeLiveJobsRequestId = 0;
 const RELATED_OCCUPATIONS_DEFAULT_COUNT = 5;
 let relatedOccupationsExpanded = false;
 let relatedOccupationItems = [];
@@ -2711,6 +2736,7 @@ const WORKER_WORKSPACE_STAGE_LABELS = {
   "explore-occupations": "Explore Occupations",
   "saved-occupations": "Saved Occupations",
   investigate: "Investigate",
+  "live-jobs": "Live Jobs",
   "investigation-summary": "Investigation Summary",
   "next-investigation": "What To Investigate Next"
 };
@@ -2767,6 +2793,10 @@ function handleWorkerStageAction(button) {
   }
   if (load === "related-occupations") {
     void loadRelatedOccupations();
+    return;
+  }
+  if (load === "live-jobs") {
+    void loadLiveJobs();
     return;
   }
   setWorkerWorkspaceStage(stage, true);
@@ -7602,6 +7632,82 @@ async function loadWorkerOutlook() {
   }
 }
 
+function renderLiveJobOpening(opening) {
+  const facts = [
+    opening.employer ? `<div><strong>Employer:</strong> ${escapeHtml(opening.employer)}</div>` : "",
+    opening.location ? `<div><strong>Location:</strong> ${escapeHtml(opening.location)}</div>` : "",
+    opening.country_code ? `<div><strong>Country:</strong> ${escapeHtml(opening.country_code)}</div>` : "",
+    opening.employment_type ? `<div><strong>Employment type:</strong> ${escapeHtml(opening.employment_type)}</div>` : "",
+    opening.remote_or_hybrid ? `<div><strong>Remote/hybrid:</strong> ${escapeHtml(opening.remote_or_hybrid)}</div>` : "",
+    opening.compensation ? `<div><strong>Compensation published:</strong> ${escapeHtml(JSON.stringify(opening.compensation))}</div>` : "",
+    opening.posted_at ? `<div><strong>Posted:</strong> ${escapeHtml(opening.posted_at)}</div>` : ""
+  ].filter(Boolean).join("");
+  return `
+    <article class="related-occupation-item live-job-item">
+      <div class="transition-evidence-subtitle">${escapeHtml(opening.title || "Untitled opening")}</div>
+      <div class="worker-outlook-summary">${facts || "No additional published details."}</div>
+      <div class="worker-outlook-summary">Source: ${escapeHtml(opening.source_attribution || opening.provider || "Unknown provider")}</div>
+      <a class="worker-outlook-button" href="${escapeHtml(opening.apply_url)}" target="_blank" rel="noopener noreferrer">Apply at source</a>
+    </article>
+  `;
+}
+
+async function loadLiveJobs() {
+  const status = document.getElementById("live-jobs-status");
+  const content = document.getElementById("live-jobs-content");
+  if (!status || !content) return;
+
+  const occupationCode = currentDrilldownCode || currentOccupationCode;
+  if (!occupationCode) {
+    status.textContent = "Select an occupation to investigate.";
+    content.innerHTML = "";
+    return;
+  }
+
+  const requestId = ++activeLiveJobsRequestId;
+  const occupationTitle = document.getElementById("investigated-occupation-context")?.textContent?.trim() || currentOccupationTitle || "";
+  const params = new URLSearchParams({
+    occupation: occupationCode,
+    occupation_title: occupationTitle,
+  });
+  if (window.GVAI_WORKER_COUNTRY_CODE) {
+    params.set("country", window.GVAI_WORKER_COUNTRY_CODE);
+  }
+  if (currentRegionLatitude !== null) params.set("lat", currentRegionLatitude);
+  if (currentRegionLongitude !== null) params.set("lon", currentRegionLongitude);
+
+  openLaborersWorkspace("live-jobs");
+  setWorkerJourneyStep(5);
+  status.textContent = "Loading live jobs...";
+  content.innerHTML = "";
+
+  try {
+    const response = await fetch(`${window.GVAI_API_BASE || ""}/api/worker/live-jobs?${params.toString()}`);
+    const data = await response.json();
+    if (requestId !== activeLiveJobsRequestId) return;
+
+    if (!response.ok || !data.ok) {
+      status.textContent = data.reason || "Live job openings are temporarily unavailable.";
+      return;
+    }
+    const openings = Array.isArray(data.openings) ? data.openings : [];
+    if (data.status === "available_with_results") {
+      status.textContent = `${openings.length} opening${openings.length === 1 ? "" : "s"} from ${data.provider || "the configured provider"}.`;
+      content.innerHTML = openings.map(renderLiveJobOpening).join("");
+    } else if (data.status === "available_zero_results") {
+      status.textContent = `No current openings were published by ${data.provider || "the configured provider"} for this search.`;
+    } else {
+      status.textContent = data.reason || "Live job openings are unavailable for this selection.";
+      content.innerHTML = "";
+    }
+  } catch (error) {
+    if (requestId !== activeLiveJobsRequestId) return;
+    console.error("Live jobs load failed:", error);
+    status.textContent = "Live job openings are temporarily unavailable.";
+    content.innerHTML = "";
+  }
+}
+
 async function loadRelatedOccupationDrilldown(occupationCode, occupationTitle) {
   if (
     currentRegionLatitude === null ||
@@ -8291,6 +8397,12 @@ document
   .getElementById("related-occupations-btn")
   .addEventListener("click", () => {
     void loadRelatedOccupations();
+  });
+
+document
+  .getElementById("live-jobs-btn")
+  .addEventListener("click", () => {
+    void loadLiveJobs();
   });
 
 document
