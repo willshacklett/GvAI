@@ -1311,6 +1311,61 @@
       width: auto;
     }
 
+    .saved-occupations-list {
+      margin: 10px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .saved-occupation-item {
+      margin-top: 10px;
+      list-style: none;
+    }
+
+    .saved-occupation-meta {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .saved-occupation-actions {
+      margin-top: 6px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .saved-occupation-actions button {
+      font-size: 11px;
+      padding: 4px 10px;
+      width: auto;
+      margin-top: 0;
+    }
+
+    .save-occupation-btn {
+      margin-top: 10px;
+      width: auto;
+      font-size: 11px;
+      padding: 6px 12px;
+    }
+
+    .save-occupation-status {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .clear-saved-occupations-btn {
+      margin-top: 14px;
+      width: auto;
+      font-size: 11px;
+      padding: 6px 12px;
+    }
+
     .occupation-drilldown-card {
       display: none;
       margin-top: 14px;
@@ -1758,6 +1813,7 @@
         <button type="button" class="laborers-stage-link active" data-worker-stage-target="my-work">My Work</button>
         <button type="button" class="laborers-stage-link" data-worker-stage-target="local-outlook">My Local Outlook</button>
         <button type="button" class="laborers-stage-link" data-worker-stage-target="explore-occupations">Explore Occupations</button>
+        <button type="button" class="laborers-stage-link" data-worker-stage-target="saved-occupations">Saved Occupations</button>
         <button type="button" class="laborers-stage-link" data-worker-stage-target="investigate">Investigate</button>
         <button type="button" class="laborers-stage-link" data-worker-stage-target="next-investigation">What To Investigate Next</button>
       </nav>
@@ -1871,6 +1927,20 @@
         </div>
       </section>
 
+      <section id="worker-stage-saved-occupations" class="laborers-stage" data-worker-stage="saved-occupations" aria-labelledby="worker-stage-saved-occupations-title">
+        <div class="laborers-stage-head">
+          <div>
+            <div id="worker-stage-saved-occupations-title" class="laborers-stage-title">Saved occupations</div>
+            <div class="laborers-stage-note">Occupations you want to revisit, saved privately on this browser/device. This is a personal bookmark list, not a recommendation.</div>
+          </div>
+        </div>
+        <div id="saved-occupations-card" class="related-occupations-card visible" aria-live="polite">
+          <div id="saved-occupations-status" class="stex-status"></div>
+          <div id="saved-occupations-content"></div>
+          <button id="clear-saved-occupations-btn" type="button" class="worker-outlook-button clear-saved-occupations-btn" hidden>Clear saved occupations</button>
+        </div>
+      </section>
+
       <section id="worker-stage-investigate" class="laborers-stage" data-worker-stage="investigate" aria-labelledby="worker-stage-investigate-title">
         <div class="laborers-stage-head">
           <div>
@@ -1880,6 +1950,8 @@
         </div>
         <div id="occupation-drilldown-card" class="occupation-drilldown-card" aria-live="polite">
           <div class="worker-context"><strong>You're investigating</strong><span id="investigated-occupation-context"></span></div>
+          <button id="save-occupation-btn" type="button" class="worker-outlook-button save-occupation-btn" hidden>Save occupation</button>
+          <div id="save-occupation-status" class="save-occupation-status" aria-live="polite"></div>
           <div class="section-title" style="margin-top:12px">Market evidence</div>
           <div id="occupation-drilldown-status" class="stex-status"></div>
           <div id="occupation-drilldown-content"></div>
@@ -2455,6 +2527,7 @@ const WORKER_WORKSPACE_STAGE_LABELS = {
   "my-work": "My Work",
   "local-outlook": "My Local Outlook",
   "explore-occupations": "Explore Occupations",
+  "saved-occupations": "Saved Occupations",
   investigate: "Investigate",
   "next-investigation": "What To Investigate Next"
 };
@@ -6192,6 +6265,150 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+const SAVED_OCCUPATIONS_STORAGE_KEY = "gvai.savedOccupations.v1";
+const SAVED_OCCUPATIONS_VERSION = "v1";
+const SAVED_OCCUPATIONS_MAX = 200;
+
+// A saved occupation is a private navigation bookmark: code, title, and a
+// saved timestamp only. No evidence (STEX/OEWS/O*NET/wage) is ever stored here.
+function isSavedOccupationRecord(record) {
+  return (
+    record &&
+    typeof record === "object" &&
+    record.schema_version === SAVED_OCCUPATIONS_VERSION &&
+    typeof record.occupation_code === "string" &&
+    record.occupation_code.trim().length > 0 &&
+    typeof record.occupation_title === "string" &&
+    typeof record.saved_at === "string"
+  );
+}
+
+function loadSavedOccupations() {
+  let raw;
+  try {
+    raw = localStorage.getItem(SAVED_OCCUPATIONS_STORAGE_KEY);
+  } catch (error) {
+    return [];
+  }
+  if (!raw) return [];
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.filter(isSavedOccupationRecord);
+}
+
+function persistSavedOccupations(records) {
+  try {
+    localStorage.setItem(SAVED_OCCUPATIONS_STORAGE_KEY, JSON.stringify(records));
+  } catch (error) {
+    // Storage unavailable (private mode/quota); saved list simply won't persist.
+  }
+}
+
+function isOccupationSaved(occupationCode) {
+  if (!occupationCode) return false;
+  return loadSavedOccupations().some(record => record.occupation_code === occupationCode);
+}
+
+function saveOccupation(occupationCode, occupationTitle) {
+  if (!occupationCode) return;
+  const existing = loadSavedOccupations().filter(record => record.occupation_code !== occupationCode);
+  const record = {
+    schema_version: SAVED_OCCUPATIONS_VERSION,
+    occupation_code: occupationCode,
+    occupation_title: occupationTitle || occupationCode,
+    saved_at: new Date().toISOString()
+  };
+  const next = [record, ...existing].slice(0, SAVED_OCCUPATIONS_MAX);
+  persistSavedOccupations(next);
+  renderSavedOccupations();
+  renderSaveOccupationButton(occupationCode, occupationTitle);
+}
+
+function removeSavedOccupation(occupationCode) {
+  const next = loadSavedOccupations().filter(record => record.occupation_code !== occupationCode);
+  persistSavedOccupations(next);
+  renderSavedOccupations();
+  if (currentDrilldownCode === occupationCode) {
+    renderSaveOccupationButton(currentDrilldownCode, document.getElementById("investigated-occupation-context")?.textContent?.trim());
+  }
+}
+
+function clearSavedOccupations() {
+  persistSavedOccupations([]);
+  renderSavedOccupations();
+  if (currentDrilldownCode) {
+    renderSaveOccupationButton(currentDrilldownCode, document.getElementById("investigated-occupation-context")?.textContent?.trim());
+  }
+}
+
+function renderSaveOccupationButton(occupationCode, occupationTitle) {
+  const button = document.getElementById("save-occupation-btn");
+  const status = document.getElementById("save-occupation-status");
+  if (!button || !status) return;
+  if (!occupationCode) {
+    button.hidden = true;
+    status.textContent = "";
+    return;
+  }
+  button.hidden = false;
+  button.dataset.code = occupationCode;
+  button.dataset.title = occupationTitle || occupationCode;
+  const saved = isOccupationSaved(occupationCode);
+  button.textContent = saved ? "Remove from saved occupations" : "Save occupation";
+  status.textContent = saved
+    ? "Saved on this browser/device."
+    : "";
+}
+
+function renderSavedOccupations() {
+  const status = document.getElementById("saved-occupations-status");
+  const content = document.getElementById("saved-occupations-content");
+  const clearButton = document.getElementById("clear-saved-occupations-btn");
+  if (!status || !content) return;
+
+  const records = loadSavedOccupations();
+
+  if (records.length === 0) {
+    status.textContent = "No saved occupations yet.";
+    content.innerHTML = `
+      <div class="worker-outlook-summary">
+        Occupations you want to revisit can be saved privately on this browser/device
+        while you investigate them. Saved occupations are not a recommendation —
+        they are a personal bookmark list only you can see here.
+      </div>
+    `;
+    if (clearButton) clearButton.hidden = true;
+    return;
+  }
+
+  status.textContent = `${records.length} occupation${records.length === 1 ? "" : "s"} saved on this browser/device, most recently saved first.`;
+  content.innerHTML = `
+    <ul class="saved-occupations-list">${records.map(record => `
+      <li class="saved-occupation-item" data-occupation-code="${escapeHtml(record.occupation_code)}">
+        <strong>${escapeHtml(record.occupation_title || record.occupation_code)}</strong><br>
+        ${escapeHtml(record.occupation_code)}
+        <div class="saved-occupation-meta">Saved ${escapeHtml(formatSavedAt(record.saved_at))}</div>
+        <div class="saved-occupation-actions">
+          <button type="button" class="worker-outlook-button saved-occupation-open-btn" data-code="${escapeHtml(record.occupation_code)}" data-title="${escapeHtml(record.occupation_title || record.occupation_code)}">Continue investigation</button>
+          <button type="button" class="worker-outlook-button saved-occupation-remove-btn" data-code="${escapeHtml(record.occupation_code)}">Remove</button>
+        </div>
+      </li>
+    `).join("")}</ul>
+  `;
+  if (clearButton) clearButton.hidden = false;
+}
+
+function formatSavedAt(isoString) {
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return "at an earlier date";
+  return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+
 const WORKER_PROFILE_STORAGE_KEY = "gvai.workerProfile.v1";
 const WORKER_PROFILE_VERSION = "v1";
 
@@ -6670,6 +6887,7 @@ function clearOccupationDrilldown() {
   const investigatedContext = document.getElementById("investigated-occupation-context");
   if (investigatedContext) investigatedContext.textContent = "";
   renderWorkerWorkspaceContext();
+  renderSaveOccupationButton(null);
   clearTransitionEvidence();
   clearPersonalComparison();
 }
@@ -6987,6 +7205,7 @@ async function loadRelatedOccupationDrilldown(occupationCode, occupationTitle) {
   }
 
   currentDrilldownCode = occupationCode;
+  renderSaveOccupationButton(occupationCode, occupationTitle);
   void loadTransitionEvidence(occupationCode, occupationTitle);
   void loadTransitionPreparation(occupationCode, occupationTitle);
   void loadTransitionActionPlan(occupationCode, occupationTitle);
@@ -7089,6 +7308,7 @@ async function loadRelatedOccupationDrilldown(occupationCode, occupationTitle) {
     const investigatedContext = document.getElementById("investigated-occupation-context");
     if (investigatedContext) investigatedContext.textContent = data.occupation_title || data.occupation_code;
     renderWorkerWorkspaceContext();
+    renderSaveOccupationButton(data.occupation_code || occupationCode, data.occupation_title || occupationTitle);
 
     status.textContent =
       `Related occupation (O*NET Related Occupations) · not your current occupation · ${data.county || "Selected region"} · no composite score`;
@@ -7679,6 +7899,47 @@ document
     if (!link) return;
     document.getElementById("personal-comparison-section").open = true;
   });
+
+document
+  .getElementById("save-occupation-btn")
+  .addEventListener("click", event => {
+    const button = event.target;
+    const code = button.dataset.code;
+    const title = button.dataset.title;
+    if (!code) return;
+    if (isOccupationSaved(code)) {
+      removeSavedOccupation(code);
+    } else {
+      saveOccupation(code, title);
+    }
+  });
+
+document
+  .getElementById("saved-occupations-content")
+  .addEventListener("click", event => {
+    const openButton = event.target.closest(".saved-occupation-open-btn");
+    if (openButton) {
+      const code = openButton.dataset.code;
+      const title = openButton.dataset.title;
+      if (code) void loadRelatedOccupationDrilldown(code, title);
+      return;
+    }
+    const removeButton = event.target.closest(".saved-occupation-remove-btn");
+    if (removeButton) {
+      const code = removeButton.dataset.code;
+      if (code) removeSavedOccupation(code);
+    }
+  });
+
+document
+  .getElementById("clear-saved-occupations-btn")
+  .addEventListener("click", () => {
+    if (window.confirm("Remove all saved occupations from this browser/device?")) {
+      clearSavedOccupations();
+    }
+  });
+
+renderSavedOccupations();
 
 renderWorkerOutlookAvailability();
 
