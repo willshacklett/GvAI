@@ -7697,7 +7697,12 @@ async function loadLiveJobs() {
     } else if (data.status === "available_zero_results") {
       status.textContent = `No current openings were published by ${data.provider || "the configured provider"} for this search.`;
     } else {
-      status.textContent = data.reason || "Live job openings are unavailable for this selection.";
+      const stateMessages = {
+        provider_unavailable: "Live job openings are not available from a configured provider for this region yet.",
+        unsupported_country: "Live job openings are not supported for this country yet.",
+        provider_failure: "The live jobs provider could not return a valid response right now.",
+      };
+      status.textContent = stateMessages[data.status] || data.reason || "Live job openings are unavailable for this selection.";
       content.innerHTML = "";
     }
   } catch (error) {

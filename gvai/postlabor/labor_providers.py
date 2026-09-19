@@ -30,6 +30,7 @@ class OccupationReference:
     provider_occupation_code: str
     title: str
     international_identifier: str | None = None
+    mapping_type: Literal["authoritative", "search_query"] = "authoritative"
 
     def __post_init__(self) -> None:
         if len(self.country_code) != 2 or not self.country_code.isalpha():
@@ -40,6 +41,8 @@ class OccupationReference:
             raise ValueError("provider_occupation_code is required.")
         if not self.title.strip():
             raise ValueError("title is required.")
+        if self.mapping_type not in {"authoritative", "search_query"}:
+            raise ValueError("mapping_type must be authoritative or search_query.")
         object.__setattr__(self, "country_code", self.country_code.upper())
 
     def to_dict(self) -> dict[str, str | None]:
@@ -79,12 +82,25 @@ US_ONET_OEWS_STEX = ProviderMetadata(
 )
 
 
+US_LIVE_JOBS = ProviderMetadata(
+    country_code="US",
+    provider="usajobs",
+    capabilities=frozenset({"live_job_openings"}),
+    attribution="USAJOBS API",
+)
+
+
 def provider_for_country(country_code: str | None) -> ProviderMetadata | None:
     """Return a configured provider only; never fall back across countries."""
     normalized = str(country_code or "US").strip().upper()
     if normalized == "US":
         return US_ONET_OEWS_STEX
     return None
+
+
+def live_jobs_provider_for_country(country_code: str | None) -> ProviderMetadata | None:
+    normalized = str(country_code or "US").strip().upper()
+    return US_LIVE_JOBS if normalized == "US" else None
 
 
 def unavailable_evidence(

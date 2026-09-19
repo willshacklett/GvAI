@@ -44,6 +44,7 @@ from gvai.postlabor.worker_personal_comparison import (
 )
 from gvai.postlabor.labor_providers import (
     OccupationReference,
+    live_jobs_provider_for_country,
     provider_for_country,
     unavailable_evidence,
 )
@@ -1170,13 +1171,14 @@ def api_worker_live_jobs():
         return jsonify({"ok": False, "reason": str(exc)}), 400
 
     occupation = None
-    metadata = provider_for_country(context.country_code)
+    metadata = live_jobs_provider_for_country(context.country_code)
     if occupation_code and occupation_title and metadata:
         occupation = OccupationReference(
             country_code=context.country_code,
             provider=metadata.provider,
             provider_occupation_code=occupation_code,
             title=occupation_title,
+            mapping_type="search_query",
         )
 
     result = DEFAULT_LIVE_JOBS_REGISTRY.search(context, occupation=occupation)
