@@ -1336,9 +1336,11 @@ def test_main_globe_worker_outlook_precedes_detailed_stex_audit():
     assert html.index('id="worker-outlook-btn"') < html.index(
         'id="worker-outlook-card"'
     )
-    assert html.index('id="worker-outlook-card"') < html.index(
-        'id="stex-task-audit"'
+    workspace = html[html.index('<main id="laborers-workspace"'):]
+    assert workspace.index('id="worker-outlook-card"') < workspace.index(
+        'id="related-occupations-card"'
     )
+    assert 'id="stex-task-audit"' in html
     assert html.index('id="stex-task-audit"') < html.index(
         'id="stex-contributors-list"'
     )
@@ -1448,8 +1450,8 @@ def test_main_globe_related_occupation_drilldown_contract():
     # The drill-down reuses the existing region-outlook endpoint and the
     # same region context, rather than inventing a new backend API.
     assert 'id="occupation-drilldown-card"' in html
-    assert html.index('id="occupation-drilldown-card"') < html.index(
-        'id="related-occupations-card"'
+    assert html.index('id="related-occupations-card"') < html.index(
+        'id="occupation-drilldown-card"'
     )
     assert "loadRelatedOccupationDrilldown" in html
     assert 'card.scrollIntoView({ behavior: "smooth", block: "nearest" });' in html

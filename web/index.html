@@ -440,6 +440,182 @@
       background: var(--panel-soft);
     }
 
+    .laborers-workspace {
+      position: absolute;
+      top: 92px;
+      left: 430px;
+      right: 430px;
+      bottom: 22px;
+      min-width: 0;
+      z-index: 9;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      border: 1px solid rgba(101, 211, 255, 0.22);
+      border-radius: 18px;
+      background: rgba(6, 18, 30, 0.88);
+      box-shadow: 0 22px 60px rgba(0,0,0,0.34);
+      backdrop-filter: blur(18px);
+      overflow: hidden;
+      pointer-events: auto;
+    }
+
+    .laborers-workspace[hidden] {
+      display: none;
+    }
+
+    .laborers-workspace-shell {
+      min-height: 0;
+      overflow-y: auto;
+      padding: 18px;
+    }
+
+    .laborers-workspace-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(4, 14, 24, 0.82);
+    }
+
+    .laborers-workspace-kicker {
+      color: var(--accent);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .laborers-workspace-title {
+      margin-top: 4px;
+      font-size: 24px;
+      font-weight: 850;
+      line-height: 1.1;
+    }
+
+    .laborers-workspace-copy {
+      max-width: 760px;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .laborers-workspace-close {
+      align-self: start;
+      white-space: nowrap;
+    }
+
+    .laborers-context-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .laborers-context-card {
+      min-width: 0;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: rgba(255,255,255,0.035);
+    }
+
+    .laborers-context-label {
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .laborers-context-value {
+      margin-top: 4px;
+      font-size: 12px;
+      font-weight: 750;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .laborers-stage-nav {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .laborers-stage-link {
+      width: 100%;
+      min-height: 52px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.25;
+      text-align: left;
+      background: rgba(255,255,255,0.035);
+    }
+
+    .laborers-stage-link.active {
+      border-color: var(--accent);
+      color: var(--text);
+      background: rgba(101, 211, 255, 0.10);
+    }
+
+    .laborers-stage {
+      display: grid;
+      gap: 14px;
+      margin-top: 14px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(8, 20, 34, 0.72);
+      scroll-margin-top: 18px;
+    }
+
+    .laborers-stage:first-of-type {
+      margin-top: 0;
+    }
+
+    .laborers-stage-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .laborers-stage-title {
+      font-size: 16px;
+      font-weight: 820;
+      line-height: 1.25;
+    }
+
+    .laborers-stage-note {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .laborers-stage-grid {
+      display: grid;
+      grid-template-columns: minmax(260px, 0.85fr) minmax(320px, 1.15fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .laborers-workspace .worker-profile-card,
+    .laborers-workspace .occupation-card,
+    .laborers-workspace .worker-outlook-card,
+    .laborers-workspace .related-occupations-card,
+    .laborers-workspace .occupation-drilldown-card {
+      margin-top: 0;
+    }
+
+    .laborers-workspace .worker-outlook-button {
+      width: auto;
+    }
+
     .worker-journey {
       margin-top: 14px;
       padding: 16px;
@@ -486,6 +662,13 @@
     .worker-journey-action {
       margin-top: 12px;
       width: 100%;
+    }
+
+    .worker-journey-secondary {
+      margin-top: 8px;
+      width: 100%;
+      font-size: 11px;
+      padding: 8px 10px;
     }
 
     .worker-context {
@@ -600,6 +783,17 @@
       .worker-step { padding: 5px 0 5px 8px; border-top: 0; border-left: 2px solid rgba(255,255,255,0.16); }
       .worker-step.active { border-left-color: var(--accent); }
       .worker-summary-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 1240px) {
+      .laborers-workspace {
+        left: 20px;
+        right: 430px;
+      }
+
+      .laborers-stage-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
 
@@ -1254,6 +1448,35 @@
 
 
     @media (max-width: 900px) {
+      .laborers-workspace {
+        top: 126px;
+        left: 14px;
+        right: 14px;
+        bottom: calc(70vh + 32px);
+        min-height: 260px;
+      }
+
+      .laborers-workspace-header {
+        grid-template-columns: 1fr;
+      }
+
+      .laborers-context-grid,
+      .laborers-stage-nav {
+        grid-template-columns: 1fr;
+      }
+
+      .laborers-workspace-shell {
+        padding: 14px;
+      }
+
+      .laborers-stage {
+        padding: 14px;
+      }
+
+      .laborers-stage-head {
+        display: block;
+      }
+
       .brand-sub {
         display: none;
       }
@@ -1458,10 +1681,11 @@
         <li class="worker-step">5. Decide what to investigate next</li>
       </ol>
       <button id="start-worker-profile-btn" type="button" class="primary worker-journey-action">Start with my current occupation</button>
+      <button id="open-laborers-workspace-btn" type="button" class="worker-journey-secondary">Open Laborers workspace</button>
       <div id="worker-context" class="worker-context" hidden></div>
     </section>
 
-    <div class="section-title">Your work and local outlook</div>
+    <div class="section-title">Regional exploration</div>
 
     <div id="regional-stex-card" class="regional-stex-card" aria-live="polite">
       <div class="section-title" style="margin-top:0">Regional STEX Coverage</div>
@@ -1475,159 +1699,7 @@
       <div id="regional-labor-intel-content"></div>
     </div>
 
-    <label class="occupation-select-label" for="stex-occupation-select">Current occupation</label>
-    <select id="stex-occupation-select" class="occupation-select" aria-label="Select current occupation">
-      <option value="">Loading occupations…</option>
-    </select>
-
-    <section id="worker-profile-card" class="worker-profile-card" aria-labelledby="worker-profile-title" hidden>
-      <div id="worker-profile-title" class="section-title" style="margin-top:0">Tell us about your work</div>
-      <p>A few self-reported facts help keep your background separate from published occupation evidence. You can save a partial profile and add more later.</p>
-      <p>Your Worker Profile is stored only in this browser on this device. GVAI does not need your name, email, or street address for this profile.</p>
-      <form id="worker-profile-form">
-        <div class="worker-profile-grid">
-          <label class="worker-profile-wide">Current occupation<input id="worker-profile-occupation-title" maxlength="160" autocomplete="off"></label>
-          <input id="worker-profile-occupation-code" type="hidden">
-          <label>Years in current occupation<input id="worker-profile-years" type="number" min="0" max="80" step="0.1"></label>
-          <label>Education<input id="worker-profile-education" maxlength="160" autocomplete="off"></label>
-          <label class="worker-profile-wide">Licenses/certifications you entered<textarea id="worker-profile-credentials" maxlength="2000" placeholder="One per line"></textarea></label>
-          <label class="worker-profile-wide">Skills you entered<textarea id="worker-profile-skills" maxlength="2000" placeholder="One per line"></textarea></label>
-          <label>Current annual wage<input id="worker-profile-current-annual" type="number" min="0" max="2000000" step="1"></label>
-          <label>Minimum desired annual wage<input id="worker-profile-minimum-annual" type="number" min="0" max="2000000" step="1"></label>
-          <label>Mobility radius (miles)<input id="worker-profile-radius" type="number" min="0" max="1000" step="1"></label>
-          <label>Remote-work preference<select id="worker-profile-remote"><option value="">Unknown</option><option value="no_preference">No preference</option><option value="prefer_remote">Prefer remote</option><option value="remote_required">Remote required</option><option value="prefer_on_site">Prefer on-site</option></select></label>
-          <label>Willing to relocate<select id="worker-profile-relocate"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
-          <label class="worker-profile-wide">Constraints or preferences you reported<textarea id="worker-profile-notes" maxlength="1000"></textarea></label>
-        </div>
-        <button id="use-selected-occupation-btn" type="button" class="worker-outlook-button">Use as my current occupation</button>
-        <div class="worker-profile-actions"><button type="submit">Save Profile</button><button id="edit-worker-profile-btn" type="button">Edit Profile</button><button id="clear-worker-profile-btn" type="button">Clear Profile</button></div>
-        <div id="worker-profile-status" class="worker-profile-status" aria-live="polite"></div>
-      </form>
-    </section>
-
-
-    <div class="occupation-card">
-      <div class="worker-context"><strong>Your current work</strong><span id="current-occupation-context">Pest Control Workers</span></div>
-      <div class="occupation-head">
-        <div>
-          <div id="stex-occupation-name" class="occupation-name">
-            Pest Control Workers
-          </div>
-          <div id="stex-occupation-code" class="occupation-code">
-            O*NET-SOC 37-2021.00
-          </div>
-        </div>
-
-        <div>
-          <div id="stex-score" class="stex-score">—</div>
-          <div class="stex-label">Career exposure</div>
-        </div>
-      </div>
-
-      <div class="occupation-meta">
-        <div class="occupation-meta-item">
-          <div class="occupation-meta-label">Rated tasks</div>
-          <div id="stex-rated" class="occupation-meta-value">—</div>
-        </div>
-
-        <div class="occupation-meta-item">
-          <div class="occupation-meta-label">Source vintage</div>
-          <div id="stex-source-year" class="occupation-meta-value">—</div>
-        </div>
-      </div>
-
-      <div id="stex-note" class="stex-note">
-        Structural task exposure under the GVAI STEX methodology.
-        This is not a probability of job loss or percent automatable.
-      </div>
-
-      <div id="stex-status" class="stex-status">
-        Loading audited occupation profile…
-      </div>
-
-
-      <button
-        id="worker-outlook-btn"
-        class="worker-outlook-button"
-      >
-        View Worker Outlook for this region
-      </button>
-    </div>
-
-    <div id="worker-outlook-card" class="worker-outlook-card" aria-live="polite">
-      <div class="section-title" style="margin-top:0">Your local outlook</div>
-      <div id="worker-outlook-status" class="stex-status">Select a region and an audited occupation.</div>
-      <div id="worker-outlook-content"></div>
-    </div>
-
-    <div id="occupation-drilldown-card" class="occupation-drilldown-card" aria-live="polite">
-      <div class="worker-context"><strong>You're investigating</strong><span id="investigated-occupation-context"></span></div>
-      <div class="section-title" style="margin-top:12px">Occupation details</div>
-      <div id="occupation-drilldown-status" class="stex-status"></div>
-      <div id="occupation-drilldown-content"></div>
-
-      <details class="worker-deep-evidence">
-        <summary>How the work differs</summary>
-        <div class="transition-evidence-section">
-        <div class="transition-evidence-note">
-          GVAI compares O*NET occupational profiles. This does not determine
-          whether an individual is qualified for a job or personally
-          possesses or lacks a skill.
-        </div>
-        <div id="transition-evidence-status" class="stex-status"></div>
-        <div id="transition-evidence-content"></div>
-        </div>
-      </details>
-
-      <details class="worker-deep-evidence">
-        <summary>Typical preparation</summary>
-        <div class="transition-evidence-section">
-        <div class="transition-evidence-note">
-          O*NET's published preparation profile for each occupation. This
-          describes the occupation, not whether you personally already have
-          this preparation.
-        </div>
-        <div id="transition-preparation-status" class="stex-status"></div>
-        <div id="transition-preparation-content"></div>
-        </div>
-      </details>
-
-      <details class="worker-deep-evidence" open>
-        <summary>Next steps to investigate</summary>
-        <div class="transition-evidence-section">
-        <div class="transition-evidence-note">
-          Occupational and regional evidence only. Your personal background is not assessed here.
-        </div>
-        <div id="transition-action-plan-status" class="stex-status"></div>
-        <div id="transition-action-plan-content"></div>
-        </div>
-      </details>
-
-      <details class="worker-deep-evidence" id="personal-comparison-section">
-        <summary>How this compares with your profile</summary>
-        <div class="transition-evidence-section">
-        <div class="transition-evidence-note">
-          Facts you reported are shown beside published occupational and
-          regional evidence. GVAI does not compute a match score and does
-          not tell you whether to pursue this occupation.
-        </div>
-        <div id="personal-comparison-status" class="stex-status"></div>
-        <div id="personal-comparison-content"></div>
-        </div>
-      </details>
-
-      <button id="occupation-drilldown-close" type="button" class="worker-outlook-button occupation-drilldown-close">Close</button>
-    </div>
-
-    <button id="related-occupations-btn" class="worker-outlook-button">
-      View related occupations
-    </button>
-
-    <div id="related-occupations-card" class="related-occupations-card" aria-live="polite">
-      <div class="section-title" style="margin-top:0">Other occupations to investigate</div>
-      <div id="related-occupations-status" class="stex-status">Select a region and an occupation.</div>
-      <div id="related-occupations-content"></div>
-    </div>
+    <p class="worker-outlook-summary">The globe remains the regional exploration surface. Open the Laborers workspace when you want to work through your current occupation and related occupation evidence.</p>
 
     <details id="stex-task-audit" class="stex-audit-disclosure">
       <summary>View detailed STEX task audit</summary>
@@ -1656,6 +1728,222 @@
       </button>
     </div>
   </div>
+
+  <main id="laborers-workspace" class="laborers-workspace" aria-labelledby="laborers-workspace-title" hidden>
+    <div class="laborers-workspace-header">
+      <div>
+        <div class="laborers-workspace-kicker">Laborers Workspace</div>
+        <div id="laborers-workspace-title" class="laborers-workspace-title">Your work options</div>
+        <div class="laborers-workspace-copy">Move from your current work to local evidence, jobs to explore, one occupation investigation, and things to investigate next.</div>
+        <div class="laborers-context-grid" aria-label="Worker workspace context">
+          <div class="laborers-context-card">
+            <div class="laborers-context-label">Current occupation</div>
+            <div id="workspace-current-occupation-context" class="laborers-context-value">Pest Control Workers</div>
+          </div>
+          <div class="laborers-context-card">
+            <div class="laborers-context-label">Investigating</div>
+            <div id="workspace-investigated-occupation-context" class="laborers-context-value">Choose an occupation to investigate</div>
+          </div>
+          <div class="laborers-context-card">
+            <div class="laborers-context-label">Stage</div>
+            <div id="workspace-stage-context" class="laborers-context-value">My Work</div>
+          </div>
+        </div>
+      </div>
+      <button id="close-laborers-workspace-btn" type="button" class="laborers-workspace-close">Back to globe</button>
+    </div>
+
+    <div class="laborers-workspace-shell">
+      <nav class="laborers-stage-nav" aria-label="Laborers workspace stages">
+        <button type="button" class="laborers-stage-link active" data-worker-stage-target="my-work">My Work</button>
+        <button type="button" class="laborers-stage-link" data-worker-stage-target="local-outlook">My Local Outlook</button>
+        <button type="button" class="laborers-stage-link" data-worker-stage-target="explore-occupations">Explore Occupations</button>
+        <button type="button" class="laborers-stage-link" data-worker-stage-target="investigate">Investigate</button>
+        <button type="button" class="laborers-stage-link" data-worker-stage-target="next-investigation">What To Investigate Next</button>
+      </nav>
+
+      <section id="worker-stage-my-work" class="laborers-stage" data-worker-stage="my-work" aria-labelledby="worker-stage-my-work-title">
+        <div class="laborers-stage-head">
+          <div>
+            <div id="worker-stage-my-work-title" class="laborers-stage-title">Your current work</div>
+            <div class="laborers-stage-note">Keep your private Worker Profile beside the published current-occupation evidence it anchors.</div>
+          </div>
+        </div>
+        <div class="laborers-stage-grid">
+          <section id="worker-profile-card" class="worker-profile-card" aria-labelledby="worker-profile-title" hidden>
+            <div id="worker-profile-title" class="section-title" style="margin-top:0">Tell us about your work</div>
+            <p>A few self-reported facts help keep your background separate from published occupation evidence. You can save a partial profile and add more later.</p>
+            <p>Your Worker Profile is stored only in this browser on this device. GVAI does not need your name, email, or street address for this profile.</p>
+            <form id="worker-profile-form">
+              <div class="worker-profile-grid">
+                <label class="worker-profile-wide">Current occupation<input id="worker-profile-occupation-title" maxlength="160" autocomplete="off"></label>
+                <input id="worker-profile-occupation-code" type="hidden">
+                <label>Years in current occupation<input id="worker-profile-years" type="number" min="0" max="80" step="0.1"></label>
+                <label>Education<input id="worker-profile-education" maxlength="160" autocomplete="off"></label>
+                <label class="worker-profile-wide">Licenses/certifications you entered<textarea id="worker-profile-credentials" maxlength="2000" placeholder="One per line"></textarea></label>
+                <label class="worker-profile-wide">Skills you entered<textarea id="worker-profile-skills" maxlength="2000" placeholder="One per line"></textarea></label>
+                <label>Current annual wage<input id="worker-profile-current-annual" type="number" min="0" max="2000000" step="1"></label>
+                <label>Minimum desired annual wage<input id="worker-profile-minimum-annual" type="number" min="0" max="2000000" step="1"></label>
+                <label>Mobility radius (miles)<input id="worker-profile-radius" type="number" min="0" max="1000" step="1"></label>
+                <label>Remote-work preference<select id="worker-profile-remote"><option value="">Unknown</option><option value="no_preference">No preference</option><option value="prefer_remote">Prefer remote</option><option value="remote_required">Remote required</option><option value="prefer_on_site">Prefer on-site</option></select></label>
+                <label>Willing to relocate<select id="worker-profile-relocate"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
+                <label class="worker-profile-wide">Constraints or preferences you reported<textarea id="worker-profile-notes" maxlength="1000"></textarea></label>
+              </div>
+              <button id="use-selected-occupation-btn" type="button" class="worker-outlook-button">Use as my current occupation</button>
+              <div class="worker-profile-actions"><button type="submit">Save Profile</button><button id="edit-worker-profile-btn" type="button">Edit Profile</button><button id="clear-worker-profile-btn" type="button">Clear Profile</button></div>
+              <div id="worker-profile-status" class="worker-profile-status" aria-live="polite"></div>
+            </form>
+          </section>
+
+          <div class="occupation-card">
+            <label class="occupation-select-label" for="stex-occupation-select">Current occupation</label>
+            <select id="stex-occupation-select" class="occupation-select" aria-label="Select current occupation">
+              <option value="">Loading occupations…</option>
+            </select>
+            <div class="worker-context"><strong>Your current work</strong><span id="current-occupation-context">Pest Control Workers</span></div>
+            <div class="occupation-head">
+              <div>
+                <div id="stex-occupation-name" class="occupation-name">
+                  Pest Control Workers
+                </div>
+                <div id="stex-occupation-code" class="occupation-code">
+                  O*NET-SOC 37-2021.00
+                </div>
+              </div>
+
+              <div>
+                <div id="stex-score" class="stex-score">—</div>
+                <div class="stex-label">Career exposure</div>
+              </div>
+            </div>
+
+            <div class="occupation-meta">
+              <div class="occupation-meta-item">
+                <div class="occupation-meta-label">Rated tasks</div>
+                <div id="stex-rated" class="occupation-meta-value">—</div>
+              </div>
+
+              <div class="occupation-meta-item">
+                <div class="occupation-meta-label">Source vintage</div>
+                <div id="stex-source-year" class="occupation-meta-value">—</div>
+              </div>
+            </div>
+
+            <div id="stex-note" class="stex-note">
+              Structural task exposure under the GVAI STEX methodology.
+              This is not a probability of job loss or percent automatable.
+            </div>
+
+            <div id="stex-status" class="stex-status">
+              Loading audited occupation profile…
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="worker-stage-local-outlook" class="laborers-stage" data-worker-stage="local-outlook" aria-labelledby="worker-stage-local-outlook-title">
+        <div class="laborers-stage-head">
+          <div>
+            <div id="worker-stage-local-outlook-title" class="laborers-stage-title">Your local outlook</div>
+            <div class="laborers-stage-note">Published regional employment, wage, and STEX evidence for your current occupation.</div>
+          </div>
+          <button id="worker-outlook-btn" class="worker-outlook-button">View Worker Outlook for this region</button>
+        </div>
+        <div id="worker-outlook-card" class="worker-outlook-card" aria-live="polite">
+          <div class="section-title" style="margin-top:0">Your local outlook</div>
+          <div id="worker-outlook-status" class="stex-status">Select a region and an audited occupation.</div>
+          <div id="worker-outlook-content"></div>
+        </div>
+      </section>
+
+      <section id="worker-stage-explore-occupations" class="laborers-stage" data-worker-stage="explore-occupations" aria-labelledby="worker-stage-explore-occupations-title">
+        <div class="laborers-stage-head">
+          <div>
+            <div id="worker-stage-explore-occupations-title" class="laborers-stage-title">Jobs to explore</div>
+            <div class="laborers-stage-note">Related occupations stay in O*NET source order with compact regional evidence previews.</div>
+          </div>
+          <button id="related-occupations-btn" class="worker-outlook-button">View related occupations</button>
+        </div>
+        <div id="related-occupations-card" class="related-occupations-card" aria-live="polite">
+          <div class="section-title" style="margin-top:0">Other occupations to investigate</div>
+          <div id="related-occupations-status" class="stex-status">Select a region and an occupation.</div>
+          <div id="related-occupations-content"></div>
+        </div>
+      </section>
+
+      <section id="worker-stage-investigate" class="laborers-stage" data-worker-stage="investigate" aria-labelledby="worker-stage-investigate-title">
+        <div class="laborers-stage-head">
+          <div>
+            <div id="worker-stage-investigate-title" class="laborers-stage-title">Investigate an occupation</div>
+            <div class="laborers-stage-note">Market evidence, occupation evidence, typical preparation, and personal comparison are grouped here for the occupation being investigated.</div>
+          </div>
+        </div>
+        <div id="occupation-drilldown-card" class="occupation-drilldown-card" aria-live="polite">
+          <div class="worker-context"><strong>You're investigating</strong><span id="investigated-occupation-context"></span></div>
+          <div class="section-title" style="margin-top:12px">Market evidence</div>
+          <div id="occupation-drilldown-status" class="stex-status"></div>
+          <div id="occupation-drilldown-content"></div>
+
+          <details class="worker-deep-evidence">
+            <summary>Occupation evidence</summary>
+            <div class="transition-evidence-section">
+            <div class="transition-evidence-note">
+              GVAI compares O*NET occupational profiles. This does not determine
+              whether an individual is qualified for a job or personally
+              possesses or lacks a skill.
+            </div>
+            <div id="transition-evidence-status" class="stex-status"></div>
+            <div id="transition-evidence-content"></div>
+            </div>
+          </details>
+
+          <details class="worker-deep-evidence">
+            <summary>Preparation commonly reported for this occupation</summary>
+            <div class="transition-evidence-section">
+            <div class="transition-evidence-note">
+              O*NET's published preparation profile for each occupation. This
+              describes the occupation, not whether you personally already have
+              this preparation.
+            </div>
+            <div id="transition-preparation-status" class="stex-status"></div>
+            <div id="transition-preparation-content"></div>
+            </div>
+          </details>
+
+          <details class="worker-deep-evidence" id="personal-comparison-section">
+            <summary>How this compares with your profile</summary>
+            <div class="transition-evidence-section">
+            <div class="transition-evidence-note">
+              Facts you reported are shown beside published occupational and
+              regional evidence. GVAI does not rate your background and does
+              not tell you whether to pursue this occupation.
+            </div>
+            <div id="personal-comparison-status" class="stex-status"></div>
+            <div id="personal-comparison-content"></div>
+            </div>
+          </details>
+
+          <button id="occupation-drilldown-close" type="button" class="worker-outlook-button occupation-drilldown-close">Close investigation</button>
+        </div>
+      </section>
+
+      <section id="worker-stage-next-investigation" class="laborers-stage" data-worker-stage="next-investigation" aria-labelledby="worker-stage-next-investigation-title">
+        <div class="laborers-stage-head">
+          <div>
+            <div id="worker-stage-next-investigation-title" class="laborers-stage-title">Things to investigate next</div>
+            <div class="laborers-stage-note">Deterministic evidence checks to help you decide what to look up outside GVAI.</div>
+          </div>
+        </div>
+        <div class="transition-evidence-section">
+          <div class="transition-evidence-note">
+            Occupational and regional evidence only. Your personal background is not assessed here.
+          </div>
+          <div id="transition-action-plan-status" class="stex-status"></div>
+          <div id="transition-action-plan-content"></div>
+        </div>
+      </section>
+    </div>
+  </main>
 
   <div class="layer-bar">
     <button class="layer-btn active" data-layer="stability">
@@ -2161,6 +2449,48 @@ let transitionEvidenceActivityItems = [];
 let transitionEvidenceSkillItems = [];
 let transitionEvidenceKnowledgeItems = [];
 let transitionEvidenceAbilityItems = [];
+let activeWorkerWorkspaceStage = "my-work";
+
+const WORKER_WORKSPACE_STAGE_LABELS = {
+  "my-work": "My Work",
+  "local-outlook": "My Local Outlook",
+  "explore-occupations": "Explore Occupations",
+  investigate: "Investigate",
+  "next-investigation": "What To Investigate Next"
+};
+
+function renderWorkerWorkspaceContext() {
+  const current = document.getElementById("workspace-current-occupation-context");
+  const investigated = document.getElementById("workspace-investigated-occupation-context");
+  const stage = document.getElementById("workspace-stage-context");
+  const currentTitle = storedWorkerProfile()?.current_occupation?.occupation_title || currentOccupationTitle || "Choose your current occupation";
+  const investigatedTitle = document.getElementById("investigated-occupation-context")?.textContent?.trim();
+  if (current) current.textContent = currentTitle;
+  if (investigated) investigated.textContent = investigatedTitle || "Choose an occupation to investigate";
+  if (stage) stage.textContent = WORKER_WORKSPACE_STAGE_LABELS[activeWorkerWorkspaceStage] || "My Work";
+}
+
+function setWorkerWorkspaceStage(stage, scroll = false) {
+  activeWorkerWorkspaceStage = stage;
+  document.querySelectorAll(".laborers-stage-link").forEach(button => {
+    button.classList.toggle("active", button.dataset.workerStageTarget === stage);
+  });
+  renderWorkerWorkspaceContext();
+  const target = document.querySelector(`[data-worker-stage="${stage}"]`);
+  if (scroll && target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function openLaborersWorkspace(stage = "my-work") {
+  const workspace = document.getElementById("laborers-workspace");
+  if (!workspace) return;
+  workspace.hidden = false;
+  setWorkerWorkspaceStage(stage, true);
+}
+
+function closeLaborersWorkspace() {
+  const workspace = document.getElementById("laborers-workspace");
+  if (workspace) workspace.hidden = true;
+}
 
 async function loadSelectedCountyBoundary(
   stateFips,
@@ -5942,6 +6272,7 @@ function renderWorkerJourneyState(profile) {
     : "";
   const currentContext = document.getElementById("current-occupation-context");
   if (currentContext) currentContext.textContent = title;
+  renderWorkerWorkspaceContext();
   setWorkerJourneyStep(profile ? 2 : 1);
 }
 
@@ -5963,13 +6294,21 @@ document.getElementById("worker-profile-form").addEventListener("submit", event 
   const profile = workerProfileFromForm();
   localStorage.setItem(WORKER_PROFILE_STORAGE_KEY, JSON.stringify(profile));
   workerProfileField("worker-profile-status").textContent = "Profile saved in this browser only. Facts are self-reported and not independently verified.";
+  clearPersonalComparison();
   renderWorkerJourneyState(profile);
+  openLaborersWorkspace("local-outlook");
 });
 document.getElementById("start-worker-profile-btn").addEventListener("click", () => {
   const card = document.getElementById("worker-profile-card");
+  openLaborersWorkspace("my-work");
   card.hidden = false;
   workerProfileField("worker-profile-occupation-title").focus();
   document.getElementById("start-worker-profile-btn").textContent = "Save my work profile below";
+});
+document.getElementById("open-laborers-workspace-btn").addEventListener("click", () => openLaborersWorkspace(activeWorkerWorkspaceStage));
+document.getElementById("close-laborers-workspace-btn").addEventListener("click", closeLaborersWorkspace);
+document.querySelectorAll(".laborers-stage-link").forEach(button => {
+  button.addEventListener("click", () => setWorkerWorkspaceStage(button.dataset.workerStageTarget, true));
 });
 document.getElementById("use-selected-occupation-btn").addEventListener("click", useSelectedOccupationForWorkerProfile);
 document.getElementById("edit-worker-profile-btn").addEventListener("click", () => workerProfileField("worker-profile-occupation-title").focus());
@@ -5980,6 +6319,7 @@ document.getElementById("clear-worker-profile-btn").addEventListener("click", ()
   workerProfileField("worker-profile-status").textContent = "Profile cleared from this browser.";
   clearPersonalComparison();
   renderWorkerJourneyState(null);
+  openLaborersWorkspace("my-work");
 });
 const initialWorkerProfile = storedWorkerProfile();
 if (initialWorkerProfile) {
@@ -6327,6 +6667,9 @@ function clearOccupationDrilldown() {
   if (status) status.textContent = "";
   if (content) content.innerHTML = "";
   currentDrilldownCode = null;
+  const investigatedContext = document.getElementById("investigated-occupation-context");
+  if (investigatedContext) investigatedContext.textContent = "";
+  renderWorkerWorkspaceContext();
   clearTransitionEvidence();
   clearPersonalComparison();
 }
@@ -6493,6 +6836,7 @@ async function loadRelatedOccupations() {
   if (!card || !status || !content) return;
 
   card.classList.add("visible");
+  openLaborersWorkspace("explore-occupations");
   setWorkerJourneyStep(3);
   status.textContent = "Loading O*NET related occupations...";
   content.innerHTML = "";
@@ -6546,6 +6890,7 @@ async function loadWorkerOutlook() {
   if (!card || !status || !content) return;
 
   card.classList.add("visible");
+  openLaborersWorkspace("local-outlook");
   setWorkerJourneyStep(2);
   status.textContent = "Loading worker outlook...";
   content.innerHTML = "";
@@ -6657,6 +7002,7 @@ async function loadRelatedOccupationDrilldown(occupationCode, occupationTitle) {
   if (!card || !status || !content) return;
 
   card.classList.add("visible");
+  openLaborersWorkspace("investigate");
   setWorkerJourneyStep(4);
   card.scrollIntoView({ behavior: "smooth", block: "nearest" });
   status.textContent = `Loading evidence for ${occupationTitle || occupationCode}...`;
@@ -6742,6 +7088,7 @@ async function loadRelatedOccupationDrilldown(occupationCode, occupationTitle) {
 
     const investigatedContext = document.getElementById("investigated-occupation-context");
     if (investigatedContext) investigatedContext.textContent = data.occupation_title || data.occupation_code;
+    renderWorkerWorkspaceContext();
 
     status.textContent =
       `Related occupation (O*NET Related Occupations) · not your current occupation · ${data.county || "Selected region"} · no composite score`;
@@ -7238,7 +7585,7 @@ async function loadPersonalComparison(targetCode, targetTitle) {
       return;
     }
 
-    status.textContent = "Facts you reported beside published evidence · no match score.";
+    status.textContent = "Facts you reported beside published evidence · no personal rating.";
     content.innerHTML = renderPersonalComparison(data);
   } catch (error) {
     if (requestId !== activePersonalComparisonRequestId || currentDrilldownCode !== targetCode) return;
@@ -7281,6 +7628,7 @@ async function loadTransitionActionPlan(targetCode, targetTitle) {
     const actions = Array.isArray(data.actions) ? data.actions : [];
     status.textContent = `${actions.length} factual next steps for ${data.target_occupation_title || targetCode}.`;
     content.innerHTML = renderTransitionActionPlan(actions, !!storedWorkerProfile());
+    setWorkerWorkspaceStage("next-investigation");
     setWorkerJourneyStep(5);
   } catch (error) {
     if (requestId !== activeTransitionActionPlanRequestId || currentDrilldownCode !== targetCode) return;
