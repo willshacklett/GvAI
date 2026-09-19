@@ -91,3 +91,4 @@ def test_no_forbidden_scoring_language_in_personal_comparison_ui_code():
     snippet = html[start:end].lower()
     for prohibited in ("matched_skills", "skill_gap", "similarity_score", "\"score\"", "\"confidence\""):
         assert prohibited not in snippet
+    assert "no personal rating" in html
