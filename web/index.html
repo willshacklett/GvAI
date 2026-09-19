@@ -539,7 +539,7 @@
 
     .laborers-stage-nav {
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 8px;
       margin-bottom: 16px;
     }
@@ -713,6 +713,44 @@
       font-size: 14px;
       font-weight: 700;
       overflow-wrap: anywhere;
+    }
+
+    .investigation-summary {
+      display: grid;
+      gap: 12px;
+    }
+
+    .investigation-summary-section {
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel-soft);
+    }
+
+    .investigation-summary-section h3 {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.25;
+    }
+
+    .investigation-summary-source {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.45;
+    }
+
+    .investigation-summary-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .investigation-summary-actions button {
+      width: auto;
+      margin-top: 0;
+      font-size: 11px;
+      padding: 6px 12px;
     }
 
     .worker-profile-card[hidden] {
@@ -1576,6 +1614,32 @@
         width: 100%;
       }
     }
+
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+
+      #worker-stage-investigation-summary,
+      #worker-stage-investigation-summary * {
+        visibility: visible;
+      }
+
+      #worker-stage-investigation-summary {
+        position: absolute;
+        inset: 0;
+        display: block;
+        color: #111;
+        background: #fff;
+        border: 0;
+        box-shadow: none;
+      }
+
+      .investigation-summary-actions,
+      .laborers-stage-note {
+        display: none !important;
+      }
+    }
   </style>
 
   <link
@@ -1815,6 +1879,7 @@
         <button type="button" class="laborers-stage-link" data-worker-stage-target="explore-occupations">Explore Occupations</button>
         <button type="button" class="laborers-stage-link" data-worker-stage-target="saved-occupations">Saved Occupations</button>
         <button type="button" class="laborers-stage-link" data-worker-stage-target="investigate">Investigate</button>
+        <button type="button" class="laborers-stage-link" data-worker-stage-target="investigation-summary">Investigation Summary</button>
         <button type="button" class="laborers-stage-link" data-worker-stage-target="next-investigation">What To Investigate Next</button>
       </nav>
 
@@ -1996,7 +2061,21 @@
           </details>
 
           <button id="occupation-drilldown-close" type="button" class="worker-outlook-button occupation-drilldown-close">Close investigation</button>
+          <button id="open-investigation-summary-btn" type="button" class="worker-outlook-button occupation-drilldown-close">Open Investigation Summary</button>
         </div>
+      </section>
+
+      <section id="worker-stage-investigation-summary" class="laborers-stage" data-worker-stage="investigation-summary" aria-labelledby="worker-stage-investigation-summary-title">
+        <div class="laborers-stage-head">
+          <div>
+            <div id="worker-stage-investigation-summary-title" class="laborers-stage-title">Investigation Summary</div>
+            <div class="laborers-stage-note">One printable view of the existing evidence for the occupation being investigated.</div>
+          </div>
+          <div class="investigation-summary-actions">
+            <button id="print-investigation-summary-btn" type="button" class="worker-outlook-button">Print summary</button>
+          </div>
+        </div>
+        <div id="investigation-summary-content" class="investigation-summary" aria-live="polite"></div>
       </section>
 
       <section id="worker-stage-next-investigation" class="laborers-stage" data-worker-stage="next-investigation" aria-labelledby="worker-stage-next-investigation-title">
@@ -2529,7 +2608,16 @@ const WORKER_WORKSPACE_STAGE_LABELS = {
   "explore-occupations": "Explore Occupations",
   "saved-occupations": "Saved Occupations",
   investigate: "Investigate",
+  "investigation-summary": "Investigation Summary",
   "next-investigation": "What To Investigate Next"
+};
+
+const investigationSummaryState = {
+  drilldown: null,
+  transitionEvidence: null,
+  preparation: null,
+  personalComparison: null,
+  actionPlan: null
 };
 
 function renderWorkerWorkspaceContext() {
@@ -6363,6 +6451,7 @@ function renderSaveOccupationButton(occupationCode, occupationTitle) {
   status.textContent = saved
     ? "Saved on this browser/device."
     : "";
+  renderInvestigationSummary();
 }
 
 function renderSavedOccupations() {
@@ -6890,6 +6979,8 @@ function clearOccupationDrilldown() {
   renderSaveOccupationButton(null);
   clearTransitionEvidence();
   clearPersonalComparison();
+  investigationSummaryState.drilldown = null;
+  renderInvestigationSummary();
 }
 
 function clearTransitionEvidence() {
@@ -6906,6 +6997,7 @@ function clearTransitionEvidence() {
   transitionEvidenceSkillItems = [];
   transitionEvidenceKnowledgeItems = [];
   transitionEvidenceAbilityItems = [];
+  investigationSummaryState.transitionEvidence = null;
   clearTransitionPreparation();
 }
 
@@ -6915,6 +7007,7 @@ function clearTransitionPreparation() {
   const content = document.getElementById("transition-preparation-content");
   if (status) status.textContent = "";
   if (content) content.innerHTML = "";
+  investigationSummaryState.preparation = null;
   clearTransitionActionPlan();
 }
 
@@ -6924,6 +7017,8 @@ function clearTransitionActionPlan() {
   activeTransitionActionPlanRequestId += 1;
   if (status) status.textContent = "";
   if (content) content.innerHTML = "";
+  investigationSummaryState.actionPlan = null;
+  renderInvestigationSummary();
 }
 
 function renderWorkerOutlookAvailability() {
@@ -7033,6 +7128,184 @@ function renderRelatedOccupationItems() {
     `).join("")}</ul>
     ${toggleMarkup}
   `;
+}
+
+function investigationSummaryEmptyState() {
+  return `
+    <section class="investigation-summary-section">
+      <h3>No occupation is being investigated yet</h3>
+      <div class="worker-outlook-summary">
+        Choose an occupation from Explore Occupations or reopen one from Saved Occupations. The summary will use the evidence loaded by that investigation.
+      </div>
+      <div class="investigation-summary-actions">
+        <button type="button" class="worker-outlook-button" data-summary-stage="explore-occupations">Explore Occupations</button>
+        <button type="button" class="worker-outlook-button" data-summary-stage="saved-occupations">Saved Occupations</button>
+      </div>
+    </section>
+  `;
+}
+
+function summarySection(title, source, body) {
+  return `
+    <section class="investigation-summary-section">
+      <h3>${escapeHtml(title)}</h3>
+      <div class="investigation-summary-source">Source: ${escapeHtml(source)}</div>
+      ${body}
+    </section>
+  `;
+}
+
+function summaryFacts(items) {
+  return `<ul class="worker-outlook-facts">${items.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+}
+
+function oewsSpecificityText(record) {
+  if (!record || record.status === "unknown" || record.status === "unavailable") return "OEWS evidence unavailable or unknown.";
+  if (record.status === "suppressed") return "BLS suppressed this OEWS value; it is unavailable, not zero.";
+  if (record.match_specificity === "broader_category") {
+    return `Broader OEWS category: ${record.occupation_title || "unknown category"} (${record.oews_occupation_code || "unknown code"}); not specific to this occupation.`;
+  }
+  return "Exact OEWS occupation evidence for the investigated occupation.";
+}
+
+function renderSummaryOccupation(data) {
+  const code = data?.occupation_code || currentDrilldownCode || "—";
+  const title = data?.occupation_title || document.getElementById("investigated-occupation-context")?.textContent?.trim() || code;
+  const region = data?.county || selectedProfile?.title || "Selected region";
+  const saved = currentDrilldownCode && isOccupationSaved(currentDrilldownCode)
+    ? "Saved on this browser/device."
+    : "Not saved as a browser bookmark.";
+  return summarySection("Occupation", "O*NET occupation identity; Saved Occupations bookmark metadata; selected region", summaryFacts([
+    `Occupation: ${title}`,
+    `O*NET-SOC: ${code}`,
+    `Saved state: ${saved}`,
+    `Region being investigated: ${region}`
+  ]));
+}
+
+function renderSummaryLocalEvidence(data) {
+  const occupation = data?.occupation || {};
+  const employment = occupation.regional_employment || {};
+  const wage = occupation.regional_wage || {};
+  const employmentText = employment.status === "known"
+    ? `${employment.match_specificity === "broader_category" ? "Broader-category regional employment" : "Regional employment"}: ${formatCompact(employment.employment)}`
+    : "Regional employment unavailable or unknown.";
+  let wageText = "Regional median wage unavailable or unknown.";
+  if (wage.status === "known") {
+    wageText = `${wage.match_specificity === "broader_category" ? "Broader-category regional median wage" : "Regional median wage"}: ${formatWageText(wage)}`;
+  } else if (wage.status === "suppressed") {
+    wageText = "Regional median wage suppressed by BLS (unavailable, not zero).";
+  }
+  return summarySection("Local Work Evidence", "BLS OEWS regional employment and wage evidence", summaryFacts([
+    employmentText,
+    oewsSpecificityText(employment),
+    wageText,
+    oewsSpecificityText(wage)
+  ]));
+}
+
+function renderSummarySTEX(data) {
+  const stex = data?.occupation?.stex || {};
+  if (stex.status !== "known") {
+    return summarySection("Automation / STEX Evidence", "STEX/GVAI audited profile", summaryFacts([
+      "STEX exposure unknown or unavailable for this occupation.",
+      "Structural task exposure is not a probability of job loss or percent automatable."
+    ]));
+  }
+  const profile = stex.profile || {};
+  return summarySection("Automation / STEX Evidence", "STEX/GVAI audited profile", summaryFacts([
+    `STEX structural exposure: ${Number.isFinite(profile.structural_exposure) ? profile.structural_exposure : "unknown"}`,
+    `Rated task count: ${Number.isFinite(profile.rated_task_count) ? profile.rated_task_count : "unknown"}`,
+    `Source vintage: ${profile.source?.tasks_year ? "O*NET " + profile.source.tasks_year : "unknown"}`,
+    profile.interpretation || "Structural task exposure under the GVAI STEX methodology. This is not a probability of job loss or percent automatable."
+  ]));
+}
+
+function renderSummaryPreparation(data) {
+  const preparation = data?.target_preparation || {};
+  const jobZone = preparation.job_zone || {};
+  const education = preparation.education || {};
+  const facts = [];
+  if (jobZone.status === "known") {
+    facts.push(`O*NET Job Zone ${jobZone.job_zone_code ?? "unknown"}: ${jobZone.title || "unknown title"}.`);
+    facts.push(`Education: ${jobZone.education || "unknown"}.`);
+    facts.push(`Related experience: ${jobZone.related_experience || "unknown"}.`);
+    facts.push(`On-the-job training: ${jobZone.job_training || "unknown"}.`);
+  } else {
+    facts.push("O*NET Job Zone evidence unavailable for this occupation.");
+  }
+  const levels = Array.isArray(education.levels) ? education.levels : [];
+  if (education.status === "known" && levels.length) {
+    facts.push(`Published O*NET education survey includes ${levels.length} reported education level${levels.length === 1 ? "" : "s"}; top listed: ${levels[0].title || "unknown"}${Number.isFinite(levels[0].percentage_of_respondents) ? " (" + levels[0].percentage_of_respondents + "% of respondents)" : ""}.`);
+  } else {
+    facts.push("O*NET education survey evidence unavailable for this occupation.");
+  }
+  return summarySection("Preparation", "O*NET Job Zone and education survey", summaryFacts(facts));
+}
+
+function summarizeTransitionCategory(label, comparison) {
+  const items = Array.isArray(comparison?.items) ? comparison.items : [];
+  if (comparison?.status !== "known" || !items.length) return `${label}: comparable O*NET evidence unavailable.`;
+  const first = items[0];
+  return `${label}: published O*NET profiles differ most in ${first.name || "an unnamed item"}; current occupation ${formatImportanceValue(first.source_importance)}, investigated occupation ${formatImportanceValue(first.target_importance)}.`;
+}
+
+function renderSummaryTransitionEvidence(data) {
+  return summarySection("Transition Evidence", "O*NET work activity, skill, knowledge, and ability profiles", summaryFacts([
+    summarizeTransitionCategory("Work activities", data?.work_activity_comparison || {}),
+    summarizeTransitionCategory("Skills", data?.skill_comparison || {}),
+    summarizeTransitionCategory("Knowledge", data?.knowledge_comparison || {}),
+    summarizeTransitionCategory("Abilities", data?.ability_comparison || {})
+  ]));
+}
+
+function renderSummaryPersonalComparison(data) {
+  if (!storedWorkerProfile()) {
+    return summarySection("My Profile", "Self-reported Worker Profile; published occupation evidence where available", `
+      <div class="worker-outlook-summary">No Worker Profile is saved in this browser. Add one in My Work to compare self-reported facts beside published evidence. The rest of this summary is still available.</div>
+    `);
+  }
+  if (!data) {
+    return summarySection("My Profile", "Self-reported Worker Profile; published occupation evidence where available", `
+      <div class="worker-outlook-summary">Worker Profile exists, but personal comparison evidence is unavailable for this investigation.</div>
+    `);
+  }
+  const comparisons = Array.isArray(data.comparisons) ? data.comparisons.slice(0, 4) : [];
+  const facts = comparisons.flatMap(comparison => {
+    const worker = personalComparisonWorkerLines(comparison).slice(0, 2).join(" ");
+    const evidence = personalComparisonEvidenceLines(comparison).slice(0, 2).join(" ");
+    return [
+      `Self-reported ${comparison.title || comparison.comparison_id}: ${worker}`,
+      `Published evidence for ${comparison.title || comparison.comparison_id}: ${evidence}`
+    ];
+  });
+  return summarySection("My Profile", "Self-reported Worker Profile; BLS/O*NET published evidence", summaryFacts(facts.length ? facts : ["Personal comparison evidence unavailable for this investigation."]));
+}
+
+function renderSummaryActionPlan(data) {
+  const actions = Array.isArray(data?.actions) ? data.actions : [];
+  const body = actions.length
+    ? renderTransitionActionPlan(actions, !!storedWorkerProfile())
+    : `<div class="worker-outlook-summary">Transition Action Plan evidence is unavailable for this investigation.</div>`;
+  return summarySection("What To Investigate Next", "Existing Transition Action Plan evidence", body);
+}
+
+function renderInvestigationSummary() {
+  const content = document.getElementById("investigation-summary-content");
+  if (!content) return;
+  if (!currentDrilldownCode) {
+    content.innerHTML = investigationSummaryEmptyState();
+    return;
+  }
+  content.innerHTML = [
+    renderSummaryOccupation(investigationSummaryState.drilldown),
+    renderSummaryLocalEvidence(investigationSummaryState.drilldown),
+    renderSummarySTEX(investigationSummaryState.drilldown),
+    renderSummaryPreparation(investigationSummaryState.preparation),
+    renderSummaryTransitionEvidence(investigationSummaryState.transitionEvidence),
+    renderSummaryPersonalComparison(investigationSummaryState.personalComparison),
+    renderSummaryActionPlan(investigationSummaryState.actionPlan)
+  ].join("");
 }
 
 async function loadRelatedOccupations() {
@@ -7307,8 +7580,10 @@ async function loadRelatedOccupationDrilldown(occupationCode, occupationTitle) {
 
     const investigatedContext = document.getElementById("investigated-occupation-context");
     if (investigatedContext) investigatedContext.textContent = data.occupation_title || data.occupation_code;
+    investigationSummaryState.drilldown = data;
     renderWorkerWorkspaceContext();
     renderSaveOccupationButton(data.occupation_code || occupationCode, data.occupation_title || occupationTitle);
+    renderInvestigationSummary();
 
     status.textContent =
       `Related occupation (O*NET Related Occupations) · not your current occupation · ${data.county || "Selected region"} · no composite score`;
@@ -7490,6 +7765,7 @@ async function loadTransitionEvidence(targetCode, targetTitle) {
     transitionEvidenceSkillItems = Array.isArray(skills.items) ? skills.items : [];
     transitionEvidenceKnowledgeItems = Array.isArray(knowledge.items) ? knowledge.items : [];
     transitionEvidenceAbilityItems = Array.isArray(abilities.items) ? abilities.items : [];
+    investigationSummaryState.transitionEvidence = data;
 
     const statusBits = [
       `${data.source_occupation_title || data.source_occupation_code} vs ${data.target_occupation_title || data.target_occupation_code}`,
@@ -7501,6 +7777,7 @@ async function loadTransitionEvidence(targetCode, targetTitle) {
     status.textContent = statusBits.join(" · ");
 
     renderTransitionEvidenceContent();
+    renderInvestigationSummary();
   } catch (error) {
     if (
       requestId !== activeTransitionEvidenceRequestId ||
@@ -7511,6 +7788,7 @@ async function loadTransitionEvidence(targetCode, targetTitle) {
     console.error("Transition evidence load failed:", error);
     status.textContent = "Career transition evidence is temporarily unavailable.";
     content.innerHTML = "";
+    renderInvestigationSummary();
   }
 }
 
@@ -7604,9 +7882,12 @@ async function loadTransitionPreparation(targetCode, targetTitle) {
     status.textContent =
       `${data.source_occupation_title || data.source_occupation_code} vs ${data.target_occupation_title || data.target_occupation_code} · O*NET Job Zone and education survey · no readiness score`;
 
+    investigationSummaryState.preparation = data;
+
     content.innerHTML =
       renderPreparationFacts("Current occupation", data.source_preparation || {}) +
       renderPreparationFacts("Occupation being investigated", data.target_preparation || {});
+    renderInvestigationSummary();
   } catch (error) {
     if (
       requestId !== activeTransitionPreparationRequestId ||
@@ -7617,6 +7898,7 @@ async function loadTransitionPreparation(targetCode, targetTitle) {
     console.error("Transition preparation load failed:", error);
     status.textContent = "Transition preparation evidence is temporarily unavailable.";
     content.innerHTML = "";
+    renderInvestigationSummary();
   }
 }
 
@@ -7653,6 +7935,8 @@ function clearPersonalComparison() {
   activePersonalComparisonRequestId += 1;
   if (status) status.textContent = "";
   if (content) content.innerHTML = "";
+  investigationSummaryState.personalComparison = null;
+  renderInvestigationSummary();
 }
 
 function personalComparisonWorkerLines(comparison) {
@@ -7806,12 +8090,15 @@ async function loadPersonalComparison(targetCode, targetTitle) {
     }
 
     status.textContent = "Facts you reported beside published evidence · no personal rating.";
+    investigationSummaryState.personalComparison = data;
     content.innerHTML = renderPersonalComparison(data);
+    renderInvestigationSummary();
   } catch (error) {
     if (requestId !== activePersonalComparisonRequestId || currentDrilldownCode !== targetCode) return;
     console.error("Personal comparison load failed:", error);
     status.textContent = "Personal comparison is temporarily unavailable.";
     content.innerHTML = "";
+    renderInvestigationSummary();
   }
 }
 
@@ -7847,7 +8134,9 @@ async function loadTransitionActionPlan(targetCode, targetTitle) {
 
     const actions = Array.isArray(data.actions) ? data.actions : [];
     status.textContent = `${actions.length} factual next steps for ${data.target_occupation_title || targetCode}.`;
+    investigationSummaryState.actionPlan = data;
     content.innerHTML = renderTransitionActionPlan(actions, !!storedWorkerProfile());
+    renderInvestigationSummary();
     setWorkerWorkspaceStage("next-investigation");
     setWorkerJourneyStep(5);
   } catch (error) {
@@ -7855,6 +8144,7 @@ async function loadTransitionActionPlan(targetCode, targetTitle) {
     console.error("Transition action plan load failed:", error);
     status.textContent = "Next steps are temporarily unavailable.";
     content.innerHTML = "";
+    renderInvestigationSummary();
   }
 }
 
@@ -7890,6 +8180,28 @@ document
   .getElementById("occupation-drilldown-close")
   .addEventListener("click", () => {
     clearOccupationDrilldown();
+  });
+
+document
+  .getElementById("open-investigation-summary-btn")
+  .addEventListener("click", () => {
+    renderInvestigationSummary();
+    setWorkerWorkspaceStage("investigation-summary", true);
+  });
+
+document
+  .getElementById("print-investigation-summary-btn")
+  .addEventListener("click", () => {
+    renderInvestigationSummary();
+    window.print();
+  });
+
+document
+  .getElementById("investigation-summary-content")
+  .addEventListener("click", event => {
+    const button = event.target.closest("[data-summary-stage]");
+    if (!button) return;
+    setWorkerWorkspaceStage(button.dataset.summaryStage, true);
   });
 
 document
@@ -7942,6 +8254,8 @@ document
 renderSavedOccupations();
 
 renderWorkerOutlookAvailability();
+
+renderInvestigationSummary();
 
 
 

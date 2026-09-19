@@ -60,6 +60,7 @@ def test_laborers_workspace_has_worker_journey_stages():
         "My Local Outlook",
         "Explore Occupations",
         "Investigate",
+        "Investigation Summary",
         "What To Investigate Next",
     ):
         assert stage in html
@@ -67,8 +68,112 @@ def test_laborers_workspace_has_worker_journey_stages():
     assert 'data-worker-stage="local-outlook"' in html
     assert 'data-worker-stage="explore-occupations"' in html
     assert 'data-worker-stage="investigate"' in html
+    assert 'data-worker-stage="investigation-summary"' in html
     assert 'data-worker-stage="next-investigation"' in html
     assert "Back to globe" in html
+
+
+def test_investigation_summary_reuses_existing_investigation_evidence():
+    html = _html()
+    assert 'id="investigation-summary-content"' in html
+    assert 'id="open-investigation-summary-btn"' in html
+    assert 'id="print-investigation-summary-btn"' in html
+    assert "const investigationSummaryState" in html
+    assert "investigationSummaryState.drilldown = data" in html
+    assert "investigationSummaryState.transitionEvidence = data" in html
+    assert "investigationSummaryState.preparation = data" in html
+    assert "investigationSummaryState.personalComparison = data" in html
+    assert "investigationSummaryState.actionPlan = data" in html
+    assert "renderTransitionActionPlan(actions, !!storedWorkerProfile())" in html
+
+
+def test_investigation_summary_sources_and_missing_states_are_explicit():
+    html = _html()
+    summary_start = html.index("function investigationSummaryEmptyState")
+    summary_end = html.index("async function loadRelatedOccupations", summary_start)
+    summary = html[summary_start:summary_end]
+    for source in (
+        "O*NET occupation identity",
+        "BLS OEWS regional employment and wage evidence",
+        "STEX/GVAI audited profile",
+        "O*NET Job Zone and education survey",
+        "Self-reported Worker Profile",
+        "Existing Transition Action Plan evidence",
+    ):
+        assert source in summary
+    assert "No occupation is being investigated yet" in summary
+    assert "Explore Occupations" in summary
+    assert "Saved Occupations" in summary
+    assert "unavailable, not zero" in summary
+    assert "unknown" in summary.lower()
+
+
+def test_investigation_summary_preserves_evidence_boundaries():
+    html = _html()
+    summary_start = html.index("function oewsSpecificityText")
+    summary_end = html.index("async function loadRelatedOccupations", summary_start)
+    summary = html[summary_start:summary_end]
+    assert "currentDrilldownCode" in summary
+    assert "isOccupationSaved(currentDrilldownCode)" in summary
+    assert "Broader OEWS category" in summary
+    assert "Exact OEWS occupation evidence" in summary
+    assert "not a probability of job loss or percent automatable" in summary
+    assert "O*NET Job Zone" in summary
+    assert "Work activities" in summary
+    assert "Skills" in summary
+    assert "Knowledge" in summary
+    assert "Abilities" in summary
+    assert "Self-reported" in summary
+    assert "Published evidence" in summary
+
+
+def test_investigation_summary_privacy_and_escaping_contract():
+    html = _html()
+    summary_start = html.index("function investigationSummaryEmptyState")
+    summary_end = html.index("async function loadRelatedOccupations", summary_start)
+    summary = html[summary_start:summary_end]
+    assert "localStorage.setItem" not in summary
+    assert "fetch(" not in summary
+    assert "/api/worker/personal-comparison" not in summary
+    assert "JSON.stringify" not in summary
+    assert "escapeHtml(title)" in summary
+    assert "items.map(item => `<li>${escapeHtml(item)}</li>`)" in summary
+    assert "window.print()" in html
+
+
+def test_investigation_summary_does_not_add_composite_or_verdict_language():
+    html = _html().lower()
+    summary = html[html.index("function investigationsummaryemptystate"):html.index("async function loadrelatedoccupations")]
+    for prohibited in (
+        "gvai score",
+        "transition score",
+        "fit score",
+        "readiness score",
+        "opportunity score",
+        "recommendation score",
+        "traffic-light",
+        "best occupation",
+        "ranking",
+        "probability of success",
+        "good match",
+        "poor match",
+        "easy transition",
+    ):
+        assert prohibited not in summary
+    assert "50" not in summary
+    assert "mystery neutral" not in summary
+
+
+def test_saved_occupation_storage_remains_metadata_only_with_summary():
+    html = _html()
+    start = html.index("function saveOccupation")
+    end = html.index("function removeSavedOccupation", start)
+    save_snippet = html[start:end]
+    assert "occupation_code" in save_snippet
+    assert "occupation_title" in save_snippet
+    assert "saved_at" in save_snippet
+    for evidence_key in ("regional_wage", "regional_employment", "stex", "workerProfile", "transitionEvidence"):
+        assert evidence_key not in save_snippet
 
 
 def test_worker_request_guards_do_not_share_region_generation_counter():
