@@ -3630,6 +3630,7 @@ let tennesseeLaborAvailabilityDataSource = null;
 let tennesseeWorkforceMixDataSource = null;
 let tennesseeHousingPressureDataSource = null;
 let tennesseeSTEXCoverageDataSource = null;
+let activeCountyOverlayStateFips = null;
 
 let laborAvailabilityByGeoid = new Map();
 let workforceMixByGeoid = new Map();
@@ -5003,7 +5004,8 @@ function ensureLaborAvailabilityLegend() {
 
 
 async function loadTennesseeLaborAvailabilityOverlay(
-  countyGeoJson
+  countyGeoJson,
+  stateFips = "47"
 ) {
   if (
     tennesseeLaborAvailabilityDataSource
@@ -5016,7 +5018,7 @@ async function loadTennesseeLaborAvailabilityOverlay(
   try {
     const endpoint =
       (window.GVAI_API_BASE || "") +
-      "/api/region/labor-availability?state=47";
+      `/api/region/labor-availability?state=${encodeURIComponent(stateFips)}`;
 
     const response =
       await fetch(endpoint);
@@ -5323,7 +5325,8 @@ function applyWorkforceMixGroup() {
 
 
 async function loadTennesseeWorkforceMixOverlay(
-  countyGeoJson
+  countyGeoJson,
+  stateFips = "47"
 ) {
   if (
     tennesseeWorkforceMixDataSource
@@ -5334,7 +5337,7 @@ async function loadTennesseeWorkforceMixOverlay(
   try {
     const endpoint =
       (window.GVAI_API_BASE || "") +
-      "/api/region/workforce-mix?state=47";
+      `/api/region/workforce-mix?state=${encodeURIComponent(stateFips)}`;
 
     const response =
       await fetch(endpoint);
@@ -5507,6 +5510,7 @@ function updateTennesseeOverlayMode() {
   if (stexLegend) {
     stexLegend.classList.toggle(
       "visible",
+      !!tennesseeSTEXCoverageDataSource &&
       localVisible &&
       activeTennesseeOverlay === "stex"
     );
@@ -5644,7 +5648,8 @@ function ensureHousingPressureLegend() {
 
 
 async function loadTennesseeHousingPressureOverlay(
-  countyGeoJson
+  countyGeoJson,
+  stateFips = "47"
 ) {
   if (
     tennesseeHousingPressureDataSource
@@ -5657,7 +5662,7 @@ async function loadTennesseeHousingPressureOverlay(
   try {
     const endpoint =
       (window.GVAI_API_BASE || "") +
-      "/api/region/housing-pressure?state=47";
+      `/api/region/housing-pressure?state=${encodeURIComponent(stateFips)}`;
 
     const response =
       await fetch(endpoint);
@@ -6038,17 +6043,73 @@ async function loadTennesseeSTEXCoverageOverlay(
 
 
 
-async function loadTennesseeCountyBoundaries() {
-  if (tennesseeCountiesDataSource) {
+function clearCountyOverlayDataSources() {
+  const dataSources = [
+    tennesseeCountiesDataSource,
+    tennesseeLaborAvailabilityDataSource,
+    tennesseeWorkforceMixDataSource,
+    tennesseeHousingPressureDataSource,
+    tennesseeSTEXCoverageDataSource
+  ];
+
+  for (const dataSource of dataSources) {
+    if (dataSource) {
+      viewer.dataSources.remove(
+        dataSource,
+        true
+      );
+    }
+  }
+
+  tennesseeCountiesDataSource = null;
+  tennesseeLaborAvailabilityDataSource = null;
+  tennesseeWorkforceMixDataSource = null;
+  tennesseeHousingPressureDataSource = null;
+  tennesseeSTEXCoverageDataSource = null;
+
+  laborAvailabilityByGeoid = new Map();
+  workforceMixByGeoid = new Map();
+  housingPressureByGeoid = new Map();
+  stexCoverageByGeoid = new Map();
+
+  activeCountyOverlayStateFips = null;
+}
+
+
+async function loadTennesseeCountyBoundaries(
+  stateFips = "47"
+) {
+  const normalizedStateFips =
+    String(stateFips || "")
+      .padStart(2, "0");
+
+  if (!normalizedStateFips) {
+    return null;
+  }
+
+  if (
+    tennesseeCountiesDataSource &&
+    activeCountyOverlayStateFips ===
+      normalizedStateFips
+  ) {
     return tennesseeCountiesDataSource;
   }
 
+  if (
+    activeCountyOverlayStateFips &&
+    activeCountyOverlayStateFips !==
+      normalizedStateFips
+  ) {
+    clearCountyOverlayDataSources();
+  }
   try {
     const url =
       "https://tigerweb.geo.census.gov/arcgis/rest/services/" +
       "TIGERweb/State_County/MapServer/7/query" +
       "?where=" +
-      encodeURIComponent("STATE='47'") +
+      encodeURIComponent(
+        `STATE='${normalizedStateFips}'`
+      ) +
       "&outFields=NAME,STATE,COUNTY,GEOID" +
       "&returnGeometry=true" +
       "&outSR=4326" +
@@ -6058,31 +6119,36 @@ async function loadTennesseeCountyBoundaries() {
 
     if (!response.ok) {
       throw new Error(
-        `Tennessee county boundaries returned ${response.status}`
+        `County boundaries for state ${normalizedStateFips} returned ${response.status}`
       );
     }
 
     const geojson = await response.json();
 
     void loadTennesseeLaborAvailabilityOverlay(
-      geojson
+      geojson,
+      normalizedStateFips
     );
 
     void loadTennesseeWorkforceMixOverlay(
-      geojson
+      geojson,
+      normalizedStateFips
     );
 
     void loadTennesseeHousingPressureOverlay(
-      geojson
+      geojson,
+      normalizedStateFips
     );
 
-    void loadTennesseeSTEXCoverageOverlay(
-      geojson
-    );
+    if (normalizedStateFips === "47") {
+      void loadTennesseeSTEXCoverageOverlay(
+        geojson
+      );
+    }
 
     tennesseeCountiesDataSource =
       new Cesium.CustomDataSource(
-        "Tennessee County Boundaries"
+        `County Boundaries ${normalizedStateFips}`
       );
 
     await viewer.dataSources.add(
@@ -6158,8 +6224,11 @@ async function loadTennesseeCountyBoundaries() {
       }
     }
 
+    activeCountyOverlayStateFips =
+      normalizedStateFips;
+
     console.log(
-      "Tennessee county boundaries rendered:",
+      `County boundaries rendered for state ${normalizedStateFips}:`,
       geojson.features?.length || 0
     );
 
@@ -6167,7 +6236,7 @@ async function loadTennesseeCountyBoundaries() {
 
   } catch (error) {
     console.error(
-      "Tennessee county boundary load failed",
+      `County boundary load failed for state ${normalizedStateFips}`,
       error
     );
 
@@ -7071,10 +7140,17 @@ async function loadRegionalData(
         requestId
       );
 
-      void loadSelectedStateBoundary(
+      const selectedStateFips =
         data.state_fips ||
-        options.stateFips,
+        options.stateFips;
+
+      void loadSelectedStateBoundary(
+        selectedStateFips,
         requestId
+      );
+
+      void loadTennesseeCountyBoundaries(
+        selectedStateFips
       );
 
     } else {
@@ -7090,6 +7166,12 @@ async function loadRegionalData(
         data.county_fips,
         requestId
       );
+
+      if (data.state_fips) {
+        void loadTennesseeCountyBoundaries(
+          data.state_fips
+        );
+      }
     }
 
     document.getElementById(

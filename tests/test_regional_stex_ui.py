@@ -302,7 +302,7 @@ def test_main_globe_contains_labor_availability_overlay():
     html = (ROOT / "web/index.html").read_text()
 
     assert "loadTennesseeLaborAvailabilityOverlay" in html
-    assert "/api/region/labor-availability?state=47" in html
+    assert "/api/region/labor-availability?state=${encodeURIComponent(stateFips)}" in html
     assert "laborAvailabilityByGeoid" in html
     assert "laborAvailabilityColor" in html
     assert "labor-availability-legend" in html
@@ -473,7 +473,7 @@ def test_main_globe_contains_workforce_mix_overlay():
     html = (ROOT / "web/index.html").read_text()
 
     assert "loadTennesseeWorkforceMixOverlay" in html
-    assert "/api/region/workforce-mix?state=47" in html
+    assert "/api/region/workforce-mix?state=${encodeURIComponent(stateFips)}" in html
     assert "tennesseeWorkforceMixDataSource" in html
     assert "workforceMixByGeoid" in html
     assert "workforceMixColor" in html
@@ -640,7 +640,7 @@ def test_main_globe_contains_housing_pressure_overlay():
     html = (ROOT / "web/index.html").read_text()
 
     assert "loadTennesseeHousingPressureOverlay" in html
-    assert "/api/region/housing-pressure?state=47" in html
+    assert "/api/region/housing-pressure?state=${encodeURIComponent(stateFips)}" in html
     assert "tennesseeHousingPressureDataSource" in html
     assert "housingPressureByGeoid" in html
     assert "housingPressureColor" in html
