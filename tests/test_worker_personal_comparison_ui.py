@@ -54,12 +54,18 @@ def test_current_occupation_and_target_both_displayed_distinctly():
     assert "Investigated occupation:" in snippet
 
 
-def test_related_occupation_drilldown_triggers_personal_comparison_and_clears_stale_state():
+def test_personal_comparison_requires_explicit_action_and_clears_stale_state():
     html = _html()
     drilldown_start = html.index("async function loadRelatedOccupationDrilldown")
     drilldown_end = html.index("function renderTransitionComparison", drilldown_start)
     drilldown = html[drilldown_start:drilldown_end]
-    assert "void loadPersonalComparison(occupationCode, occupationTitle);" in drilldown
+    assert "void loadPersonalComparison(occupationCode, occupationTitle);" not in drilldown
+
+    action_start = html.index('.getElementById("open-personal-comparison-btn")')
+    action_end = html.index('.getElementById("open-investigation-summary-btn")', action_start)
+    action = html[action_start:action_end]
+    assert "section.open = true" in action
+    assert "void loadPersonalComparison(currentDrilldownCode, currentDrilldownTitle);" in action
 
     clear_start = html.index("function clearOccupationDrilldown")
     clear_end = html.index("function clearTransitionEvidence", clear_start)
@@ -82,6 +88,11 @@ def test_action_plan_links_to_personal_comparison_section():
     snippet = html[start:end]
     assert '#personal-comparison-section' in snippet
     assert "isPersonalCompare" in snippet
+    listener_start = html.index('.getElementById("occupation-drilldown-card")')
+    listener_end = html.index('.getElementById("active-investigation-save-btn")', listener_start)
+    listener = html[listener_start:listener_end]
+    assert "section.open = true" in listener
+    assert "loadPersonalComparison(currentDrilldownCode, currentDrilldownTitle)" in listener
 
 
 def test_no_forbidden_scoring_language_in_personal_comparison_ui_code():

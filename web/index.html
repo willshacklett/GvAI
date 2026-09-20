@@ -537,6 +537,54 @@
       overflow-wrap: anywhere;
     }
 
+    .active-investigation-bar {
+      position: sticky;
+      top: -18px;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      margin: -18px -18px 16px;
+      padding: 11px 18px;
+      border-bottom: 1px solid rgba(101, 211, 255, 0.25);
+      background: rgba(6, 18, 30, 0.96);
+    }
+
+    .active-investigation-bar[hidden] {
+      display: none;
+    }
+
+    .active-investigation-title {
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .active-investigation-region {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .active-investigation-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+
+    .active-investigation-actions .worker-outlook-button {
+      width: auto;
+      min-height: 40px;
+      margin: 0;
+      padding: 7px 10px;
+      font-size: 10px;
+    }
+
     .laborers-journey-map {
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1661,11 +1709,12 @@
 
     @media (max-width: 900px) {
       .laborers-workspace {
-        top: 126px;
+        top: 112px;
         left: 14px;
         right: 14px;
-        bottom: calc(70vh + 32px);
+        bottom: 14px;
         min-height: 260px;
+        max-height: calc(100dvh - 126px);
       }
 
       .laborers-workspace-header {
@@ -1676,6 +1725,24 @@
       .laborers-journey-map,
       .laborers-stage-nav {
         grid-template-columns: 1fr;
+      }
+
+      .active-investigation-bar {
+        top: -14px;
+        grid-template-columns: 1fr;
+        margin: -14px -14px 14px;
+        padding: 12px 14px;
+      }
+
+      .active-investigation-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .active-investigation-actions .worker-outlook-button {
+        width: 100%;
+        min-width: 0;
+        white-space: normal;
       }
 
       .live-jobs-filters {
@@ -2028,6 +2095,18 @@
     </div>
 
     <div class="laborers-workspace-shell">
+      <aside id="active-investigation-bar" class="active-investigation-bar" aria-label="Active investigation" hidden>
+        <div>
+          <div id="active-investigation-title" class="active-investigation-title"></div>
+          <div id="active-investigation-region" class="active-investigation-region"></div>
+        </div>
+        <div class="active-investigation-actions">
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="explore-occupations">Return to exploration</button>
+          <button id="active-investigation-save-btn" type="button" class="worker-outlook-button">Save occupation</button>
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="investigation-summary">View summary</button>
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="live-jobs" data-worker-stage-load="live-jobs">Find live jobs</button>
+        </div>
+      </aside>
       <nav class="laborers-stage-nav" aria-label="Laborers workspace stages">
         <button type="button" class="laborers-stage-link active" data-worker-stage-target="my-work">My Work</button>
         <button type="button" class="laborers-stage-link" data-worker-stage-target="local-outlook">My Local Outlook</button>
@@ -2232,9 +2311,10 @@
             </div>
           </details>
 
-          <button id="occupation-drilldown-close" type="button" class="worker-outlook-button occupation-drilldown-close">Close investigation</button>
-          <button id="open-live-jobs-btn" type="button" class="worker-outlook-button occupation-drilldown-close" data-worker-stage-action="live-jobs" data-worker-stage-load="live-jobs">View live jobs</button>
-          <button id="open-next-investigation-btn" type="button" class="worker-outlook-button occupation-drilldown-close">Open factual next steps</button>
+          <button id="occupation-drilldown-close" type="button" class="worker-outlook-button occupation-drilldown-close">Return to exploration</button>
+          <button id="open-personal-comparison-btn" type="button" class="worker-outlook-button occupation-drilldown-close">Compare my situation</button>
+          <button id="open-next-investigation-btn" type="button" class="worker-outlook-button occupation-drilldown-close">See what to investigate next</button>
+          <button id="open-live-jobs-btn" type="button" class="worker-outlook-button occupation-drilldown-close" data-worker-stage-action="live-jobs" data-worker-stage-load="live-jobs">Find live jobs</button>
           <button id="open-investigation-summary-btn" type="button" class="worker-outlook-button occupation-drilldown-close">Open Investigation Summary</button>
         </div>
       </section>
@@ -2291,6 +2371,7 @@
         </div>
         <div id="investigation-summary-content" class="investigation-summary" aria-live="polite"></div>
         <div class="worker-stage-actions" aria-label="Investigation summary next actions">
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="live-jobs" data-worker-stage-load="live-jobs">Find live jobs</button>
           <button type="button" class="worker-outlook-button" data-worker-stage-action="saved-occupations">Review saved occupations</button>
           <button type="button" class="worker-outlook-button" data-worker-stage-action="next-investigation">Review factual next steps</button>
         </div>
@@ -2311,6 +2392,7 @@
           <div id="transition-action-plan-content"></div>
         </div>
         <div class="worker-stage-actions" aria-label="Next investigation actions">
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="live-jobs" data-worker-stage-load="live-jobs">Find live jobs</button>
           <button type="button" class="worker-outlook-button" data-worker-stage-action="investigation-summary">Open clean summary</button>
           <button type="button" class="worker-outlook-button" data-worker-stage-action="saved-occupations">Review saved occupations</button>
         </div>
@@ -2801,9 +2883,11 @@ const GEOGRAPHY_VISIBILITY = {
 let activeRegionRequestId = 0;
 let currentRegionLatitude = null;
 let currentRegionLongitude = null;
+let currentRegionLabel = null;
 let currentOccupationCode = null;
 let currentOccupationTitle = null;
 let currentDrilldownCode = null;
+let currentDrilldownTitle = null;
 let activeWorkerOutlookRequestId = 0;
 let activeRelatedOccupationsRequestId = 0;
 let activeDrilldownRequestId = 0;
@@ -2824,6 +2908,11 @@ let transitionEvidenceSkillItems = [];
 let transitionEvidenceKnowledgeItems = [];
 let transitionEvidenceAbilityItems = [];
 let activeWorkerWorkspaceStage = "my-work";
+let activeInvestigationContext = null;
+let activeInvestigationRestored = false;
+
+const ACTIVE_INVESTIGATION_STORAGE_KEY = "gvai.activeInvestigation.v1";
+const ACTIVE_INVESTIGATION_VERSION = "v1";
 
 const WORKER_WORKSPACE_STAGE_LABELS = {
   "my-work": "My Work",
@@ -2844,15 +2933,110 @@ const investigationSummaryState = {
   actionPlan: null
 };
 
+function validInvestigationOccupation(value) {
+  return value && typeof value === "object" &&
+    /^\d{2}-\d{4}(?:\.\d{2})?$/.test(value.occupation_code) &&
+    typeof value.occupation_title === "string" &&
+    value.occupation_title.trim().length > 0 && value.occupation_title.length <= 160;
+}
+
+function validInvestigationRegion(region) {
+  if (region === null) return true;
+  return region && typeof region === "object" &&
+    typeof region.country_code === "string" && /^[A-Z]{2}$/.test(region.country_code) &&
+    Number.isFinite(region.latitude) && region.latitude >= -90 && region.latitude <= 90 &&
+    Number.isFinite(region.longitude) && region.longitude >= -180 && region.longitude <= 180 &&
+    typeof region.label === "string" && region.label.length <= 160;
+}
+
+function isActiveInvestigationV1(context) {
+  return context && typeof context === "object" &&
+    context.schema_version === ACTIVE_INVESTIGATION_VERSION &&
+    validInvestigationOccupation(context.investigated_occupation) &&
+    (context.originating_occupation === null || validInvestigationOccupation(context.originating_occupation)) &&
+    validInvestigationRegion(context.region) &&
+    Object.hasOwn(WORKER_WORKSPACE_STAGE_LABELS, context.navigation_stage);
+}
+
+function loadActiveInvestigationContext() {
+  try {
+    const context = JSON.parse(localStorage.getItem(ACTIVE_INVESTIGATION_STORAGE_KEY));
+    if (isActiveInvestigationV1(context)) return context;
+    localStorage.removeItem(ACTIVE_INVESTIGATION_STORAGE_KEY);
+  } catch (error) {
+    try { localStorage.removeItem(ACTIVE_INVESTIGATION_STORAGE_KEY); } catch (storageError) {}
+  }
+  return null;
+}
+
+function persistActiveInvestigationContext() {
+  if (!activeInvestigationContext) return;
+  try {
+    localStorage.setItem(ACTIVE_INVESTIGATION_STORAGE_KEY, JSON.stringify(activeInvestigationContext));
+  } catch (error) {
+    // The journey remains usable when browser storage is unavailable.
+  }
+}
+
+function publicRegionContext() {
+  if (currentRegionLatitude === null || currentRegionLongitude === null) return null;
+  return {
+    country_code: String(window.GVAI_WORKER_COUNTRY_CODE || "US").toUpperCase(),
+    latitude: currentRegionLatitude,
+    longitude: currentRegionLongitude,
+    label: currentRegionLabel || `${currentRegionLatitude}, ${currentRegionLongitude}`
+  };
+}
+
+function setActiveInvestigation(occupationCode, occupationTitle) {
+  activeInvestigationContext = {
+    schema_version: ACTIVE_INVESTIGATION_VERSION,
+    investigated_occupation: {
+      occupation_code: occupationCode,
+      occupation_title: occupationTitle || occupationCode
+    },
+    originating_occupation: currentOccupationCode ? {
+      occupation_code: currentOccupationCode,
+      occupation_title: currentOccupationTitle || currentOccupationCode
+    } : null,
+    region: publicRegionContext(),
+    navigation_stage: "investigate"
+  };
+  currentDrilldownCode = occupationCode;
+  currentDrilldownTitle = occupationTitle || occupationCode;
+  persistActiveInvestigationContext();
+}
+
+function syncActiveInvestigationRegion() {
+  if (!activeInvestigationContext) return;
+  activeInvestigationContext.region = publicRegionContext();
+  persistActiveInvestigationContext();
+  renderWorkerWorkspaceContext();
+}
+
+function renderActiveInvestigationContext() {
+  const bar = document.getElementById("active-investigation-bar");
+  if (!bar) return;
+  bar.hidden = !activeInvestigationContext;
+  if (!activeInvestigationContext) return;
+  const occupation = activeInvestigationContext.investigated_occupation;
+  const region = activeInvestigationContext.region;
+  document.getElementById("active-investigation-title").textContent = `Investigating: ${occupation.occupation_title}`;
+  document.getElementById("active-investigation-region").textContent = region?.label ? `Region: ${region.label}` : "Region: Select a public region";
+  const saveButton = document.getElementById("active-investigation-save-btn");
+  saveButton.textContent = isOccupationSaved(occupation.occupation_code) ? "Remove saved occupation" : "Save occupation";
+}
+
 function renderWorkerWorkspaceContext() {
   const current = document.getElementById("workspace-current-occupation-context");
   const investigated = document.getElementById("workspace-investigated-occupation-context");
   const stage = document.getElementById("workspace-stage-context");
   const currentTitle = storedWorkerProfile()?.current_occupation?.occupation_title || currentOccupationTitle || "Choose your current occupation";
-  const investigatedTitle = document.getElementById("investigated-occupation-context")?.textContent?.trim();
+  const investigatedTitle = activeInvestigationContext?.investigated_occupation?.occupation_title;
   if (current) current.textContent = currentTitle;
   if (investigated) investigated.textContent = investigatedTitle || "Choose an occupation to investigate";
   if (stage) stage.textContent = WORKER_WORKSPACE_STAGE_LABELS[activeWorkerWorkspaceStage] || "My Work";
+  renderActiveInvestigationContext();
   renderWorkerJourneyMap();
 }
 
@@ -2870,6 +3054,10 @@ function renderWorkerJourneyMap() {
 
 function setWorkerWorkspaceStage(stage, scroll = false) {
   activeWorkerWorkspaceStage = stage;
+  if (activeInvestigationContext) {
+    activeInvestigationContext.navigation_stage = stage;
+    persistActiveInvestigationContext();
+  }
   document.querySelectorAll(".laborers-stage-link").forEach(button => {
     button.classList.toggle("active", button.dataset.workerStageTarget === stage);
   });
@@ -2892,6 +3080,11 @@ function handleWorkerStageAction(button) {
   }
   if (load === "live-jobs") {
     void loadLiveJobs();
+    return;
+  }
+  if (stage === "investigate" && activeInvestigationContext) {
+    const occupation = activeInvestigationContext.investigated_occupation;
+    void loadRelatedOccupationDrilldown(occupation.occupation_code, occupation.occupation_title);
     return;
   }
   setWorkerWorkspaceStage(stage, true);
@@ -5690,6 +5883,7 @@ async function loadRegionalData(
   clearWorkerOutlook();
   currentRegionLatitude = null;
   currentRegionLongitude = null;
+  currentRegionLabel = null;
   renderWorkerOutlookAvailability();
 
   if (scope === "country") {
@@ -5773,6 +5967,7 @@ async function loadRegionalData(
       data.country ||
       data.name ||
       "Selected region";
+    currentRegionLabel = title.textContent;
 
     const geographyLabel =
       data.county
@@ -5791,10 +5986,13 @@ async function loadRegionalData(
     if (scope !== "country" && scope !== "state") {
       currentRegionLatitude = latitude;
       currentRegionLongitude = longitude;
+      syncActiveInvestigationRegion();
       void loadRegionalLaborIntelligence(latitude, longitude, requestId);
     } else {
       currentRegionLatitude = null;
       currentRegionLongitude = null;
+      currentRegionLabel = null;
+      syncActiveInvestigationRegion();
     }
 
     renderWorkerOutlookAvailability();
@@ -6671,6 +6869,7 @@ function saveOccupation(occupationCode, occupationTitle) {
   persistSavedOccupations(next);
   renderSavedOccupations();
   renderSaveOccupationButton(occupationCode, occupationTitle);
+  renderActiveInvestigationContext();
 }
 
 function removeSavedOccupation(occupationCode) {
@@ -6680,6 +6879,7 @@ function removeSavedOccupation(occupationCode) {
   if (currentDrilldownCode === occupationCode) {
     renderSaveOccupationButton(currentDrilldownCode, document.getElementById("investigated-occupation-context")?.textContent?.trim());
   }
+  renderActiveInvestigationContext();
 }
 
 function clearSavedOccupations() {
@@ -6688,6 +6888,7 @@ function clearSavedOccupations() {
   if (currentDrilldownCode) {
     renderSaveOccupationButton(currentDrilldownCode, document.getElementById("investigated-occupation-context")?.textContent?.trim());
   }
+  renderActiveInvestigationContext();
 }
 
 function renderSaveOccupationButton(occupationCode, occupationTitle) {
@@ -6870,7 +7071,14 @@ document.getElementById("start-worker-profile-btn").addEventListener("click", ()
 document.getElementById("open-laborers-workspace-btn").addEventListener("click", () => openLaborersWorkspace(activeWorkerWorkspaceStage));
 document.getElementById("close-laborers-workspace-btn").addEventListener("click", closeLaborersWorkspace);
 document.querySelectorAll(".laborers-stage-link").forEach(button => {
-  button.addEventListener("click", () => setWorkerWorkspaceStage(button.dataset.workerStageTarget, true));
+  button.addEventListener("click", () => {
+    if (button.dataset.workerStageTarget === "investigate" && activeInvestigationContext) {
+      const occupation = activeInvestigationContext.investigated_occupation;
+      void loadRelatedOccupationDrilldown(occupation.occupation_code, occupation.occupation_title);
+      return;
+    }
+    setWorkerWorkspaceStage(button.dataset.workerStageTarget, true);
+  });
 });
 document.querySelectorAll("[data-worker-stage-action]").forEach(button => {
   button.addEventListener("click", () => handleWorkerStageAction(button));
@@ -7167,6 +7375,8 @@ async function loadOccupationSTEXCatalog() {
       "stex-status"
     ).textContent =
       "Occupation catalog temporarily unavailable.";
+  } finally {
+    restoreActiveInvestigation();
   }
 }
 
@@ -7220,10 +7430,10 @@ function clearRelatedOccupations() {
   if (content) content.innerHTML = "";
   relatedOccupationsExpanded = false;
   relatedOccupationItems = [];
-  clearOccupationDrilldown();
+  clearOccupationDrilldown(false);
 }
 
-function clearOccupationDrilldown() {
+function clearOccupationDrilldown(discardContext = true) {
   activeDrilldownRequestId += 1;
   const card = document.getElementById("occupation-drilldown-card");
   const status = document.getElementById("occupation-drilldown-status");
@@ -7231,11 +7441,16 @@ function clearOccupationDrilldown() {
   if (card) card.classList.remove("visible");
   if (status) status.textContent = "";
   if (content) content.innerHTML = "";
-  currentDrilldownCode = null;
+  if (discardContext) {
+    currentDrilldownCode = null;
+    currentDrilldownTitle = null;
+    activeInvestigationContext = null;
+    try { localStorage.removeItem(ACTIVE_INVESTIGATION_STORAGE_KEY); } catch (error) {}
+  }
   const investigatedContext = document.getElementById("investigated-occupation-context");
-  if (investigatedContext) investigatedContext.textContent = "";
+  if (investigatedContext) investigatedContext.textContent = discardContext ? "" : currentDrilldownTitle || "";
   renderWorkerWorkspaceContext();
-  renderSaveOccupationButton(null);
+  renderSaveOccupationButton(discardContext ? null : currentDrilldownCode, currentDrilldownTitle);
   clearTransitionEvidence();
   clearPersonalComparison();
   investigationSummaryState.drilldown = null;
@@ -7814,7 +8029,7 @@ async function loadLiveJobs() {
   const content = document.getElementById("live-jobs-content");
   if (!status || !content) return;
 
-  const occupationCode = currentDrilldownCode || currentOccupationCode;
+  const occupationCode = activeInvestigationContext?.investigated_occupation?.occupation_code || currentDrilldownCode || currentOccupationCode;
   if (!occupationCode) {
     status.textContent = "Select an occupation to investigate.";
     content.innerHTML = "";
@@ -7822,7 +8037,7 @@ async function loadLiveJobs() {
   }
 
   const requestId = ++activeLiveJobsRequestId;
-  const occupationTitle = document.getElementById("investigated-occupation-context")?.textContent?.trim() || currentOccupationTitle || "";
+  const occupationTitle = activeInvestigationContext?.investigated_occupation?.occupation_title || currentDrilldownTitle || currentOccupationTitle || "";
   const countryCode = window.GVAI_WORKER_COUNTRY_CODE || "US";
   const params = new URLSearchParams({
     occupation: occupationCode,
@@ -7848,6 +8063,9 @@ async function loadLiveJobs() {
   setWorkerJourneyStep(5);
   status.textContent = "Loading live jobs...";
   content.innerHTML = "";
+  const activeRegion = activeInvestigationContext?.region;
+  document.getElementById("live-jobs-context").textContent =
+    `Occupation: ${occupationTitle || occupationCode} · Region: ${activeRegion?.label || countryCode}`;
 
   const capability = await fetchLiveJobsCapability(countryCode);
   if (requestId !== activeLiveJobsRequestId) return;
@@ -7906,24 +8124,17 @@ async function loadLiveJobs() {
 }
 
 async function loadRelatedOccupationDrilldown(occupationCode, occupationTitle) {
-  if (
-    currentRegionLatitude === null ||
-    currentRegionLongitude === null ||
-    !occupationCode
-  ) {
-    return;
-  }
+  if (!occupationCode) return;
 
-  currentDrilldownCode = occupationCode;
+  setActiveInvestigation(occupationCode, occupationTitle);
+  clearTransitionEvidence();
+  clearPersonalComparison();
   renderSaveOccupationButton(occupationCode, occupationTitle);
   void loadTransitionEvidence(occupationCode, occupationTitle);
   void loadTransitionPreparation(occupationCode, occupationTitle);
   void loadTransitionActionPlan(occupationCode, occupationTitle);
-  void loadPersonalComparison(occupationCode, occupationTitle);
 
   const requestId = ++activeDrilldownRequestId;
-  const latitude = currentRegionLatitude;
-  const longitude = currentRegionLongitude;
 
   const card = document.getElementById("occupation-drilldown-card");
   const status = document.getElementById("occupation-drilldown-status");
@@ -7936,6 +8147,13 @@ async function loadRelatedOccupationDrilldown(occupationCode, occupationTitle) {
   card.scrollIntoView({ behavior: "smooth", block: "nearest" });
   status.textContent = `Loading evidence for ${occupationTitle || occupationCode}...`;
   content.innerHTML = "";
+
+  if (currentRegionLatitude === null || currentRegionLongitude === null) {
+    status.textContent = "Select a public region to load local market evidence for this occupation.";
+    return;
+  }
+  const latitude = currentRegionLatitude;
+  const longitude = currentRegionLongitude;
 
   try {
     const endpoint =
@@ -8017,6 +8235,9 @@ async function loadRelatedOccupationDrilldown(occupationCode, occupationTitle) {
 
     const investigatedContext = document.getElementById("investigated-occupation-context");
     if (investigatedContext) investigatedContext.textContent = data.occupation_title || data.occupation_code;
+    currentDrilldownTitle = data.occupation_title || data.occupation_code;
+    activeInvestigationContext.investigated_occupation.occupation_title = currentDrilldownTitle;
+    persistActiveInvestigationContext();
     investigationSummaryState.drilldown = data;
     renderWorkerWorkspaceContext();
     renderSaveOccupationButton(data.occupation_code || occupationCode, data.occupation_title || occupationTitle);
@@ -8635,7 +8856,18 @@ document
 document
   .getElementById("occupation-drilldown-close")
   .addEventListener("click", () => {
-    clearOccupationDrilldown();
+    setWorkerWorkspaceStage("explore-occupations", true);
+  });
+
+document
+  .getElementById("open-personal-comparison-btn")
+  .addEventListener("click", () => {
+    if (!currentDrilldownCode) return;
+    setWorkerWorkspaceStage("investigate", true);
+    const section = document.getElementById("personal-comparison-section");
+    section.open = true;
+    void loadPersonalComparison(currentDrilldownCode, currentDrilldownTitle);
+    section.scrollIntoView({ behavior: "smooth", block: "nearest" });
   });
 
 document
@@ -8672,7 +8904,23 @@ document
   .addEventListener("click", event => {
     const link = event.target.closest(".personal-comparison-link");
     if (!link) return;
-    document.getElementById("personal-comparison-section").open = true;
+    const section = document.getElementById("personal-comparison-section");
+    section.open = true;
+    if (currentDrilldownCode) {
+      void loadPersonalComparison(currentDrilldownCode, currentDrilldownTitle);
+    }
+  });
+
+document
+  .getElementById("active-investigation-save-btn")
+  .addEventListener("click", () => {
+    const occupation = activeInvestigationContext?.investigated_occupation;
+    if (!occupation) return;
+    if (isOccupationSaved(occupation.occupation_code)) {
+      removeSavedOccupation(occupation.occupation_code);
+    } else {
+      saveOccupation(occupation.occupation_code, occupation.occupation_title);
+    }
   });
 
 document
@@ -8719,6 +8967,33 @@ renderSavedOccupations();
 renderWorkerOutlookAvailability();
 
 renderInvestigationSummary();
+
+function restoreActiveInvestigation() {
+  if (activeInvestigationRestored) return;
+  activeInvestigationRestored = true;
+  const restored = loadActiveInvestigationContext();
+  if (!restored) return;
+  activeInvestigationContext = restored;
+  currentDrilldownCode = restored.investigated_occupation.occupation_code;
+  currentDrilldownTitle = restored.investigated_occupation.occupation_title;
+  if (restored.region) {
+    currentRegionLatitude = restored.region.latitude;
+    currentRegionLongitude = restored.region.longitude;
+    currentRegionLabel = restored.region.label;
+  }
+  const investigatedContext = document.getElementById("investigated-occupation-context");
+  if (investigatedContext) investigatedContext.textContent = currentDrilldownTitle;
+  renderWorkerOutlookAvailability();
+  renderWorkerWorkspaceContext();
+  renderSaveOccupationButton(currentDrilldownCode, currentDrilldownTitle);
+  const restoredStage = restored.navigation_stage;
+  void loadRelatedOccupationDrilldown(currentDrilldownCode, currentDrilldownTitle);
+  if (restoredStage === "live-jobs") {
+    void loadLiveJobs();
+  } else if (restoredStage !== "investigate") {
+    setWorkerWorkspaceStage(restoredStage, false);
+  }
+}
 
 
 

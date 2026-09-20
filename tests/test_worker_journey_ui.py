@@ -116,7 +116,7 @@ def test_background_next_steps_load_does_not_steal_investigation_stage():
     assert 'setWorkerWorkspaceStage("next-investigation")' not in action_plan
     assert 'id="open-next-investigation-btn"' in html
     next_button = html[html.index('id="open-next-investigation-btn"'):html.index('id="open-investigation-summary-btn"')]
-    assert "Open factual next steps" in next_button
+    assert "See what to investigate next" in next_button
 
 
 def test_investigation_summary_reuses_existing_investigation_evidence():
