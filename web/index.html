@@ -2427,6 +2427,13 @@
       <button id="open-business-workspace-btn" type="button" class="primary">Open Business workspace</button>
     </section>
 
+    <section class="business-entry government-entry" aria-labelledby="government-entry-title">
+      <div class="business-entry-kicker">For government teams</div>
+      <h2 id="government-entry-title">Government Regional Intelligence</h2>
+      <p>Review published regional labor, workforce, housing, and structural-exposure evidence without turning those signals into a policy score or recommendation.</p>
+      <button id="open-government-workspace-btn" type="button" class="primary">Open Government workspace</button>
+    </section>
+
     <div class="section-title">Regional exploration</div>
 
     <div id="regional-stex-card" class="regional-stex-card" aria-live="polite">
@@ -2924,6 +2931,119 @@
           </div>
         </div>
         <div id="business-safety-status" class="worker-outlook-summary">GVAI Safety Systems status is shown only when returned by the workforce evidence response. If no external decider is configured, GVAI reports unavailable rather than active governance.</div>
+      </section>
+    </div>
+  </main>
+
+  <main id="government-workspace" class="business-workspace government-workspace" aria-labelledby="government-workspace-title" hidden>
+    <div class="laborers-workspace-header">
+      <div>
+        <div class="laborers-workspace-kicker">Government Workspace</div>
+        <div id="government-workspace-title" class="laborers-workspace-title">Regional evidence</div>
+        <div class="laborers-workspace-copy">Review public regional evidence as separate signals. GVAI does not combine these signals into a government score, policy ranking, or policy recommendation.</div>
+
+        <div class="business-workflow" aria-label="Government regional intelligence workflow">
+          <div class="business-workflow-step">
+            <strong>1. Choose region</strong>
+            <span id="government-region-context">Use the current globe region</span>
+          </div>
+          <div class="business-workflow-step">
+            <strong>2. Review regional conditions</strong>
+            <span>Labor availability, workforce mix, and housing pressure</span>
+          </div>
+          <div class="business-workflow-step">
+            <strong>3. Inspect structural exposure</strong>
+            <span>Review occupation-level STEX as structural evidence</span>
+          </div>
+          <div class="business-workflow-step">
+            <strong>4. Review evidence boundaries</strong>
+            <span>Keep missing, broader, and unsupported evidence explicit</span>
+          </div>
+        </div>
+      </div>
+
+      <button id="close-government-workspace-btn" type="button" class="laborers-workspace-close">Back to globe</button>
+    </div>
+
+    <div class="business-workspace-shell">
+      <section class="laborers-stage" aria-labelledby="government-region-title">
+        <div class="laborers-stage-head">
+          <div>
+            <div id="government-region-title" class="laborers-stage-title">Regional conditions</div>
+            <div class="laborers-stage-note">Start with the selected public region and inspect each published signal independently.</div>
+          </div>
+        </div>
+
+        <div class="business-evidence-grid" aria-label="Government regional evidence questions">
+          <div class="business-question-card">
+            <strong>What does labor availability show?</strong>
+            <span>Published regional labor evidence describing the available workforce signal for the selected geography.</span>
+          </div>
+
+          <div class="business-question-card">
+            <strong>What does workforce mix show?</strong>
+            <span>Published evidence describing the composition of the regional workforce where supported.</span>
+          </div>
+
+          <div class="business-question-card">
+            <strong>What does housing pressure show?</strong>
+            <span>Housing pressure is displayed as its own regional condition rather than being folded into a policy verdict.</span>
+          </div>
+
+          <div class="business-question-card">
+            <strong>What does regional STEX show?</strong>
+            <span>STEX describes structural task exposure across published occupation evidence. It is not a forecast of unemployment or job loss.</span>
+          </div>
+
+          <div class="business-question-card full-width">
+            <strong>What evidence is missing or less specific?</strong>
+            <span>Unsupported, unavailable, or broader-category evidence remains explicit rather than being replaced with zero or inferred values.</span>
+          </div>
+        </div>
+
+        <div class="worker-context">
+          <strong>Selected public region</strong>
+          <span id="government-region-display">Select a public region on the globe</span>
+        </div>
+
+        <details class="business-disclosure">
+          <summary>Sources and evidence boundaries</summary>
+          <p>Government Regional Intelligence uses the published regional evidence already exposed by GVAI. Labor availability, workforce mix, housing pressure, occupation evidence, and STEX remain separate signals. GVAI does not convert them into a government score, rank jurisdictions, or issue a policy recommendation. Missing evidence remains unavailable.</p>
+        </details>
+      </section>
+
+      <section class="laborers-stage" aria-labelledby="government-stex-title">
+        <div class="laborers-stage-head">
+          <div>
+            <div id="government-stex-title" class="laborers-stage-title">Structural exposure context</div>
+            <div class="laborers-stage-note">Use occupation and regional STEX evidence as an inspection surface, not as a prediction.</div>
+          </div>
+        </div>
+
+        <div class="business-evidence-grid">
+          <div class="business-question-card">
+            <strong>STEX meaning</strong>
+            <span>STEX measures structural task exposure under the GVAI methodology. It is not percent automatable and is not a probability that an occupation disappears.</span>
+          </div>
+
+          <div class="business-question-card">
+            <strong>Government use</strong>
+            <span>The evidence can support investigation of workforce transitions, training needs, and regional exposure without deciding what policy should be adopted.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="laborers-stage" aria-labelledby="government-safety-title">
+        <div class="laborers-stage-head">
+          <div>
+            <div id="government-safety-title" class="laborers-stage-title">GVAI Safety Systems boundary</div>
+            <div class="laborers-stage-note">Safety Systems is a separate implementation. This GvAI repository exposes the product boundary but does not copy or silently activate that governance engine.</div>
+          </div>
+        </div>
+
+        <div id="government-safety-status" class="worker-outlook-summary">
+          Government users may eventually access Safety Systems through the shared GVAI product surface. Until an external Safety Systems service or decider is explicitly configured, this workspace reports the boundary only and does not claim active governance.
+        </div>
       </section>
     </div>
   </main>
@@ -3634,6 +3754,7 @@ function openLaborersWorkspace(stage = "my-work") {
   const workspace = document.getElementById("laborers-workspace");
   if (!workspace) return;
   closeBusinessWorkspace();
+  closeGovernmentWorkspace();
   workspace.hidden = false;
   setWorkerWorkspaceStage(stage, true);
 }
@@ -3694,6 +3815,7 @@ function openBusinessWorkspace() {
   const workspace = document.getElementById("business-workspace");
   if (!workspace) return;
   closeLaborersWorkspace();
+  closeGovernmentWorkspace();
   syncBusinessRegionContext();
   workspace.hidden = false;
   renderBusinessPlan();
@@ -3701,6 +3823,32 @@ function openBusinessWorkspace() {
 
 function closeBusinessWorkspace() {
   const workspace = document.getElementById("business-workspace");
+  if (workspace) workspace.hidden = true;
+}
+
+function governmentRegionLabel() {
+  return currentRegionLabel || selectedProfile?.title || "Select a public region on the globe";
+}
+
+function syncGovernmentRegionContext() {
+  const region = governmentRegionLabel();
+  const display = document.getElementById("government-region-display");
+  const context = document.getElementById("government-region-context");
+  if (display) display.textContent = region;
+  if (context) context.textContent = region;
+}
+
+function openGovernmentWorkspace() {
+  const workspace = document.getElementById("government-workspace");
+  if (!workspace) return;
+  closeLaborersWorkspace();
+  closeBusinessWorkspace();
+  syncGovernmentRegionContext();
+  workspace.hidden = false;
+}
+
+function closeGovernmentWorkspace() {
+  const workspace = document.getElementById("government-workspace");
   if (workspace) workspace.hidden = true;
 }
 
@@ -7907,6 +8055,8 @@ document.getElementById("open-laborers-workspace-btn").addEventListener("click",
 document.getElementById("close-laborers-workspace-btn").addEventListener("click", closeLaborersWorkspace);
 document.getElementById("open-business-workspace-btn").addEventListener("click", openBusinessWorkspace);
 document.getElementById("close-business-workspace-btn").addEventListener("click", closeBusinessWorkspace);
+document.getElementById("open-government-workspace-btn").addEventListener("click", openGovernmentWorkspace);
+document.getElementById("close-government-workspace-btn").addEventListener("click", closeGovernmentWorkspace);
 document.getElementById("business-workforce-form").addEventListener("submit", event => {
   event.preventDefault();
   void loadBusinessWorkforceEvidence();
