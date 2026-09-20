@@ -26,9 +26,10 @@ def test_business_workspace_entry_and_globe_identity_remain():
 def test_business_workflow_is_region_occupation_evidence():
     business = _business_slice()
     for text in (
-        "1. Select region",
-        "2. Select occupation",
-        "3. View evidence",
+        "1. Choose location",
+        "2. Choose occupation",
+        "3. Review workforce evidence",
+        "4. Add to workforce plan",
         "How many workers are employed in this occupation locally?",
         "What does the published wage evidence show?",
         "How specific is the available occupation evidence?",
@@ -87,6 +88,17 @@ def test_business_safety_systems_representation_is_truthful_boundary_only():
     html = _html()
     assert "does not copy" in html
     assert "active governance" in html
+
+
+def test_business_workspace_explains_entry_plan_and_provenance():
+    html = _html()
+    business = _business_slice()
+    assert "For business teams" in html
+    assert "Review published regional workforce evidence" in html
+    assert "Workforce plan <span class=\"business-plan-limit\">(1-10)</span>" in business
+    assert "Sources and evidence boundaries" in business
+    assert "broader OEWS category" in business
+    assert "Add an occupation after reviewing its evidence" in business
 
 
 def test_business_mobile_layout_stacks_controls_and_plan_cards():
