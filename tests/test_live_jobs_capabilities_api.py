@@ -68,3 +68,30 @@ def test_capabilities_endpoint_defaults_country_to_us():
     assert response.status_code == 200
     assert payload["country_code"] == "US"
     assert payload["capability"] == "live_job_openings"
+
+
+def test_capabilities_endpoint_exposes_filters_without_adapter_secrets(monkeypatch):
+    adapter = FakeAdapter(True)
+    adapter.supported_search_filters = frozenset({"location", "remote_only"})
+    adapter.search_filter_options = {
+        "remote_only": ({"value": "true", "label": "Remote only"},),
+    }
+    registry = GlobalProviderRegistry([
+        ProviderRegistration(
+            country_code="US",
+            provider="fixture",
+            capability="live_job_openings",
+            priority=1,
+            attribution="Fixture API",
+            adapter=adapter,
+        )
+    ])
+    monkeypatch.setattr(api_service, "DEFAULT_PROVIDER_REGISTRY", registry)
+
+    payload = api_service.app.test_client().get(
+        "/api/worker/live-jobs/capabilities?country=US"
+    ).get_json()
+    provider = payload["providers"][0]
+    assert provider["supported_search_filters"] == ["location", "remote_only"]
+    assert provider["search_filter_options"]["remote_only"][0]["value"] == "true"
+    assert "should-never-be-exposed" not in str(payload)

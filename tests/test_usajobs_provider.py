@@ -72,6 +72,71 @@ def test_configured_provider_uses_title_as_search_query_and_preserves_provenance
     assert "worker_profile" not in request["params"]
 
 
+def test_supported_filters_are_translated_to_documented_usajobs_parameters():
+    session = FakeSession(FakeResponse({"SearchResult": {"SearchResultItems": []}}))
+    provider = USAJobsProvider(
+        api_key="configured", user_agent="ops@example.org", session=session
+    )
+    provider.list_openings(
+        country_code="US",
+        location="37201",
+        radius=25,
+        remote_only=True,
+        schedule_type_code="1",
+        posted_within_days=7,
+    )
+
+    params = session.calls[0][1]["params"]
+    assert params == {
+        "ResultsPerPage": 25,
+        "LocationName": "37201",
+        "Radius": 25,
+        "RemoteIndicator": "True",
+        "PositionScheduleTypeCode": "1",
+        "DatePosted": 7,
+    }
+
+
+def test_missing_optional_fields_remain_unknown():
+    record = _record()
+    descriptor = record["MatchedObjectDescriptor"]
+    for field in (
+        "OrganizationName",
+        "PositionLocationDisplay",
+        "TeleworkEligible",
+        "PositionSchedule",
+        "PositionRemuneration",
+        "PublicationStartDate",
+    ):
+        descriptor.pop(field)
+    session = FakeSession(FakeResponse({"SearchResult": {"SearchResultItems": [record]}}))
+    provider = USAJobsProvider(
+        api_key="configured", user_agent="ops@example.org", session=session
+    )
+
+    opening = LiveJobsRegistry([provider]).search(PublicJobSearchContext("US")).openings[0]
+    assert opening.employer is None
+    assert opening.location is None
+    assert opening.employment_type is None
+    assert opening.compensation is None
+    assert opening.remote_or_hybrid is None
+    assert opening.posted_at is None
+
+
+def test_published_compensation_telework_and_posting_date_are_preserved():
+    session = FakeSession(FakeResponse({"SearchResult": {"SearchResultItems": [_record()]}}))
+    provider = USAJobsProvider(
+        api_key="configured", user_agent="ops@example.org", session=session
+    )
+    opening = LiveJobsRegistry([provider]).search(PublicJobSearchContext("US")).openings[0]
+
+    assert opening.compensation.minimum_amount == 20.0
+    assert opening.compensation.maximum_amount == 24.0
+    assert opening.compensation.interval == "hour"
+    assert opening.remote_or_hybrid == "Yes"
+    assert opening.posted_at.isoformat() == "2026-09-19T00:00:00+00:00"
+
+
 def test_missing_configuration_is_detected_without_a_network_call():
     session = FakeSession(FakeResponse({}))
     provider = USAJobsProvider(session=session)

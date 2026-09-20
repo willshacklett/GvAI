@@ -101,6 +101,13 @@ def test_laborers_workspace_has_truthful_live_jobs_stage_and_source_navigation()
     assert "Apply at source" in html
     assert "Live job openings are not available from a configured provider for this region yet." in html
     assert "Worker Profile" not in html[html.index("async function loadLiveJobs"):html.index("async function loadRelatedOccupationDrilldown")]
+    assert 'id="live-jobs-filters"' in html
+    assert 'id="live-jobs-clear-filters"' in html
+    assert 'id="live-jobs-context"' in html
+    assert 'data-live-job-filter="remote_only"' in html
+    assert "configureLiveJobsFilters(capability)" in html
+    assert "No additional published details." in html
+    assert "JSON.stringify(opening.compensation)" not in html
 
 
 def test_background_next_steps_load_does_not_steal_investigation_stage():

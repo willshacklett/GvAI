@@ -138,6 +138,14 @@ class PublishedCompensation:
 
 
 @dataclass(frozen=True)
+class ProviderJobReference:
+    provider: str
+    provider_job_id: str
+    source_attribution: str
+    apply_url: str
+
+
+@dataclass(frozen=True)
 class NormalizedJobOpening:
     """A provider-attributed opening; fields absent upstream remain None."""
 
@@ -155,6 +163,7 @@ class NormalizedJobOpening:
     compensation: PublishedCompensation | None = None
     remote_or_hybrid: str | None = None
     posted_at: datetime | None = None
+    provider_references: tuple[ProviderJobReference, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.provider.strip() or not self.provider_job_id.strip():
@@ -164,6 +173,13 @@ class NormalizedJobOpening:
         if not self.source_attribution.strip() or not self.apply_url.strip():
             raise ValueError("source_attribution and apply_url are required.")
         object.__setattr__(self, "country_code", self.country_code.upper())
+        if not self.provider_references:
+            object.__setattr__(self, "provider_references", (ProviderJobReference(
+                provider=self.provider,
+                provider_job_id=self.provider_job_id,
+                source_attribution=self.source_attribution,
+                apply_url=self.apply_url,
+            ),))
 
     def to_dict(self) -> dict[str, object]:
         result = asdict(self)
@@ -179,6 +195,7 @@ class LiveJobsProvider(Protocol):
     """Authorized live-job adapters must not receive a Worker Profile."""
 
     metadata: ProviderMetadata
+    supported_search_filters: frozenset[str]
 
     def list_openings(
         self,
@@ -189,4 +206,7 @@ class LiveJobsProvider(Protocol):
         latitude: float | None = None,
         longitude: float | None = None,
         radius: float | None = None,
+        remote_only: bool | None = None,
+        schedule_type_code: str | None = None,
+        posted_within_days: int | None = None,
     ) -> Sequence[NormalizedJobOpening | Mapping[str, Any]]: ...
