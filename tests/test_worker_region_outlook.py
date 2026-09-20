@@ -1455,8 +1455,9 @@ def test_main_globe_related_occupation_drilldown_contract():
     )
     assert "loadRelatedOccupationDrilldown" in html
     assert 'card.scrollIntoView({ behavior: "smooth", block: "nearest" });' in html
-    # Both the main outlook and the drill-down reuse the same endpoint.
-    assert html.count("/api/worker/region-outlook?lat=") == 2
+    # The main outlook, the drill-down, and Compare Occupations all reuse the
+    # same canonical endpoint instead of inventing a second evidence path.
+    assert html.count("/api/worker/region-outlook?lat=") == 3
     drilldown_start = html.index("async function loadRelatedOccupationDrilldown")
     drilldown_end = html.index("function transitionEmphasisLabel", drilldown_start)
     drilldown = html[drilldown_start:drilldown_end]
