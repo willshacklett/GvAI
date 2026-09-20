@@ -76,12 +76,11 @@ def test_worker_profile_clearing_does_not_touch_saved_occupations():
 
 def test_closing_investigation_does_not_clear_saved_occupations():
     html = _html()
-    snippet = _fn(html, "function clearOccupationDrilldown()", "function clearTransitionEvidence()")
+    snippet = _fn(html, "function clearOccupationDrilldown(", "function clearTransitionEvidence()")
     assert "SAVED_OCCUPATIONS_STORAGE_KEY" not in snippet
     assert "removeSavedOccupation" not in snippet
     assert "clearSavedOccupations" not in snippet
-    # the drilldown clear only hides the save button, it does not delete the bookmark
-    assert "renderSaveOccupationButton(null)" in snippet
+    assert "localStorage.removeItem(ACTIVE_INVESTIGATION_STORAGE_KEY)" in snippet
 
 
 def test_changing_current_occupation_does_not_delete_saved_occupations():

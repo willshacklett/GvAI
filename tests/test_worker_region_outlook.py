@@ -1457,7 +1457,11 @@ def test_main_globe_related_occupation_drilldown_contract():
     assert 'card.scrollIntoView({ behavior: "smooth", block: "nearest" });' in html
     # Both the main outlook and the drill-down reuse the same endpoint.
     assert html.count("/api/worker/region-outlook?lat=") == 2
-    assert "currentRegionLatitude" in html.split("loadRelatedOccupationDrilldown")[1][:400]
+    drilldown_start = html.index("async function loadRelatedOccupationDrilldown")
+    drilldown_end = html.index("function transitionEmphasisLabel", drilldown_start)
+    drilldown = html[drilldown_start:drilldown_end]
+    assert "currentRegionLatitude" in drilldown
+    assert "currentRegionLongitude" in drilldown
 
     # Drill-down language distinguishes investigation from the current
     # occupation, and never implies a recommendation.
