@@ -769,6 +769,203 @@
       padding: 8px 10px;
     }
 
+    .business-entry {
+      margin-top: 14px;
+      padding: 16px;
+      border: 1px solid rgba(94, 227, 139, 0.24);
+      border-radius: 14px;
+      background: linear-gradient(145deg, rgba(16, 45, 42, 0.92), rgba(7, 22, 33, 0.94));
+    }
+
+    .business-entry h2 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.2;
+    }
+
+    .business-entry p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .business-entry button {
+      width: 100%;
+      min-height: 44px;
+      margin-top: 12px;
+    }
+
+    .business-workspace {
+      position: absolute;
+      top: 92px;
+      left: 430px;
+      right: 430px;
+      bottom: 22px;
+      min-width: 0;
+      z-index: 9;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      border: 1px solid rgba(94, 227, 139, 0.22);
+      border-radius: 18px;
+      background: rgba(5, 20, 25, 0.90);
+      box-shadow: 0 22px 60px rgba(0,0,0,0.34);
+      backdrop-filter: blur(18px);
+      overflow: hidden;
+      pointer-events: auto;
+    }
+
+    .business-workspace[hidden] {
+      display: none;
+    }
+
+    .business-workspace-shell {
+      min-height: 0;
+      overflow-y: auto;
+      padding: 18px;
+    }
+
+    .business-workspace .laborers-workspace-kicker {
+      color: var(--good);
+    }
+
+    .business-workflow {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .business-workflow-step,
+    .business-question-card,
+    .business-plan-item {
+      min-width: 0;
+      padding: 11px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.035);
+    }
+
+    .business-workflow-step strong,
+    .business-question-card strong,
+    .business-plan-item strong {
+      display: block;
+      font-size: 12px;
+      line-height: 1.3;
+    }
+
+    .business-workflow-step span,
+    .business-question-card span,
+    .business-plan-item span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.45;
+    }
+
+    .business-control-grid {
+      display: grid;
+      grid-template-columns: minmax(220px, 0.9fr) minmax(260px, 1.1fr) auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .business-control-grid label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .business-control-grid input,
+    .business-control-grid select {
+      width: 100%;
+      min-height: 44px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(4, 14, 24, 0.82);
+      color: var(--text);
+      padding: 9px 10px;
+      font: inherit;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .business-control-grid button,
+    .business-plan-actions button {
+      min-height: 44px;
+    }
+
+    .business-evidence-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .business-question-card.full-width {
+      grid-column: 1 / -1;
+    }
+
+    .business-plan-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .business-plan-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .business-plan-item-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .business-plan-item-head button {
+      min-height: 36px;
+      padding: 7px 10px;
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .business-plan-facts {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .business-plan-fact {
+      min-width: 0;
+      padding: 8px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .business-plan-fact-label {
+      color: var(--muted);
+      font-size: 9px;
+      line-height: 1.35;
+    }
+
+    .business-plan-fact-value {
+      margin-top: 4px;
+      font-size: 12px;
+      font-weight: 760;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
     .worker-context {
       margin: 14px 0 0;
       padding: 10px 12px;
@@ -927,8 +1124,17 @@
         right: 430px;
       }
 
+      .business-workspace {
+        left: 20px;
+        right: 430px;
+      }
+
       .laborers-stage-grid {
         grid-template-columns: 1fr;
+      }
+
+      .business-plan-facts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
@@ -1830,12 +2036,29 @@
         max-height: calc(100dvh - 126px);
       }
 
+      .business-workspace {
+        top: 112px;
+        left: 14px;
+        right: 14px;
+        bottom: 14px;
+        min-height: 260px;
+        max-height: calc(100dvh - 126px);
+      }
+
       .laborers-workspace-header {
         grid-template-columns: 1fr;
       }
 
       .laborers-context-grid,
       .laborers-journey-map,
+      .laborers-stage-nav,
+      .business-workflow,
+      .business-control-grid,
+      .business-evidence-grid,
+      .business-plan-facts {
+        grid-template-columns: 1fr;
+      }
+
       .laborers-stage-nav {
         grid-template-columns: 1fr;
       }
@@ -1867,6 +2090,20 @@
         min-height: 44px;
       }
 
+      .business-plan-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+
+      .business-plan-item-head {
+        display: grid;
+      }
+
+      .business-plan-item-head button {
+        width: 100%;
+        min-height: 44px;
+      }
+
       .compare-occupations-grid {
         grid-template-columns: 1fr;
       }
@@ -1887,6 +2124,10 @@
       }
 
       .laborers-workspace-shell {
+        padding: 14px;
+      }
+
+      .business-workspace-shell {
         padding: 14px;
       }
 
@@ -2130,6 +2371,12 @@
       <button id="start-worker-profile-btn" type="button" class="primary worker-journey-action">Start with my current occupation</button>
       <button id="open-laborers-workspace-btn" type="button" class="worker-journey-secondary">Open Laborers workspace</button>
       <div id="worker-context" class="worker-context" hidden></div>
+    </section>
+
+    <section class="business-entry" aria-labelledby="business-entry-title">
+      <h2 id="business-entry-title">Business Workforce Intelligence</h2>
+      <p>Inspect published regional workforce evidence for occupations your operation needs. GVAI supplies evidence; the business makes the decision.</p>
+      <button id="open-business-workspace-btn" type="button">Open Business workspace</button>
     </section>
 
     <div class="section-title">Regional exploration</div>
@@ -2553,6 +2800,81 @@
     </div>
   </main>
 
+  <main id="business-workspace" class="business-workspace" aria-labelledby="business-workspace-title" hidden>
+    <div class="laborers-workspace-header">
+      <div>
+        <div class="laborers-workspace-kicker">Business Workspace</div>
+        <div id="business-workspace-title" class="laborers-workspace-title">Workforce evidence</div>
+        <div class="laborers-workspace-copy">Select a public region, select an occupation, and review factual workforce evidence. This workspace does not compute a score for businesses, order occupations by preference, or tell an employer whom to hire.</div>
+        <div class="business-workflow" aria-label="Business workforce workflow">
+          <div class="business-workflow-step"><strong>1. Select region</strong><span id="business-region-context">Use the current globe region</span></div>
+          <div class="business-workflow-step"><strong>2. Select occupation</strong><span>Choose one occupation to inspect</span></div>
+          <div class="business-workflow-step"><strong>3. View evidence</strong><span>Employment, wage, STEX, preparation, and specificity</span></div>
+        </div>
+      </div>
+      <button id="close-business-workspace-btn" type="button" class="laborers-workspace-close">Back to globe</button>
+    </div>
+    <div class="business-workspace-shell">
+      <section class="laborers-stage" aria-labelledby="business-selection-title">
+        <div class="laborers-stage-head">
+          <div>
+            <div id="business-selection-title" class="laborers-stage-title">Occupation workforce evidence</div>
+            <div class="laborers-stage-note">Questions first. Missing evidence remains unavailable and is never replaced with zero.</div>
+          </div>
+        </div>
+        <div class="business-evidence-grid" aria-label="Business workforce questions">
+          <div class="business-question-card"><strong>How many workers are employed in this occupation locally?</strong><span>Regional OEWS employment where the packaged evidence supports it.</span></div>
+          <div class="business-question-card"><strong>What does the published wage evidence show?</strong><span>Median hourly and annual wage evidence where available.</span></div>
+          <div class="business-question-card"><strong>How specific is the available occupation evidence?</strong><span>Exact OEWS evidence is distinguished from broader-category evidence.</span></div>
+          <div class="business-question-card"><strong>What preparation does the occupation typically require?</strong><span>O*NET Job Zone and education/training evidence where available.</span></div>
+          <div class="business-question-card full-width"><strong>What does structural exposure indicate?</strong><span>STEX is structural exposure evidence. It is not a probability that an occupation disappears, percent automatable, or a staffing-reduction recommendation.</span></div>
+        </div>
+        <form id="business-workforce-form" class="business-control-grid">
+          <label>Region
+            <input id="business-region-display" type="text" readonly value="Select a public region on the globe" />
+          </label>
+          <label>Occupation
+            <select id="business-occupation-select">
+              <option value="15-1252.00|Software Developers">Software Developers (15-1252.00)</option>
+              <option value="37-2021.00|Pest Control Workers">Pest Control Workers (37-2021.00)</option>
+              <option value="41-2031.00|Retail Salespersons">Retail Salespersons (41-2031.00)</option>
+              <option value="35-1012.00|First-Line Supervisors of Food Preparation and Serving Workers">First-Line Supervisors of Food Preparation and Serving Workers (35-1012.00)</option>
+              <option value="53-3032.00|Heavy and Tractor-Trailer Truck Drivers">Heavy and Tractor-Trailer Truck Drivers (53-3032.00)</option>
+            </select>
+          </label>
+          <button type="submit" class="primary">View evidence</button>
+        </form>
+        <div id="business-workforce-status" class="stex-status">Select a supported U.S. region and occupation.</div>
+        <div id="business-workforce-evidence" class="business-evidence-grid"></div>
+      </section>
+
+      <section class="laborers-stage" aria-labelledby="business-plan-title">
+        <div class="laborers-stage-head">
+          <div>
+            <div id="business-plan-title" class="laborers-stage-title">Workforce plan</div>
+            <div class="laborers-stage-note">Browser-local list for 1-10 employer-selected occupations in this region. Order is preserved. This is a workforce plan, not a ranking. GVAI does not weight these occupations.</div>
+          </div>
+        </div>
+        <div id="business-plan-status" class="stex-status">No occupations added yet.</div>
+        <div class="business-plan-actions">
+          <button id="business-add-plan-btn" type="button" class="worker-outlook-button">Add selected occupation</button>
+          <button id="business-clear-plan-btn" type="button" class="worker-outlook-button">Clear plan</button>
+        </div>
+        <div id="business-plan-list" class="business-plan-list"></div>
+      </section>
+
+      <section class="laborers-stage" aria-labelledby="business-safety-title">
+        <div class="laborers-stage-head">
+          <div>
+            <div id="business-safety-title" class="laborers-stage-title">GVAI Safety Systems boundary</div>
+            <div class="laborers-stage-note">Business and Government concepts belong near governance, but this repository only exposes the existing boundary/status. It does not copy the separate Safety Systems implementation.</div>
+          </div>
+        </div>
+        <div id="business-safety-status" class="worker-outlook-summary">Safety Systems governance status is loaded with workforce evidence. If no external decider is configured, GVAI reports unavailable rather than active governance.</div>
+      </section>
+    </div>
+  </main>
+
   <div class="layer-bar">
     <button class="layer-btn active" data-layer="stability">
       Stability
@@ -2925,6 +3247,8 @@ function renderProfile(profile) {
     badge.style.color =
       "var(--risk)";
   }
+
+  syncBusinessRegionContext();
 }
 
 
@@ -3048,6 +3372,7 @@ let activeTransitionEvidenceRequestId = 0;
 let activeTransitionPreparationRequestId = 0;
 let activeTransitionActionPlanRequestId = 0;
 let activeLiveJobsRequestId = 0;
+let activeBusinessWorkforceRequestId = 0;
 const RELATED_OCCUPATIONS_DEFAULT_COUNT = 5;
 let relatedOccupationsExpanded = false;
 let relatedOccupationItems = [];
@@ -3066,6 +3391,10 @@ let activeInvestigationRestored = false;
 
 const ACTIVE_INVESTIGATION_STORAGE_KEY = "gvai.activeInvestigation.v1";
 const ACTIVE_INVESTIGATION_VERSION = "v1";
+const BUSINESS_WORKFORCE_PLAN_STORAGE_KEY = "gvai.businessWorkforcePlan.v1";
+const BUSINESS_WORKFORCE_PLAN_VERSION = "v1";
+const BUSINESS_WORKFORCE_PLAN_MAX = 10;
+let currentBusinessEvidence = null;
 
 const WORKER_WORKSPACE_STAGE_LABELS = {
   "my-work": "My Work",
@@ -3251,6 +3580,7 @@ function handleWorkerStageAction(button) {
 function openLaborersWorkspace(stage = "my-work") {
   const workspace = document.getElementById("laborers-workspace");
   if (!workspace) return;
+  closeBusinessWorkspace();
   workspace.hidden = false;
   setWorkerWorkspaceStage(stage, true);
 }
@@ -3258,6 +3588,214 @@ function openLaborersWorkspace(stage = "my-work") {
 function closeLaborersWorkspace() {
   const workspace = document.getElementById("laborers-workspace");
   if (workspace) workspace.hidden = true;
+}
+
+function businessSelectedOccupation() {
+  const value = document.getElementById("business-occupation-select")?.value || "";
+  const [occupationCode, ...titleParts] = value.split("|");
+  return {
+    occupation_code: occupationCode,
+    occupation_title: titleParts.join("|") || occupationCode
+  };
+}
+
+function validBusinessPlanRecord(record) {
+  return record && typeof record === "object" &&
+    record.schema_version === BUSINESS_WORKFORCE_PLAN_VERSION &&
+    typeof record.occupation_code === "string" &&
+    /^\d{2}-\d{4}\.\d{2}$/.test(record.occupation_code) &&
+    typeof record.occupation_title === "string" &&
+    typeof record.added_at === "string";
+}
+
+function loadBusinessPlan() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(BUSINESS_WORKFORCE_PLAN_STORAGE_KEY));
+    return Array.isArray(parsed) ? parsed.filter(validBusinessPlanRecord).slice(0, BUSINESS_WORKFORCE_PLAN_MAX) : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function persistBusinessPlan(records) {
+  try {
+    localStorage.setItem(BUSINESS_WORKFORCE_PLAN_STORAGE_KEY, JSON.stringify(records));
+  } catch (error) {
+    // Business V1 remains usable when browser storage is unavailable.
+  }
+}
+
+function businessRegionLabel() {
+  return currentRegionLabel || selectedProfile?.title || "Select a public region on the globe";
+}
+
+function syncBusinessRegionContext() {
+  const region = businessRegionLabel();
+  const display = document.getElementById("business-region-display");
+  const context = document.getElementById("business-region-context");
+  if (display) display.value = region;
+  if (context) context.textContent = region;
+}
+
+function openBusinessWorkspace() {
+  const workspace = document.getElementById("business-workspace");
+  if (!workspace) return;
+  closeLaborersWorkspace();
+  syncBusinessRegionContext();
+  workspace.hidden = false;
+  renderBusinessPlan();
+}
+
+function closeBusinessWorkspace() {
+  const workspace = document.getElementById("business-workspace");
+  if (workspace) workspace.hidden = true;
+}
+
+function businessValue(value, formatter = value => value) {
+  if (value === null || value === undefined || value === "") return "Unavailable";
+  return formatter(value);
+}
+
+function renderBusinessEvidence(data) {
+  const status = document.getElementById("business-workforce-status");
+  const content = document.getElementById("business-workforce-evidence");
+  const safety = document.getElementById("business-safety-status");
+  if (!status || !content) return;
+
+  if (!data.supported) {
+    status.textContent = data.reason || "Business workforce evidence is unsupported for this country.";
+    content.innerHTML = "";
+    if (safety) safety.textContent = "Safety Systems status is not evaluated for unsupported evidence regions.";
+    return;
+  }
+
+  const evidence = data.occupation_evidence || {};
+  const employment = evidence.employment || {};
+  const wage = evidence.wage || {};
+  const specificity = evidence.oews_specificity || {};
+  const stex = evidence.stex || {};
+  const preparation = evidence.preparation || {};
+  const jobZone = preparation.job_zone || {};
+  const education = preparation.education || {};
+  const educationLevels = Array.isArray(education.levels) ? education.levels.slice(0, 3) : [];
+  const constraints = Array.isArray(data.constraints) ? data.constraints : [];
+
+  status.textContent = `${data.occupation?.occupation_title || data.occupation?.occupation_code || "Occupation"} · ${data.region?.county || businessRegionLabel()} · GVAI evidence only`;
+  content.innerHTML = `
+    <article class="business-question-card"><strong>How many workers are employed in this occupation locally?</strong><span>${businessValue(employment.employment, formatCompact)} employed · ${businessValue(employment.source_year)} · ${escapeHtml(employment.source || "Source unavailable")}</span></article>
+    <article class="business-question-card"><strong>What does the published wage evidence show?</strong><span>Hourly median: ${businessValue(wage.median_hourly_wage, value => formatMoney(value))} · Annual median: ${businessValue(wage.median_annual_wage, value => formatMoney(value))}</span></article>
+    <article class="business-question-card"><strong>How specific is the available occupation evidence?</strong><span>${escapeHtml(specificity.disclosure || "Specificity unavailable.")}</span></article>
+    <article class="business-question-card"><strong>What preparation does the occupation typically require?</strong><span>${escapeHtml(jobZone.title || "Job Zone unavailable")} · ${escapeHtml(jobZone.education || "Education/training evidence unavailable")}</span></article>
+    <article class="business-question-card"><strong>What does structural exposure indicate?</strong><span>${businessValue(stex.structural_exposure)} STEX · ${escapeHtml(stex.semantics || "STEX semantics unavailable.")}</span></article>
+    <article class="business-question-card"><strong>What education/training evidence is published?</strong><span>${educationLevels.length ? educationLevels.map(level => `${escapeHtml(level.title)}: ${businessValue(level.percentage_of_respondents, value => `${value}%`)}`).join(" · ") : "Unavailable"}</span></article>
+    <article class="business-question-card full-width"><strong>Missing evidence</strong><span>${constraints.length ? constraints.map(item => escapeHtml(item)).join(" · ") : "No missing evidence constraints were returned for this selection."}</span></article>
+  `;
+  if (safety) {
+    const safetyStatus = data.safety_systems || {};
+    safety.textContent = `${safetyStatus.entry_point || "GVAI Safety Systems boundary"}: ${safetyStatus.status || "unavailable"}. ${safetyStatus.note || "No active governance is claimed here."}`;
+  }
+}
+
+async function loadBusinessWorkforceEvidence() {
+  const status = document.getElementById("business-workforce-status");
+  const content = document.getElementById("business-workforce-evidence");
+  if (!status || !content) return;
+  if (currentRegionLatitude === null || currentRegionLongitude === null) {
+    status.textContent = "Select a public region on the globe first.";
+    content.innerHTML = "";
+    return;
+  }
+
+  const requestId = ++activeBusinessWorkforceRequestId;
+  const occupation = businessSelectedOccupation();
+  const params = new URLSearchParams({
+    occupation_code: occupation.occupation_code,
+    occupation_title: occupation.occupation_title,
+    lat: String(currentRegionLatitude),
+    lon: String(currentRegionLongitude),
+    country_code: String(window.GVAI_WORKER_COUNTRY_CODE || "US").toUpperCase()
+  });
+
+  status.textContent = "Loading Business workforce evidence...";
+  content.innerHTML = "";
+
+  try {
+    const response = await fetch(`${window.GVAI_API_BASE || ""}/api/business/workforce-intelligence?${params.toString()}`);
+    const data = await response.json();
+    if (requestId !== activeBusinessWorkforceRequestId) return;
+    if (!response.ok || !data.ok) {
+      status.textContent = data.reason || "Business workforce evidence is temporarily unavailable.";
+      return;
+    }
+    currentBusinessEvidence = data;
+    renderBusinessEvidence(data);
+    renderBusinessPlan();
+  } catch (error) {
+    if (requestId !== activeBusinessWorkforceRequestId) return;
+    console.error("Business workforce evidence load failed:", error);
+    status.textContent = "Business workforce evidence is temporarily unavailable.";
+    content.innerHTML = "";
+  }
+}
+
+function addSelectedOccupationToBusinessPlan() {
+  const occupation = businessSelectedOccupation();
+  const existing = loadBusinessPlan();
+  if (existing.some(record => record.occupation_code === occupation.occupation_code)) return;
+  if (existing.length >= BUSINESS_WORKFORCE_PLAN_MAX) {
+    document.getElementById("business-plan-status").textContent = `Workforce plan is limited to ${BUSINESS_WORKFORCE_PLAN_MAX} occupations.`;
+    return;
+  }
+  persistBusinessPlan([...existing, {
+    schema_version: BUSINESS_WORKFORCE_PLAN_VERSION,
+    occupation_code: occupation.occupation_code,
+    occupation_title: occupation.occupation_title,
+    added_at: new Date().toISOString()
+  }]);
+  renderBusinessPlan();
+}
+
+function removeBusinessPlanOccupation(occupationCode) {
+  persistBusinessPlan(loadBusinessPlan().filter(record => record.occupation_code !== occupationCode));
+  renderBusinessPlan();
+}
+
+function renderBusinessPlan() {
+  const status = document.getElementById("business-plan-status");
+  const list = document.getElementById("business-plan-list");
+  if (!status || !list) return;
+  const plan = loadBusinessPlan();
+  status.textContent = `${plan.length} of ${BUSINESS_WORKFORCE_PLAN_MAX} occupations in this browser-local workforce plan. Employer-selected order is preserved.`;
+  if (!plan.length) {
+    list.innerHTML = "";
+    return;
+  }
+  const evidence = currentBusinessEvidence?.occupation_evidence || {};
+  list.innerHTML = plan.map(record => {
+    const isCurrent = currentBusinessEvidence?.occupation?.occupation_code === record.occupation_code;
+    const employment = isCurrent ? businessValue(evidence.employment?.employment, formatCompact) : "View evidence to load";
+    const hourly = isCurrent ? businessValue(evidence.wage?.median_hourly_wage, value => formatMoney(value)) : "View evidence to load";
+    const annual = isCurrent ? businessValue(evidence.wage?.median_annual_wage, value => formatMoney(value)) : "View evidence to load";
+    const stex = isCurrent ? businessValue(evidence.stex?.structural_exposure) : "View evidence to load";
+    const preparation = isCurrent ? escapeHtml(evidence.preparation?.job_zone?.title || "Unavailable") : "View evidence to load";
+    const specificity = isCurrent ? escapeHtml(evidence.oews_specificity?.status || "Unavailable") : "View evidence to load";
+    return `
+      <article class="business-plan-item" data-business-plan-code="${escapeHtml(record.occupation_code)}">
+        <div class="business-plan-item-head"><div><strong>${escapeHtml(record.occupation_title)}</strong><span>${escapeHtml(record.occupation_code)} · workforce plan, not a ranking</span></div><button type="button" data-business-plan-remove="${escapeHtml(record.occupation_code)}">Remove</button></div>
+        <div class="business-plan-facts">
+          <div class="business-plan-fact"><div class="business-plan-fact-label">Employment</div><div class="business-plan-fact-value">${escapeHtml(employment)}</div></div>
+          <div class="business-plan-fact"><div class="business-plan-fact-label">Hourly wage</div><div class="business-plan-fact-value">${escapeHtml(hourly)}</div></div>
+          <div class="business-plan-fact"><div class="business-plan-fact-label">Annual wage</div><div class="business-plan-fact-value">${escapeHtml(annual)}</div></div>
+          <div class="business-plan-fact"><div class="business-plan-fact-label">STEX</div><div class="business-plan-fact-value">${escapeHtml(stex)}</div></div>
+          <div class="business-plan-fact"><div class="business-plan-fact-label">Preparation</div><div class="business-plan-fact-value">${preparation}</div></div>
+          <div class="business-plan-fact"><div class="business-plan-fact-label">Specificity</div><div class="business-plan-fact-value">${specificity}</div></div>
+        </div>
+      </article>
+    `;
+  }).join("");
+  list.querySelectorAll("[data-business-plan-remove]").forEach(button => {
+    button.addEventListener("click", () => removeBusinessPlanOccupation(button.dataset.businessPlanRemove));
+  });
 }
 
 async function loadSelectedCountyBoundary(
@@ -7314,6 +7852,17 @@ document.getElementById("start-worker-profile-btn").addEventListener("click", ()
 });
 document.getElementById("open-laborers-workspace-btn").addEventListener("click", () => openLaborersWorkspace(activeWorkerWorkspaceStage));
 document.getElementById("close-laborers-workspace-btn").addEventListener("click", closeLaborersWorkspace);
+document.getElementById("open-business-workspace-btn").addEventListener("click", openBusinessWorkspace);
+document.getElementById("close-business-workspace-btn").addEventListener("click", closeBusinessWorkspace);
+document.getElementById("business-workforce-form").addEventListener("submit", event => {
+  event.preventDefault();
+  void loadBusinessWorkforceEvidence();
+});
+document.getElementById("business-add-plan-btn").addEventListener("click", addSelectedOccupationToBusinessPlan);
+document.getElementById("business-clear-plan-btn").addEventListener("click", () => {
+  persistBusinessPlan([]);
+  renderBusinessPlan();
+});
 document.querySelectorAll(".laborers-stage-link").forEach(button => {
   button.addEventListener("click", () => {
     if (button.dataset.workerStageTarget === "investigate" && activeInvestigationContext) {

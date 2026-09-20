@@ -42,6 +42,9 @@ from gvai.postlabor.worker_profile import (
 from gvai.postlabor.worker_personal_comparison import (
     synthesize_worker_personal_comparison,
 )
+from gvai.postlabor.business_workforce_intelligence import (
+    synthesize_business_workforce_intelligence,
+)
 from gvai.postlabor.labor_providers import (
     OccupationReference,
     provider_for_country,
@@ -1320,6 +1323,54 @@ def api_worker_transition_preparation():
             "source": source_code,
             "target": target_code,
             "reason": "Transition preparation evidence synthesis failed.",
+        }), 500
+
+
+@app.get("/api/business/workforce-intelligence")
+def api_business_workforce_intelligence():
+    occupation_code = (request.args.get("occupation_code") or "").strip()
+    occupation_title = (request.args.get("occupation_title") or "").strip() or None
+    country_code = (request.args.get("country_code") or "US").strip().upper()
+    lat = request.args.get("lat")
+    lon = request.args.get("lon")
+
+    if not occupation_code:
+        return jsonify({
+            "ok": False,
+            "reason": "occupation_code is required.",
+            "example": "occupation_code=37-2021.00&lat=36.1627&lon=-86.7816",
+        }), 400
+
+    if lat is None or lon is None:
+        return jsonify({
+            "ok": False,
+            "reason": "lat and lon query parameters are required.",
+        }), 400
+
+    try:
+        latitude = float(lat)
+        longitude = float(lon)
+    except ValueError:
+        return jsonify({
+            "ok": False,
+            "reason": "Valid lat and lon query parameters are required.",
+        }), 400
+
+    try:
+        result = synthesize_business_workforce_intelligence(
+            latitude=latitude,
+            longitude=longitude,
+            occupation_code=occupation_code,
+            occupation_title=occupation_title,
+            country_code=country_code,
+        )
+        return jsonify({"ok": True, **result})
+    except InvalidSTEXOccupationCode as exc:
+        return jsonify({"ok": False, "reason": str(exc)}), 400
+    except Exception:
+        return jsonify({
+            "ok": False,
+            "reason": "Business workforce intelligence synthesis failed.",
         }), 500
 
 
