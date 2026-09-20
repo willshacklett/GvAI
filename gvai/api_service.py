@@ -50,6 +50,7 @@ from gvai.postlabor.labor_providers import (
 )
 from gvai.postlabor.live_jobs import (
     DEFAULT_LIVE_JOBS_REGISTRY,
+    DEFAULT_PROVIDER_REGISTRY,
     PublicJobSearchContext,
 )
 from gvai.postlabor.stex.store import (
@@ -1193,6 +1194,26 @@ def api_worker_live_jobs():
             "country_code": result.country_code,
         },
     })
+    return jsonify(payload)
+
+
+@app.get("/api/worker/live-jobs/capabilities")
+def api_worker_live_jobs_capabilities():
+    """Report registered live-job provider coverage for a country.
+
+    Secret-safe: reports registration/priority/attribution/state only, and
+    never credentials, session objects, or adapter internals.
+    """
+    country_code = (request.args.get("country") or request.args.get("country_code") or "US").strip().upper()
+    if len(country_code) != 2 or not country_code.isalpha():
+        return jsonify({
+            "ok": False,
+            "reason": "country must be a two-letter ISO country code.",
+        }), 400
+
+    report = DEFAULT_PROVIDER_REGISTRY.capability_report(country_code, "live_job_openings")
+    payload = report.to_dict()
+    payload["ok"] = True
     return jsonify(payload)
 
 
