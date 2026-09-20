@@ -637,7 +637,7 @@
 
     .laborers-stage-nav {
       display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
+      grid-template-columns: repeat(8, minmax(0, 1fr));
       gap: 8px;
       margin-bottom: 16px;
     }
@@ -1550,6 +1550,119 @@
       margin-top: 0;
     }
 
+    .compare-toggle-btn[disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .compare-selection-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 10px 0 4px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: rgba(255,255,255,0.03);
+    }
+
+    .compare-selection-status {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    #open-compare-occupations-btn {
+      width: auto;
+      margin-top: 0;
+    }
+
+    .compare-occupations-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .compare-occupation-card {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.025);
+    }
+
+    .compare-occupation-head {
+      display: grid;
+      gap: 2px;
+    }
+
+    .compare-occupation-title {
+      font-size: 14px;
+      font-weight: 800;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
+    .compare-occupation-code {
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: 0.06em;
+    }
+
+    .compare-occupation-fields {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .compare-field {
+      min-width: 0;
+      padding: 8px 9px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .compare-field-label {
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .compare-field-value {
+      margin-top: 3px;
+      font-size: 12px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .compare-occupation-note {
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.45;
+    }
+
+    .compare-occupation-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .compare-occupation-actions button {
+      width: auto;
+      margin-top: 0;
+      font-size: 11px;
+      padding: 6px 10px;
+    }
+
     .save-occupation-btn {
       margin-top: 10px;
       width: auto;
@@ -1750,6 +1863,25 @@
       }
 
       .worker-stage-actions .worker-outlook-button {
+        width: 100%;
+        min-height: 44px;
+      }
+
+      .compare-occupations-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .compare-selection-bar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      #open-compare-occupations-btn {
+        width: 100%;
+        min-height: 44px;
+      }
+
+      .compare-occupation-actions .worker-outlook-button {
         width: 100%;
         min-height: 44px;
       }
@@ -2112,6 +2244,7 @@
         <button type="button" class="laborers-stage-link" data-worker-stage-target="local-outlook">My Local Outlook</button>
         <button type="button" class="laborers-stage-link" data-worker-stage-target="explore-occupations">Explore Occupations</button>
         <button type="button" class="laborers-stage-link" data-worker-stage-target="saved-occupations">Saved Occupations</button>
+        <button type="button" class="laborers-stage-link" data-worker-stage-target="compare-occupations">Compare Occupations</button>
         <button type="button" class="laborers-stage-link" data-worker-stage-target="investigate">Investigate</button>
         <button type="button" class="laborers-stage-link" data-worker-stage-target="live-jobs">Live Jobs</button>
         <button type="button" class="laborers-stage-link" data-worker-stage-target="investigation-summary">Investigation Summary</button>
@@ -2248,12 +2381,32 @@
         </div>
         <div id="saved-occupations-card" class="related-occupations-card visible" aria-live="polite">
           <div id="saved-occupations-status" class="stex-status"></div>
+          <div id="compare-selection-bar" class="compare-selection-bar">
+            <div id="compare-selection-status" class="compare-selection-status">0 of 5 selected for comparison (choose 2-5 to compare).</div>
+            <button id="open-compare-occupations-btn" type="button" class="worker-outlook-button" data-worker-stage-action="compare-occupations" data-worker-stage-load="compare-occupations" disabled>Compare selected occupations</button>
+          </div>
           <div id="saved-occupations-content"></div>
           <button id="clear-saved-occupations-btn" type="button" class="worker-outlook-button clear-saved-occupations-btn" hidden>Clear saved occupations</button>
         </div>
         <div class="worker-stage-actions" aria-label="Saved occupations next actions">
           <button type="button" class="worker-outlook-button" data-worker-stage-action="explore-occupations">Explore more occupations</button>
           <button type="button" class="worker-outlook-button" data-worker-stage-action="investigation-summary">Open Investigation Summary</button>
+        </div>
+      </section>
+
+      <section id="worker-stage-compare-occupations" class="laborers-stage" data-worker-stage="compare-occupations" aria-labelledby="worker-stage-compare-occupations-title">
+        <div class="laborers-stage-head">
+          <div>
+            <div id="worker-stage-compare-occupations-title" class="laborers-stage-title">Compare occupations</div>
+            <div class="laborers-stage-note">Side-by-side published evidence for occupations you selected from Saved Occupations, shown in the order you selected them. This is a factual comparison, not a ranking or recommendation.</div>
+          </div>
+        </div>
+        <div id="compare-occupations-card" class="related-occupations-card visible" aria-live="polite">
+          <div id="compare-occupations-status" class="stex-status">Select 2-5 saved occupations to compare.</div>
+          <div id="compare-occupations-content" class="compare-occupations-grid"></div>
+        </div>
+        <div class="worker-stage-actions" aria-label="Compare occupations next actions">
+          <button type="button" class="worker-outlook-button" data-worker-stage-action="saved-occupations">Change selection</button>
         </div>
       </section>
 
@@ -2919,6 +3072,7 @@ const WORKER_WORKSPACE_STAGE_LABELS = {
   "local-outlook": "My Local Outlook",
   "explore-occupations": "Explore Occupations",
   "saved-occupations": "Saved Occupations",
+  "compare-occupations": "Compare Occupations",
   investigate: "Investigate",
   "live-jobs": "Live Jobs",
   "investigation-summary": "Investigation Summary",
@@ -3041,7 +3195,7 @@ function renderWorkerWorkspaceContext() {
 }
 
 function journeyStepForStage(stage) {
-  if (stage === "saved-occupations" || stage === "next-investigation") return "investigation-summary";
+  if (stage === "saved-occupations" || stage === "next-investigation" || stage === "compare-occupations") return "investigation-summary";
   return stage;
 }
 
@@ -3080,6 +3234,10 @@ function handleWorkerStageAction(button) {
   }
   if (load === "live-jobs") {
     void loadLiveJobs();
+    return;
+  }
+  if (load === "compare-occupations") {
+    void loadCompareOccupations();
     return;
   }
   if (stage === "investigate" && activeInvestigationContext) {
@@ -6875,6 +7033,7 @@ function saveOccupation(occupationCode, occupationTitle) {
 function removeSavedOccupation(occupationCode) {
   const next = loadSavedOccupations().filter(record => record.occupation_code !== occupationCode);
   persistSavedOccupations(next);
+  removeFromCompareSelection(occupationCode);
   renderSavedOccupations();
   if (currentDrilldownCode === occupationCode) {
     renderSaveOccupationButton(currentDrilldownCode, document.getElementById("investigated-occupation-context")?.textContent?.trim());
@@ -6884,6 +7043,7 @@ function removeSavedOccupation(occupationCode) {
 
 function clearSavedOccupations() {
   persistSavedOccupations([]);
+  persistCompareSelection([]);
   renderSavedOccupations();
   if (currentDrilldownCode) {
     renderSaveOccupationButton(currentDrilldownCode, document.getElementById("investigated-occupation-context")?.textContent?.trim());
@@ -6929,12 +7089,17 @@ function renderSavedOccupations() {
       </div>
     `;
     if (clearButton) clearButton.hidden = true;
+    renderCompareSelectionBar();
     return;
   }
 
+  const compareCodes = new Set(loadCompareSelection().map(record => record.occupation_code));
   status.textContent = `${records.length} occupation${records.length === 1 ? "" : "s"} saved on this browser/device, most recently saved first.`;
   content.innerHTML = `
-    <ul class="saved-occupations-list">${records.map(record => `
+    <ul class="saved-occupations-list">${records.map(record => {
+      const inCompare = compareCodes.has(record.occupation_code);
+      const atMax = !inCompare && compareCodes.size >= COMPARE_OCCUPATIONS_MAX;
+      return `
       <li class="saved-occupation-item" data-occupation-code="${escapeHtml(record.occupation_code)}">
         <strong>${escapeHtml(record.occupation_title || record.occupation_code)}</strong><br>
         ${escapeHtml(record.occupation_code)}
@@ -6942,17 +7107,96 @@ function renderSavedOccupations() {
         <div class="saved-occupation-actions">
           <button type="button" class="worker-outlook-button saved-occupation-open-btn" data-code="${escapeHtml(record.occupation_code)}" data-title="${escapeHtml(record.occupation_title || record.occupation_code)}">Continue investigation</button>
           <button type="button" class="worker-outlook-button saved-occupation-remove-btn" data-code="${escapeHtml(record.occupation_code)}">Remove</button>
+          <button type="button" class="worker-outlook-button compare-toggle-btn" data-code="${escapeHtml(record.occupation_code)}" data-title="${escapeHtml(record.occupation_title || record.occupation_code)}" ${atMax ? "disabled" : ""}>${inCompare ? "Remove from compare" : "Add to compare"}</button>
         </div>
       </li>
-    `).join("")}</ul>
+    `;
+    }).join("")}</ul>
   `;
   if (clearButton) clearButton.hidden = false;
+  renderCompareSelectionBar();
 }
 
 function formatSavedAt(isoString) {
   const date = new Date(isoString);
   if (Number.isNaN(date.getTime())) return "at an earlier date";
   return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+
+const COMPARE_OCCUPATIONS_STORAGE_KEY = "gvai.compareOccupations.v1";
+const COMPARE_OCCUPATIONS_VERSION = "v1";
+const COMPARE_OCCUPATIONS_MIN = 2;
+const COMPARE_OCCUPATIONS_MAX = 5;
+let activeCompareOccupationsRequestId = 0;
+
+// A compare-selection record is only an occupation_code pointer into the
+// existing Saved Occupations list. It never stores evidence; titles are
+// always looked up from the existing Saved Occupations list.
+function isCompareSelectionRecord(record) {
+  return (
+    record &&
+    typeof record === "object" &&
+    record.schema_version === COMPARE_OCCUPATIONS_VERSION &&
+    typeof record.occupation_code === "string" &&
+    record.occupation_code.trim().length > 0
+  );
+}
+
+function loadCompareSelection() {
+  let raw;
+  try {
+    raw = localStorage.getItem(COMPARE_OCCUPATIONS_STORAGE_KEY);
+  } catch (error) {
+    return [];
+  }
+  if (!raw) return [];
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.filter(isCompareSelectionRecord);
+}
+
+function persistCompareSelection(records) {
+  try {
+    localStorage.setItem(COMPARE_OCCUPATIONS_STORAGE_KEY, JSON.stringify(records));
+  } catch (error) {
+    // Storage unavailable (private mode/quota); comparison selection simply won't persist.
+  }
+}
+
+function isOccupationInCompareSelection(occupationCode) {
+  if (!occupationCode) return false;
+  return loadCompareSelection().some(record => record.occupation_code === occupationCode);
+}
+
+function removeFromCompareSelection(occupationCode) {
+  const next = loadCompareSelection().filter(record => record.occupation_code !== occupationCode);
+  persistCompareSelection(next);
+}
+
+function toggleCompareSelection(occupationCode) {
+  if (!occupationCode) return;
+  const existing = loadCompareSelection();
+  if (existing.some(record => record.occupation_code === occupationCode)) {
+    persistCompareSelection(existing.filter(record => record.occupation_code !== occupationCode));
+  } else if (existing.length < COMPARE_OCCUPATIONS_MAX) {
+    // Appending preserves the order the worker selected occupations in.
+    persistCompareSelection([...existing, { schema_version: COMPARE_OCCUPATIONS_VERSION, occupation_code: occupationCode }]);
+  }
+  renderSavedOccupations();
+}
+
+function renderCompareSelectionBar() {
+  const status = document.getElementById("compare-selection-status");
+  const compareButton = document.getElementById("open-compare-occupations-btn");
+  if (!status || !compareButton) return;
+  const count = loadCompareSelection().length;
+  status.textContent = `${count} of ${COMPARE_OCCUPATIONS_MAX} selected for comparison (choose ${COMPARE_OCCUPATIONS_MIN}-${COMPARE_OCCUPATIONS_MAX} to compare).`;
+  compareButton.disabled = count < COMPARE_OCCUPATIONS_MIN;
 }
 
 const WORKER_PROFILE_STORAGE_KEY = "gvai.workerProfile.v1";
@@ -8275,6 +8519,212 @@ function transitionEmphasisClass(emphasis) {
   return "similar";
 }
 
+// --- Compare occupations: factual side-by-side, no composite/ranking ---
+// Reuses Saved Occupations as the sole canonical selection source and the
+// same canonical evidence endpoints as My Local Outlook / Investigate.
+// Never sends the whole shortlist to a job provider: Live Jobs capability
+// is a local/registry lookup, and per-occupation search only happens when
+// the worker explicitly clicks "Find live jobs" for that one occupation.
+
+function compareRegionNote(region) {
+  return region ? null : "Select a public region to see regional evidence.";
+}
+
+function compareStexFact(occupation, regionNote) {
+  if (regionNote) return `Structural exposure: ${regionNote}`;
+  const stex = occupation?.stex;
+  if (!stex || stex.status !== "known") return "Structural exposure: unavailable for this occupation.";
+  const profile = stex.profile || {};
+  return `Structural exposure: ${profile.structural_exposure} (${profile.rubric_version || "STEX"}). Not a probability of job loss or percent automatable.`;
+}
+
+function compareEmploymentFact(employment, regionNote) {
+  if (regionNote) return `Regional employment: ${regionNote}`;
+  if (!employment || employment.status !== "known") return "Regional employment: unknown.";
+  const prefix = employment.match_specificity === "broader_category"
+    ? `Regional employment (broader OEWS category "${employment.occupation_title || "unknown"}"): `
+    : "Regional employment: ";
+  return prefix + formatCompact(employment.employment);
+}
+
+function compareWageFact(wage, regionNote) {
+  if (regionNote) return `Regional median wage: ${regionNote}`;
+  if (!wage) return "Regional median wage: unknown.";
+  if (wage.status === "suppressed") return "Regional median wage: suppressed by BLS (unavailable, not zero).";
+  if (wage.status !== "known") return "Regional median wage: unknown.";
+  const prefix = wage.match_specificity === "broader_category"
+    ? `Regional median wage (broader OEWS category "${wage.occupation_title || "unknown"}"): `
+    : "Regional median wage: ";
+  return prefix + formatWageText(wage);
+}
+
+function comparePreparationFact(jobZone) {
+  if (!currentOccupationCode) return "Preparation / Job Zone: select your current occupation to compare.";
+  if (!jobZone || jobZone.status !== "known") return "Preparation / Job Zone: unavailable for this occupation.";
+  return `Job Zone ${jobZone.job_zone_code ?? "unknown"}: ${jobZone.title || "unknown"}. Education: ${jobZone.education || "unknown"}.`;
+}
+
+function compareTrainingFact(jobZone) {
+  if (!currentOccupationCode) return "Education/training evidence: select your current occupation to compare.";
+  if (!jobZone || jobZone.status !== "known") return "Education/training evidence: unavailable for this occupation.";
+  return `Related experience: ${jobZone.related_experience || "unknown"}. On-the-job training: ${jobZone.job_training || "unknown"}.`;
+}
+
+function compareTransitionFact(evidence) {
+  if (!currentOccupationCode) return "Transition evidence from your current occupation: select your current occupation to compare.";
+  if (!evidence || !evidence.ok || !evidence.supported) return "Transition evidence from your current occupation: unavailable.";
+  const activities = evidence.work_activity_comparison || {};
+  if (activities.status !== "known") return "Transition evidence from your current occupation: unavailable.";
+  const items = Array.isArray(activities.items) ? activities.items : [];
+  return `${items.length} compared work activities vs ${evidence.source_occupation_title || currentOccupationTitle || currentOccupationCode} (O*NET work activity comparison).`;
+}
+
+function compareLiveJobsFact(capability) {
+  if (!capability) return "Live Jobs provider availability: unknown.";
+  if (capability.state === "available") return "Live Jobs provider availability: a configured provider is available for this region.";
+  return LIVE_JOBS_CAPABILITY_MESSAGES[capability.state] || "Live Jobs provider availability: unavailable.";
+}
+
+function compareOccupationCardSkeleton(record) {
+  const code = record.occupation_code;
+  const title = record.occupation_title || code;
+  return `
+    <article class="compare-occupation-card">
+      <div class="compare-occupation-head">
+        <div class="compare-occupation-title">${escapeHtml(title)}</div>
+        <div class="compare-occupation-code">${escapeHtml(code)}</div>
+      </div>
+      <ul class="compare-occupation-fields" id="compare-fields-${escapeHtml(code)}">
+        <li class="compare-field"><div class="compare-field-label">Structural exposure</div><div class="compare-field-value">Loading…</div></li>
+        <li class="compare-field"><div class="compare-field-label">Regional employment</div><div class="compare-field-value">Loading…</div></li>
+        <li class="compare-field"><div class="compare-field-label">Regional median wage</div><div class="compare-field-value">Loading…</div></li>
+        <li class="compare-field"><div class="compare-field-label">Preparation</div><div class="compare-field-value">Loading…</div></li>
+        <li class="compare-field"><div class="compare-field-label">Education/training evidence</div><div class="compare-field-value">Loading…</div></li>
+        <li class="compare-field"><div class="compare-field-label">Transition evidence from your current occupation</div><div class="compare-field-value">Loading…</div></li>
+        <li class="compare-field"><div class="compare-field-label">Live Jobs provider availability</div><div class="compare-field-value">Loading…</div></li>
+      </ul>
+      <div class="compare-occupation-note">STEX is structural exposure evidence, not a probability of job loss or percent automatable.</div>
+      <div class="compare-occupation-actions">
+        <button type="button" class="worker-outlook-button compare-investigate-btn" data-code="${escapeHtml(code)}" data-title="${escapeHtml(title)}">Investigate</button>
+        <button type="button" class="worker-outlook-button compare-live-jobs-btn" data-code="${escapeHtml(code)}" data-title="${escapeHtml(title)}">Find live jobs</button>
+        <button type="button" class="worker-outlook-button compare-remove-btn" data-code="${escapeHtml(code)}">Remove from comparison</button>
+      </div>
+    </article>
+  `;
+}
+
+async function loadCompareOccupationCard(record, region, liveJobsCapability, requestId) {
+  const code = record.occupation_code;
+  const title = record.occupation_title || code;
+  const regionNote = compareRegionNote(region);
+
+  const regionOutlookPromise = region
+    ? fetch(`${window.GVAI_API_BASE || ""}/api/worker/region-outlook?lat=${encodeURIComponent(region.latitude)}&lon=${encodeURIComponent(region.longitude)}&occupation=${encodeURIComponent(code)}`)
+        .then(response => response.json()).catch(() => null)
+    : Promise.resolve(null);
+
+  const preparationPromise = currentOccupationCode
+    ? fetch(`${window.GVAI_API_BASE || ""}/api/worker/transition-preparation?source=${encodeURIComponent(currentOccupationCode)}&target=${encodeURIComponent(code)}` +
+        (currentOccupationTitle ? `&source_title=${encodeURIComponent(currentOccupationTitle)}` : "") +
+        `&target_title=${encodeURIComponent(title)}`)
+        .then(response => response.json()).catch(() => null)
+    : Promise.resolve(null);
+
+  const evidencePromise = currentOccupationCode
+    ? fetch(`${window.GVAI_API_BASE || ""}/api/worker/transition-evidence?source=${encodeURIComponent(currentOccupationCode)}&target=${encodeURIComponent(code)}` +
+        (currentOccupationTitle ? `&source_title=${encodeURIComponent(currentOccupationTitle)}` : "") +
+        `&target_title=${encodeURIComponent(title)}`)
+        .then(response => response.json()).catch(() => null)
+    : Promise.resolve(null);
+
+  const [regionOutlook, preparation, evidence] = await Promise.all([regionOutlookPromise, preparationPromise, evidencePromise]);
+  if (requestId !== activeCompareOccupationsRequestId) return;
+
+  const occupation = (regionOutlook && regionOutlook.ok && regionOutlook.supported) ? (regionOutlook.occupation || {}) : {};
+  const jobZone = (preparation && preparation.ok && preparation.supported) ? (preparation.target_preparation || {}).job_zone : null;
+
+  const fieldsEl = document.getElementById("compare-fields-" + code);
+  if (!fieldsEl) return;
+  fieldsEl.innerHTML = `
+    <li class="compare-field"><div class="compare-field-label">Structural exposure</div><div class="compare-field-value">${escapeHtml(compareStexFact(occupation, regionNote))}</div></li>
+    <li class="compare-field"><div class="compare-field-label">Regional employment</div><div class="compare-field-value">${escapeHtml(compareEmploymentFact(occupation.regional_employment, regionNote))}</div></li>
+    <li class="compare-field"><div class="compare-field-label">Regional median wage</div><div class="compare-field-value">${escapeHtml(compareWageFact(occupation.regional_wage, regionNote))}</div></li>
+    <li class="compare-field"><div class="compare-field-label">Preparation</div><div class="compare-field-value">${escapeHtml(comparePreparationFact(jobZone))}</div></li>
+    <li class="compare-field"><div class="compare-field-label">Education/training evidence</div><div class="compare-field-value">${escapeHtml(compareTrainingFact(jobZone))}</div></li>
+    <li class="compare-field"><div class="compare-field-label">Transition evidence from your current occupation</div><div class="compare-field-value">${escapeHtml(compareTransitionFact(evidence))}</div></li>
+    <li class="compare-field"><div class="compare-field-label">Live Jobs provider availability</div><div class="compare-field-value">${escapeHtml(compareLiveJobsFact(liveJobsCapability))}</div></li>
+  `;
+}
+
+async function loadCompareOccupations() {
+  const status = document.getElementById("compare-occupations-status");
+  const content = document.getElementById("compare-occupations-content");
+  if (!status || !content) return;
+
+  openLaborersWorkspace("compare-occupations");
+
+  // Saved Occupations remains the only source of truth; drop any
+  // compare-selection codes that no longer have a saved record.
+  const savedByCode = new Map(loadSavedOccupations().map(record => [record.occupation_code, record]));
+  const selection = loadCompareSelection();
+  const items = selection.filter(record => savedByCode.has(record.occupation_code)).map(record => savedByCode.get(record.occupation_code));
+  if (items.length !== selection.length) {
+    persistCompareSelection(items.map(item => ({ schema_version: COMPARE_OCCUPATIONS_VERSION, occupation_code: item.occupation_code })));
+  }
+
+  const requestId = ++activeCompareOccupationsRequestId;
+
+  if (items.length < COMPARE_OCCUPATIONS_MIN) {
+    status.textContent = `Select at least ${COMPARE_OCCUPATIONS_MIN} saved occupations to compare (up to ${COMPARE_OCCUPATIONS_MAX}).`;
+    content.innerHTML = "";
+    return;
+  }
+
+  status.textContent = `Loading factual comparison for ${items.length} occupations in the order you selected them...`;
+  content.innerHTML = items.map(compareOccupationCardSkeleton).join("");
+
+  const region = publicRegionContext();
+  const countryCode = region?.country_code || window.GVAI_WORKER_COUNTRY_CODE || "US";
+  const liveJobsCapability = await fetchLiveJobsCapability(countryCode);
+  if (requestId !== activeCompareOccupationsRequestId) return;
+
+  await Promise.all(items.map(item => loadCompareOccupationCard(item, region, liveJobsCapability, requestId)));
+  if (requestId !== activeCompareOccupationsRequestId) return;
+  status.textContent = `Comparing ${items.length} occupations in the order you selected them. This is a factual comparison, not a ranking or recommendation.`;
+}
+
+document
+  .getElementById("compare-occupations-content")
+  .addEventListener("click", event => {
+    const investigateButton = event.target.closest(".compare-investigate-btn");
+    if (investigateButton) {
+      const code = investigateButton.dataset.code;
+      const title = investigateButton.dataset.title;
+      if (code) void loadRelatedOccupationDrilldown(code, title);
+      return;
+    }
+    const liveJobsButton = event.target.closest(".compare-live-jobs-btn");
+    if (liveJobsButton) {
+      const code = liveJobsButton.dataset.code;
+      const title = liveJobsButton.dataset.title;
+      if (code) {
+        setActiveInvestigation(code, title);
+        renderWorkerWorkspaceContext();
+        void loadLiveJobs();
+      }
+      return;
+    }
+    const removeButton = event.target.closest(".compare-remove-btn");
+    if (removeButton) {
+      const code = removeButton.dataset.code;
+      if (code) {
+        removeFromCompareSelection(code);
+        renderSavedOccupations();
+        void loadCompareOccupations();
+      }
+    }
+  });
+
 function formatImportanceValue(value) {
   return Number.isFinite(value) ? value.toFixed(1) : "—";
 }
@@ -8951,6 +9401,12 @@ document
     if (removeButton) {
       const code = removeButton.dataset.code;
       if (code) removeSavedOccupation(code);
+      return;
+    }
+    const compareButton = event.target.closest(".compare-toggle-btn");
+    if (compareButton) {
+      const code = compareButton.dataset.code;
+      if (code) toggleCompareSelection(code);
     }
   });
 
