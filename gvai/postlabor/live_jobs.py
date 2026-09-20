@@ -127,11 +127,17 @@ def normalize_provider_opening(
 class LiveJobsRegistry:
     """Registry for authorized adapters, keyed by their country boundary."""
 
-    def __init__(self, providers: Sequence[LiveJobsProvider] = ()) -> None:
+    def __init__(
+        self,
+        providers: Sequence[LiveJobsProvider] = (),
+        *,
+        capability_registry: "GlobalProviderRegistry | None" = None,
+    ) -> None:
         self._providers = {
             provider.metadata.country_code.upper(): provider
             for provider in providers
         }
+        self._capability_registry = capability_registry
 
     def provider_for_country(self, country_code: str) -> LiveJobsProvider | None:
         return self._providers.get(country_code.upper())
@@ -204,6 +210,10 @@ class LiveJobsRegistry:
             if malformed_records and not openings:
                 raise ValueError("provider returned only malformed job records")
         except Exception as exc:
+            if self._capability_registry is not None:
+                self._capability_registry.record_failure(
+                    context.country_code, provider.metadata.provider, "live_job_openings"
+                )
             return LiveJobsResult(
                 status="provider_failure",
                 country_code=context.country_code,
@@ -214,6 +224,10 @@ class LiveJobsRegistry:
                 error_type=type(exc).__name__,
             )
 
+        if self._capability_registry is not None:
+            self._capability_registry.record_success(
+                context.country_code, provider.metadata.provider, "live_job_openings"
+            )
         return LiveJobsResult(
             status=("available_with_results" if openings else "available_zero_results"),
             country_code=context.country_code,
@@ -224,10 +238,24 @@ class LiveJobsRegistry:
         )
 
 
-from gvai.postlabor.usajobs_provider import configured_usajobs_provider
+from gvai.postlabor.provider_registry import GlobalProviderRegistry, ProviderRegistration
+from gvai.postlabor.usajobs_provider import USAJOBS_METADATA, USAJobsProvider
 
 
-_configured_provider = configured_usajobs_provider()
+_usajobs_provider = USAJobsProvider()
+
+DEFAULT_PROVIDER_REGISTRY = GlobalProviderRegistry([
+    ProviderRegistration(
+        country_code=USAJOBS_METADATA.country_code,
+        provider=USAJOBS_METADATA.provider,
+        capability="live_job_openings",
+        priority=1,
+        attribution=USAJOBS_METADATA.attribution,
+        adapter=_usajobs_provider,
+    ),
+])
+
 DEFAULT_LIVE_JOBS_REGISTRY = LiveJobsRegistry(
-    [_configured_provider] if _configured_provider is not None else []
+    [_usajobs_provider] if _usajobs_provider.configured else [],
+    capability_registry=DEFAULT_PROVIDER_REGISTRY,
 )

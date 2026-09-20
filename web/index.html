@@ -7652,6 +7652,25 @@ function renderLiveJobOpening(opening) {
   `;
 }
 
+const LIVE_JOBS_CAPABILITY_MESSAGES = {
+  unsupported: "Live job openings are not supported for this country yet.",
+  authorization_required: "A live jobs provider is registered for this country but is awaiting authorization; live openings are not available yet.",
+  temporarily_unavailable: "The live jobs provider for this country recently failed and is temporarily unavailable.",
+};
+
+async function fetchLiveJobsCapability(countryCode) {
+  try {
+    const params = new URLSearchParams({ country: countryCode || "US" });
+    const response = await fetch(`${window.GVAI_API_BASE || ""}/api/worker/live-jobs/capabilities?${params.toString()}`);
+    const data = await response.json();
+    if (!response.ok || !data.ok) return null;
+    return data;
+  } catch (error) {
+    console.error("Live jobs capability lookup failed:", error);
+    return null;
+  }
+}
+
 async function loadLiveJobs() {
   const status = document.getElementById("live-jobs-status");
   const content = document.getElementById("live-jobs-content");
@@ -7666,6 +7685,7 @@ async function loadLiveJobs() {
 
   const requestId = ++activeLiveJobsRequestId;
   const occupationTitle = document.getElementById("investigated-occupation-context")?.textContent?.trim() || currentOccupationTitle || "";
+  const countryCode = window.GVAI_WORKER_COUNTRY_CODE || "US";
   const params = new URLSearchParams({
     occupation: occupationCode,
     occupation_title: occupationTitle,
@@ -7680,6 +7700,14 @@ async function loadLiveJobs() {
   setWorkerJourneyStep(5);
   status.textContent = "Loading live jobs...";
   content.innerHTML = "";
+
+  const capability = await fetchLiveJobsCapability(countryCode);
+  if (requestId !== activeLiveJobsRequestId) return;
+  if (capability && capability.state !== "available") {
+    status.textContent = LIVE_JOBS_CAPABILITY_MESSAGES[capability.state] || "Live job openings are unavailable for this selection.";
+    content.innerHTML = "";
+    return;
+  }
 
   try {
     const response = await fetch(`${window.GVAI_API_BASE || ""}/api/worker/live-jobs?${params.toString()}`);

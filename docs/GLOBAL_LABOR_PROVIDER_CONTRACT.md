@@ -63,3 +63,36 @@ application submission or employer contact is governed or claimed.
 This work adds no LLM inference, semantic matching, crosswalk guessing,
 ranking, recommendation, fit score, credential equivalence, or synthetic
 labor-market data.
+
+## Global Job Provider Coverage Registry V1
+
+`gvai.postlabor.provider_registry.GlobalProviderRegistry` is a separate,
+additive capability registry. It represents multiple live-job providers per
+country and providers spanning multiple countries, and it never fetches jobs,
+scrapes, ranks by quality/fit, or exposes adapter credentials.
+
+Each `ProviderRegistration` declares a `country_code`, `provider`,
+`capability`, `priority`, `attribution`, and an `adapter` reference. `priority`
+only orders provider selection; it never implies job quality or worker fit.
+
+Per-provider state (`ProviderRuntimeState`) is one of `configured` (registered
+and authorized), `authorization_required` (registered but missing
+credentials), or `temporarily_unavailable` (registered, authorized, but inside
+a failure cooldown window set by `GVAI_PROVIDER_UNAVAILABLE_COOLDOWN_SECONDS`,
+default 300 seconds).
+
+Country/capability aggregate state (`CountryCapabilityState`) is one of
+`available` (at least one configured provider), `temporarily_unavailable`,
+`authorization_required`, or `unsupported` (no provider registered at all).
+
+`gvai.postlabor.live_jobs.DEFAULT_PROVIDER_REGISTRY` registers the existing
+USAJOBS adapter unchanged; `DEFAULT_LIVE_JOBS_REGISTRY` records provider
+success/failure into it after each search so `temporarily_unavailable`
+reflects real recent failures. The USAJOBS adapter itself is untouched.
+
+`GET /api/worker/live-jobs/capabilities?country=XX` reports the registry
+state for `live_job_openings` without exposing secrets: provider name,
+priority, attribution, and state only. The Laborers workspace calls this
+endpoint before searching so it can truthfully tell the worker whether live
+jobs are unsupported, awaiting authorization, temporarily unavailable, or
+available for the selected country, instead of assuming U.S. behavior.
