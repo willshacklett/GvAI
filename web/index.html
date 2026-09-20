@@ -714,6 +714,92 @@
       width: auto;
     }
 
+    .audience-hub {
+      margin-top: 14px;
+      padding: 16px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 16px;
+      background: rgba(6, 18, 29, 0.90);
+    }
+
+    .audience-hub-kicker {
+      color: var(--accent);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .audience-hub h2 {
+      margin: 5px 0 0;
+      font-size: 20px;
+      line-height: 1.2;
+    }
+
+    .audience-hub-copy {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .audience-hub-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .audience-path-card {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 190px;
+      padding: 14px;
+      border: 1px solid rgba(255,255,255,0.11);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.035);
+    }
+
+    .audience-path-card[data-audience="laborers"] {
+      border-top: 2px solid var(--accent);
+    }
+
+    .audience-path-card[data-audience="business"] {
+      border-top: 2px solid var(--good);
+    }
+
+    .audience-path-card[data-audience="government"] {
+      border-top: 2px solid rgba(188, 168, 255, 0.82);
+    }
+
+    .audience-path-label {
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    .audience-path-card h3 {
+      margin: 6px 0 0;
+      font-size: 16px;
+      line-height: 1.25;
+    }
+
+    .audience-path-card p {
+      margin: 7px 0 14px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .audience-path-card button {
+      width: 100%;
+      min-height: 44px;
+      margin-top: auto;
+    }
+
     .worker-journey {
       margin-top: 14px;
       padding: 16px;
@@ -2096,6 +2182,7 @@
         grid-template-columns: 1fr;
       }
 
+      .audience-hub-grid,
       .laborers-context-grid,
       .laborers-journey-map,
       .laborers-stage-nav,
@@ -2404,6 +2491,35 @@
         <div id="resilience-bar" class="bar-fill" style="width:0%"></div>
       </div>
     </div>
+
+    <section class="audience-hub" aria-labelledby="audience-hub-title">
+      <div class="audience-hub-kicker">Choose your path</div>
+      <h2 id="audience-hub-title">One regional intelligence platform. Three ways in.</h2>
+      <p class="audience-hub-copy">Start with the perspective that matches what you need to understand. The globe remains the shared regional evidence surface across GVAI.</p>
+
+      <div class="audience-hub-grid">
+        <article class="audience-path-card" data-audience="laborers">
+          <div class="audience-path-label">For laborers</div>
+          <h3>Understand your work and options</h3>
+          <p>Review your occupation, local workforce evidence, related occupations, and things you may want to investigate next.</p>
+          <button id="audience-laborers-btn" type="button" class="primary">Enter Laborers</button>
+        </article>
+
+        <article class="audience-path-card" data-audience="business">
+          <div class="audience-path-label">For business</div>
+          <h3>Understand workforce conditions</h3>
+          <p>Review occupation-level regional employment, wage, preparation, and structural-exposure evidence for workforce planning.</p>
+          <button id="audience-business-btn" type="button" class="primary">Enter Business</button>
+        </article>
+
+        <article class="audience-path-card" data-audience="government">
+          <div class="audience-path-label">For government</div>
+          <h3>Understand regional labor conditions</h3>
+          <p>Inspect labor availability, workforce mix, housing pressure, structural exposure, and evidence boundaries for a selected region.</p>
+          <button id="audience-government-btn" type="button" class="primary">Enter Government</button>
+        </article>
+      </div>
+    </section>
 
     <section class="worker-journey" aria-labelledby="worker-journey-title">
       <h2 id="worker-journey-title">Explore your work options</h2>
@@ -8057,6 +8173,9 @@ document.getElementById("open-business-workspace-btn").addEventListener("click",
 document.getElementById("close-business-workspace-btn").addEventListener("click", closeBusinessWorkspace);
 document.getElementById("open-government-workspace-btn").addEventListener("click", openGovernmentWorkspace);
 document.getElementById("close-government-workspace-btn").addEventListener("click", closeGovernmentWorkspace);
+document.getElementById("audience-laborers-btn").addEventListener("click", () => openLaborersWorkspace());
+document.getElementById("audience-business-btn").addEventListener("click", openBusinessWorkspace);
+document.getElementById("audience-government-btn").addEventListener("click", openGovernmentWorkspace);
 document.getElementById("business-workforce-form").addEventListener("submit", event => {
   event.preventDefault();
   void loadBusinessWorkforceEvidence();
