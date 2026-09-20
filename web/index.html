@@ -777,6 +777,15 @@
       background: linear-gradient(145deg, rgba(16, 45, 42, 0.92), rgba(7, 22, 33, 0.94));
     }
 
+    .business-entry-kicker {
+      margin-bottom: 6px;
+      color: var(--good);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
     .business-entry h2 {
       margin: 0;
       font-size: 18px;
@@ -862,6 +871,44 @@
       color: var(--muted);
       font-size: 10px;
       line-height: 1.45;
+    }
+
+    .business-workflow-step {
+      border-top: 2px solid rgba(255,255,255,0.16);
+    }
+
+    .business-workflow-step:first-child {
+      border-top-color: var(--good);
+    }
+
+    .business-plan-section {
+      border-color: rgba(94, 227, 139, 0.34);
+      background: rgba(21, 54, 46, 0.2);
+    }
+
+    .business-plan-limit {
+      color: var(--good);
+      font-weight: 800;
+    }
+
+    .business-disclosure {
+      margin-top: 12px;
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
+    }
+
+    .business-disclosure summary {
+      cursor: pointer;
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .business-disclosure p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
     }
 
     .business-control-grid {
@@ -2374,9 +2421,10 @@
     </section>
 
     <section class="business-entry" aria-labelledby="business-entry-title">
+      <div class="business-entry-kicker">For business teams</div>
       <h2 id="business-entry-title">Business Workforce Intelligence</h2>
-      <p>Inspect published regional workforce evidence for occupations your operation needs. GVAI supplies evidence; the business makes the decision.</p>
-      <button id="open-business-workspace-btn" type="button">Open Business workspace</button>
+      <p>Review published regional workforce evidence for occupations your operation needs, then keep selected occupations in a local workforce plan.</p>
+      <button id="open-business-workspace-btn" type="button" class="primary">Open Business workspace</button>
     </section>
 
     <div class="section-title">Regional exploration</div>
@@ -2805,11 +2853,12 @@
       <div>
         <div class="laborers-workspace-kicker">Business Workspace</div>
         <div id="business-workspace-title" class="laborers-workspace-title">Workforce evidence</div>
-        <div class="laborers-workspace-copy">Select a public region, select an occupation, and review factual workforce evidence. This workspace does not compute a score for businesses, order occupations by preference, or tell an employer whom to hire.</div>
+        <div class="laborers-workspace-copy">Review published regional workforce evidence for selected occupations and keep an employer-selected local plan.</div>
         <div class="business-workflow" aria-label="Business workforce workflow">
-          <div class="business-workflow-step"><strong>1. Select region</strong><span id="business-region-context">Use the current globe region</span></div>
-          <div class="business-workflow-step"><strong>2. Select occupation</strong><span>Choose one occupation to inspect</span></div>
-          <div class="business-workflow-step"><strong>3. View evidence</strong><span>Employment, wage, STEX, preparation, and specificity</span></div>
+          <div class="business-workflow-step"><strong>1. Choose location</strong><span id="business-region-context">Use the current globe region</span></div>
+          <div class="business-workflow-step"><strong>2. Choose occupation</strong><span>Choose one occupation to inspect</span></div>
+          <div class="business-workflow-step"><strong>3. Review workforce evidence</strong><span>Employment, wage, STEX, preparation, and specificity</span></div>
+          <div class="business-workflow-step"><strong>4. Add to workforce plan</strong><span>Keep 1-10 employer-selected occupations in this browser</span></div>
         </div>
       </div>
       <button id="close-business-workspace-btn" type="button" class="laborers-workspace-close">Back to globe</button>
@@ -2844,18 +2893,22 @@
           </label>
           <button type="submit" class="primary">View evidence</button>
         </form>
-        <div id="business-workforce-status" class="stex-status">Select a supported U.S. region and occupation.</div>
+        <div id="business-workforce-status" class="stex-status" role="status" aria-live="polite">Select a supported U.S. region and occupation.</div>
         <div id="business-workforce-evidence" class="business-evidence-grid"></div>
+        <details class="business-disclosure">
+          <summary>Sources and evidence boundaries</summary>
+          <p>Employment and wage evidence comes from the published regional OEWS data returned for this selection. Exact occupation evidence is distinguished from a broader OEWS category when the source uses one. Preparation evidence comes from O*NET where available; STEX remains structural exposure evidence, not a prediction or staffing-reduction recommendation. This workspace does not compute a score for businesses.</p>
+        </details>
       </section>
 
-      <section class="laborers-stage" aria-labelledby="business-plan-title">
+      <section class="laborers-stage business-plan-section" aria-labelledby="business-plan-title">
         <div class="laborers-stage-head">
           <div>
-            <div id="business-plan-title" class="laborers-stage-title">Workforce plan</div>
-            <div class="laborers-stage-note">Browser-local list for 1-10 employer-selected occupations in this region. Order is preserved. This is a workforce plan, not a ranking. GVAI does not weight these occupations.</div>
+            <div id="business-plan-title" class="laborers-stage-title">Workforce plan <span class="business-plan-limit">(1-10)</span></div>
+            <div class="laborers-stage-note">Add the selected occupation after reviewing its evidence. The browser-local list preserves employer-selected order; it is not a ranking and GVAI does not weight these occupations.</div>
           </div>
         </div>
-        <div id="business-plan-status" class="stex-status">No occupations added yet.</div>
+        <div id="business-plan-status" class="stex-status" role="status" aria-live="polite">No occupations added yet. Add an occupation after reviewing its evidence.</div>
         <div class="business-plan-actions">
           <button id="business-add-plan-btn" type="button" class="worker-outlook-button">Add selected occupation</button>
           <button id="business-clear-plan-btn" type="button" class="worker-outlook-button">Clear plan</button>
@@ -2870,7 +2923,7 @@
             <div class="laborers-stage-note">Business and Government concepts belong near governance, but this repository only exposes the existing boundary/status. It does not copy the separate Safety Systems implementation.</div>
           </div>
         </div>
-        <div id="business-safety-status" class="worker-outlook-summary">Safety Systems governance status is loaded with workforce evidence. If no external decider is configured, GVAI reports unavailable rather than active governance.</div>
+        <div id="business-safety-status" class="worker-outlook-summary">GVAI Safety Systems status is shown only when returned by the workforce evidence response. If no external decider is configured, GVAI reports unavailable rather than active governance.</div>
       </section>
     </div>
   </main>
