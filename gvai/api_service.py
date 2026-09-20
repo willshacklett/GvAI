@@ -44,7 +44,6 @@ from gvai.postlabor.worker_personal_comparison import (
 )
 from gvai.postlabor.labor_providers import (
     OccupationReference,
-    live_jobs_provider_for_country,
     provider_for_country,
     unavailable_evidence,
 )
@@ -1148,15 +1147,25 @@ def api_worker_live_jobs():
     occupation_code = (request.args.get("occupation") or request.args.get("occupation_code") or "").strip() or None
     occupation_title = (request.args.get("occupation_title") or "").strip() or None
     location = (request.args.get("location") or "").strip() or None
+    schedule_type_code = (request.args.get("schedule_type_code") or "").strip() or None
+
+    raw_remote_only = (request.args.get("remote_only") or "").strip().lower()
+    if raw_remote_only not in {"", "true", "false"}:
+        return jsonify({
+            "ok": False,
+            "reason": "remote_only must be true or false when provided.",
+        }), 400
+    remote_only = None if not raw_remote_only else raw_remote_only == "true"
 
     try:
         latitude = float(request.args["lat"]) if request.args.get("lat") else None
         longitude = float(request.args["lon"]) if request.args.get("lon") else None
         radius = float(request.args["radius"]) if request.args.get("radius") else None
+        posted_within_days = int(request.args["posted_within_days"]) if request.args.get("posted_within_days") else None
     except (TypeError, ValueError):
         return jsonify({
             "ok": False,
-            "reason": "lat, lon, and radius must be numeric when provided.",
+            "reason": "lat, lon, radius, and posted_within_days must be numeric when provided.",
         }), 400
 
     try:
@@ -1167,16 +1176,18 @@ def api_worker_live_jobs():
             latitude=latitude,
             longitude=longitude,
             radius=radius,
+            remote_only=remote_only,
+            schedule_type_code=schedule_type_code,
+            posted_within_days=posted_within_days,
         )
     except ValueError as exc:
         return jsonify({"ok": False, "reason": str(exc)}), 400
 
     occupation = None
-    metadata = live_jobs_provider_for_country(context.country_code)
-    if occupation_code and occupation_title and metadata:
+    if occupation_code and occupation_title:
         occupation = OccupationReference(
             country_code=context.country_code,
-            provider=metadata.provider,
+            provider="public_search",
             provider_occupation_code=occupation_code,
             title=occupation_title,
             mapping_type="search_query",
@@ -1187,9 +1198,22 @@ def api_worker_live_jobs():
     payload.update({
         "ok": True,
         "capability": "live_job_openings",
-        "provider_configured": result.provider_registered,
+        "provider_configured": bool(result.providers),
+        "search_context": {
+            "country_code": context.country_code,
+            "occupation_code": context.occupation_code,
+            "occupation_title": occupation_title,
+            "location": context.location,
+            "latitude": context.latitude,
+            "longitude": context.longitude,
+            "radius": context.radius,
+            "remote_only": context.remote_only,
+            "schedule_type_code": context.schedule_type_code,
+            "posted_within_days": context.posted_within_days,
+        },
         "provenance": {
             "provider": result.provider,
+            "providers": list(result.providers),
             "attribution": result.attribution,
             "country_code": result.country_code,
         },

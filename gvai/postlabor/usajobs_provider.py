@@ -30,6 +30,35 @@ USAJOBS_METADATA = ProviderMetadata(
 class USAJobsProvider:
     metadata = USAJOBS_METADATA
     endpoint = "https://data.usajobs.gov/api/search"
+    supported_search_filters = frozenset({
+        "location",
+        "radius",
+        "remote_only",
+        "schedule_type_code",
+        "posted_within_days",
+    })
+    search_filter_options = {
+        "remote_only": (
+            {"value": "true", "label": "Remote only"},
+            {"value": "false", "label": "Exclude remote"},
+        ),
+        "schedule_type_code": (
+            {"value": "1", "label": "Full-time"},
+            {"value": "2", "label": "Part-time"},
+            {"value": "3", "label": "Shift work"},
+            {"value": "4", "label": "Intermittent"},
+            {"value": "5", "label": "Job sharing"},
+            {"value": "6", "label": "Multiple schedules"},
+        ),
+        "posted_within_days": (
+            {"value": "1", "label": "Past day"},
+            {"value": "3", "label": "Past 3 days"},
+            {"value": "7", "label": "Past week"},
+            {"value": "14", "label": "Past 2 weeks"},
+            {"value": "30", "label": "Past 30 days"},
+            {"value": "60", "label": "Past 60 days"},
+        ),
+    }
 
     def __init__(
         self,
@@ -73,6 +102,9 @@ class USAJobsProvider:
         latitude: float | None = None,
         longitude: float | None = None,
         radius: float | None = None,
+        remote_only: bool | None = None,
+        schedule_type_code: str | None = None,
+        posted_within_days: int | None = None,
     ) -> Sequence[Mapping[str, object]]:
         if (country_code or "US").upper() != "US":
             raise ValueError("USAJOBS only supports US openings.")
@@ -90,6 +122,12 @@ class USAJobsProvider:
             params["GeoLong"] = longitude
         if radius is not None:
             params["Radius"] = radius
+        if remote_only is not None:
+            params["RemoteIndicator"] = str(remote_only)
+        if schedule_type_code:
+            params["PositionScheduleTypeCode"] = schedule_type_code
+        if posted_within_days is not None:
+            params["DatePosted"] = posted_within_days
 
         response = self.session.get(
             self.endpoint,

@@ -1,4 +1,4 @@
-# Global Labor Provider Contract V1
+# Global Labor Provider Contract V2
 
 `gvai.postlabor.labor_providers` is the country/provider boundary for Laborers.
 
@@ -24,8 +24,10 @@ replace an unavailable observation with zero, 50, or a synthetic estimate.
 ## Live Jobs
 
 `LiveJobsProvider` is an adapter protocol for authorized APIs, feeds,
-aggregators, government services, and other authorized providers. It accepts an
-occupation reference and country only. It does not accept a Worker Profile.
+aggregators, government services, and other authorized providers. It accepts
+an occupation reference and explicit public search context only. Adapters
+declare their supported search filters and provider-specific option values.
+They do not accept a Worker Profile.
 
 `NormalizedJobOpening` preserves provider, provider job ID, occupation when
 known, title, employer, location, country, employment type, published
@@ -33,12 +35,21 @@ compensation, published remote/hybrid information, posting date, retrieval
 time, source attribution, and original apply URL. Unknown upstream values are
 null.
 
-`gvai.postlabor.live_jobs.LiveJobsRegistry` distinguishes
-`available_with_results`, `available_zero_results`, `provider_unavailable`,
-`unsupported_country`, and `provider_failure`. It validates adapter output and
-deduplicates by provider and provider job ID. The worker API accepts only
-public occupation and geographic search context; it never accepts a Worker
-Profile.
+`gvai.postlabor.live_jobs.LiveJobsRegistry` distinguishes results, zero results,
+authorization required, provider unavailable, temporary unavailability,
+unsupported filters, unsupported countries, and provider failure. It queries
+all eligible providers for a country and isolates one provider's failure from
+successful providers. It deduplicates the same provider ID and exact normalized
+source URLs only. A shared source URL retains every provider ID and attribution;
+similar titles alone are never merged.
+
+The normalized V2 request supports location, provider-supported radius,
+remote-only inclusion/exclusion, provider schedule codes, and posting recency.
+USAJOBS maps these to its documented `LocationName`, `Radius`,
+`RemoteIndicator`, `PositionScheduleTypeCode`, and `DatePosted` parameters.
+Unsupported filters are reported rather than silently ignored. Missing opening
+fields remain null; GVAI does not infer compensation, remote status, schedule,
+qualifications, distance, or occupational fit.
 
 ## Compatibility And Limits
 
@@ -50,8 +61,9 @@ worker's occupation title is sent as `Keyword` with `mapping_type=search_query`;
 it is not treated as a USAJOBS occupation mapping. Optional
 `USAJOBS_TIMEOUT_SECONDS`, `USAJOBS_RESULT_LIMIT`, and
 `GVAI_LIVE_JOBS_RESULT_LIMIT` settings are bounded by the adapter/registry.
-Missing configuration remains `provider_unavailable`; no scraping or fallback
-to another country's evidence occurs.
+Missing USAJOBS credentials produce `authorization_required` through the
+registered default capability. No scraping or fallback to another country's
+evidence occurs.
 
 The adapter preserves USAJOBS job IDs, titles, employer/location fields,
 published schedule/telework/date fields when supplied, the original apply URL,
@@ -90,9 +102,8 @@ USAJOBS adapter unchanged; `DEFAULT_LIVE_JOBS_REGISTRY` records provider
 success/failure into it after each search so `temporarily_unavailable`
 reflects real recent failures. The USAJOBS adapter itself is untouched.
 
-`GET /api/worker/live-jobs/capabilities?country=XX` reports the registry
-state for `live_job_openings` without exposing secrets: provider name,
-priority, attribution, and state only. The Laborers workspace calls this
-endpoint before searching so it can truthfully tell the worker whether live
-jobs are unsupported, awaiting authorization, temporarily unavailable, or
-available for the selected country, instead of assuming U.S. behavior.
+`GET /api/worker/live-jobs/capabilities?country=XX` reports the registry state
+for `live_job_openings` without exposing secrets: provider name, priority,
+attribution, state, supported public filters, and non-secret filter options.
+The Laborers workspace uses that response to enable only controls an active
+provider can honor.

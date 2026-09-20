@@ -1373,6 +1373,75 @@
       margin-top: 10px;
     }
 
+    .live-jobs-filters {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 10px;
+      margin: 12px 0;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.025);
+    }
+
+    .live-jobs-filter {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 750;
+    }
+
+    .live-jobs-filter input,
+    .live-jobs-filter select {
+      width: 100%;
+      min-width: 0;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      background: var(--panel);
+    }
+
+    .live-jobs-filter-actions {
+      display: flex;
+      align-items: end;
+      gap: 8px;
+    }
+
+    .live-jobs-filter-actions .worker-outlook-button {
+      margin: 0;
+      white-space: nowrap;
+    }
+
+    .live-jobs-context {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .live-job-item {
+      padding: 11px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .live-job-facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px 14px;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .live-job-source {
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
     .related-occupation-employment {
       margin-top: 3px;
       color: var(--muted);
@@ -1606,6 +1675,10 @@
       .laborers-context-grid,
       .laborers-journey-map,
       .laborers-stage-nav {
+        grid-template-columns: 1fr;
+      }
+
+      .live-jobs-filters {
         grid-template-columns: 1fr;
       }
 
@@ -2172,8 +2245,30 @@
             <div id="worker-stage-live-jobs-title" class="laborers-stage-title">Live Jobs</div>
             <div class="laborers-stage-note">Current openings retrieved from an authorized provider for the occupation and region you are investigating.</div>
           </div>
-          <button id="live-jobs-btn" type="button" class="worker-outlook-button">Refresh live jobs</button>
+          <button id="live-jobs-btn" type="button" class="worker-outlook-button">Search openings</button>
         </div>
+        <div id="live-jobs-context" class="live-jobs-context"></div>
+        <form id="live-jobs-filters" class="live-jobs-filters">
+          <label class="live-jobs-filter">Location
+            <input id="live-jobs-location" data-live-job-filter="location" type="text" autocomplete="address-level2" placeholder="City, state, or ZIP">
+          </label>
+          <label class="live-jobs-filter">Radius (miles)
+            <input id="live-jobs-radius" data-live-job-filter="radius" type="number" min="1" max="200" step="1" placeholder="Any radius">
+          </label>
+          <label class="live-jobs-filter">Remote status
+            <select id="live-jobs-remote" data-live-job-filter="remote_only"><option value="">Any published status</option></select>
+          </label>
+          <label class="live-jobs-filter">Schedule
+            <select id="live-jobs-schedule" data-live-job-filter="schedule_type_code"><option value="">Any published schedule</option></select>
+          </label>
+          <label class="live-jobs-filter">Posting date
+            <select id="live-jobs-recency" data-live-job-filter="posted_within_days"><option value="">Any posting date</option></select>
+          </label>
+          <div class="live-jobs-filter-actions">
+            <button type="submit" class="worker-outlook-button">Apply filters</button>
+            <button id="live-jobs-clear-filters" type="button" class="worker-outlook-button">Clear</button>
+          </div>
+        </form>
         <div id="live-jobs-card" class="related-occupations-card visible" aria-live="polite">
           <div id="live-jobs-status" class="stex-status">Live job openings are not available from a configured provider for this region yet.</div>
           <div id="live-jobs-content"></div>
@@ -7633,20 +7728,34 @@ async function loadWorkerOutlook() {
 }
 
 function renderLiveJobOpening(opening) {
+  const compensation = opening.compensation;
+  let compensationText = null;
+  if (compensation) {
+    const currency = compensation.currency || "currency unknown";
+    const interval = compensation.interval ? ` per ${compensation.interval}` : "";
+    if (compensation.minimum_amount !== null && compensation.minimum_amount !== undefined && compensation.maximum_amount !== null && compensation.maximum_amount !== undefined) {
+      compensationText = `${currency} ${Number(compensation.minimum_amount).toLocaleString()}–${Number(compensation.maximum_amount).toLocaleString()}${interval}`;
+    } else if (compensation.amount !== null && compensation.amount !== undefined) {
+      compensationText = `${currency} ${Number(compensation.amount).toLocaleString()}${interval}`;
+    }
+  }
   const facts = [
-    opening.employer ? `<div><strong>Employer:</strong> ${escapeHtml(opening.employer)}</div>` : "",
-    opening.location ? `<div><strong>Location:</strong> ${escapeHtml(opening.location)}</div>` : "",
-    opening.country_code ? `<div><strong>Country:</strong> ${escapeHtml(opening.country_code)}</div>` : "",
-    opening.employment_type ? `<div><strong>Employment type:</strong> ${escapeHtml(opening.employment_type)}</div>` : "",
-    opening.remote_or_hybrid ? `<div><strong>Remote/hybrid:</strong> ${escapeHtml(opening.remote_or_hybrid)}</div>` : "",
-    opening.compensation ? `<div><strong>Compensation published:</strong> ${escapeHtml(JSON.stringify(opening.compensation))}</div>` : "",
-    opening.posted_at ? `<div><strong>Posted:</strong> ${escapeHtml(opening.posted_at)}</div>` : ""
+    opening.employer ? `<span><strong>Employer:</strong> ${escapeHtml(opening.employer)}</span>` : "",
+    opening.location ? `<span><strong>Location:</strong> ${escapeHtml(opening.location)}</span>` : "",
+    opening.employment_type ? `<span><strong>Schedule:</strong> ${escapeHtml(opening.employment_type)}</span>` : "",
+    opening.remote_or_hybrid ? `<span><strong>Telework:</strong> ${escapeHtml(opening.remote_or_hybrid)}</span>` : "",
+    compensationText ? `<span><strong>Published pay:</strong> ${escapeHtml(compensationText)}</span>` : "",
+    opening.posted_at ? `<span><strong>Posted:</strong> ${escapeHtml(opening.posted_at.slice(0, 10))}</span>` : ""
   ].filter(Boolean).join("");
+  const references = Array.isArray(opening.provider_references) && opening.provider_references.length
+    ? opening.provider_references
+    : [{ source_attribution: opening.source_attribution, provider: opening.provider }];
+  const sources = references.map(reference => reference.source_attribution || reference.provider).filter(Boolean).join(", ");
   return `
     <article class="related-occupation-item live-job-item">
       <div class="transition-evidence-subtitle">${escapeHtml(opening.title || "Untitled opening")}</div>
-      <div class="worker-outlook-summary">${facts || "No additional published details."}</div>
-      <div class="worker-outlook-summary">Source: ${escapeHtml(opening.source_attribution || opening.provider || "Unknown provider")}</div>
+      <div class="live-job-facts">${facts || "No additional published details."}</div>
+      <div class="live-job-source">Source: ${escapeHtml(sources || "Unknown provider")}</div>
       <a class="worker-outlook-button" href="${escapeHtml(opening.apply_url)}" target="_blank" rel="noopener noreferrer">Apply at source</a>
     </article>
   `;
@@ -7669,6 +7778,35 @@ async function fetchLiveJobsCapability(countryCode) {
     console.error("Live jobs capability lookup failed:", error);
     return null;
   }
+}
+
+function configureLiveJobsFilters(capability) {
+  const configuredProviders = Array.isArray(capability?.providers)
+    ? capability.providers.filter(provider => provider.state === "configured")
+    : [];
+  const supported = new Set(configuredProviders.flatMap(provider => provider.supported_search_filters || []));
+  document.querySelectorAll("[data-live-job-filter]").forEach(control => {
+    const enabled = supported.has(control.dataset.liveJobFilter);
+    control.disabled = !enabled;
+    control.title = enabled ? "" : "The active provider does not support this filter.";
+    if (!enabled) control.value = "";
+  });
+  const optionControls = {
+    remote_only: document.getElementById("live-jobs-remote"),
+    schedule_type_code: document.getElementById("live-jobs-schedule"),
+    posted_within_days: document.getElementById("live-jobs-recency"),
+  };
+  Object.entries(optionControls).forEach(([filter, control]) => {
+    if (!control) return;
+    const emptyLabel = control.options[0]?.textContent || "Any";
+    const selected = control.value;
+    const options = configuredProviders.flatMap(provider => provider.search_filter_options?.[filter] || []);
+    const unique = new Map(options.map(option => [String(option.value), option]));
+    control.innerHTML = `<option value="">${escapeHtml(emptyLabel)}</option>` + Array.from(unique.values()).map(option =>
+      `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`
+    ).join("");
+    if (unique.has(selected)) control.value = selected;
+  });
 }
 
 async function loadLiveJobs() {
@@ -7695,6 +7833,16 @@ async function loadLiveJobs() {
   }
   if (currentRegionLatitude !== null) params.set("lat", currentRegionLatitude);
   if (currentRegionLongitude !== null) params.set("lon", currentRegionLongitude);
+  const selectedFilters = {
+    location: document.getElementById("live-jobs-location")?.value.trim(),
+    radius: document.getElementById("live-jobs-radius")?.value,
+    remote_only: document.getElementById("live-jobs-remote")?.value,
+    schedule_type_code: document.getElementById("live-jobs-schedule")?.value,
+    posted_within_days: document.getElementById("live-jobs-recency")?.value,
+  };
+  Object.entries(selectedFilters).forEach(([name, value]) => {
+    if (value) params.set(name, value);
+  });
 
   openLaborersWorkspace("live-jobs");
   setWorkerJourneyStep(5);
@@ -7708,6 +7856,7 @@ async function loadLiveJobs() {
     content.innerHTML = "";
     return;
   }
+  configureLiveJobsFilters(capability);
 
   try {
     const response = await fetch(`${window.GVAI_API_BASE || ""}/api/worker/live-jobs?${params.toString()}`);
@@ -7719,14 +7868,29 @@ async function loadLiveJobs() {
       return;
     }
     const openings = Array.isArray(data.openings) ? data.openings : [];
+    const context = data.search_context || {};
+    const region = context.location || (
+      context.latitude !== null && context.latitude !== undefined && context.longitude !== null && context.longitude !== undefined
+        ? `${context.latitude}, ${context.longitude}`
+        : context.country_code || countryCode
+    );
+    const providers = Array.isArray(data.providers) && data.providers.length
+      ? data.providers.join(", ")
+      : data.provider || "No active provider";
+    document.getElementById("live-jobs-context").textContent =
+      `Occupation: ${context.occupation_title || occupationTitle || occupationCode} · Region: ${region} · Provider: ${providers}`;
     if (data.status === "available_with_results") {
-      status.textContent = `${openings.length} opening${openings.length === 1 ? "" : "s"} from ${data.provider || "the configured provider"}.`;
+      const partial = Array.isArray(data.provider_failures) && data.provider_failures.length ? " Some providers were unavailable." : "";
+      status.textContent = `${openings.length} opening${openings.length === 1 ? "" : "s"}.${partial}`;
       content.innerHTML = openings.map(renderLiveJobOpening).join("");
     } else if (data.status === "available_zero_results") {
       status.textContent = `No current openings were published by ${data.provider || "the configured provider"} for this search.`;
     } else {
       const stateMessages = {
         provider_unavailable: "Live job openings are not available from a configured provider for this region yet.",
+        authorization_required: "A registered live jobs provider requires authorization.",
+        temporarily_unavailable: "Registered live jobs providers are temporarily unavailable.",
+        unsupported_filters: `The active providers cannot honor: ${(data.unsupported_filters || []).join(", ")}.`,
         unsupported_country: "Live job openings are not supported for this country yet.",
         provider_failure: "The live jobs provider could not return a valid response right now.",
       };
@@ -8435,6 +8599,20 @@ document
 document
   .getElementById("live-jobs-btn")
   .addEventListener("click", () => {
+    void loadLiveJobs();
+  });
+
+document
+  .getElementById("live-jobs-filters")
+  .addEventListener("submit", event => {
+    event.preventDefault();
+    void loadLiveJobs();
+  });
+
+document
+  .getElementById("live-jobs-clear-filters")
+  .addEventListener("click", () => {
+    document.getElementById("live-jobs-filters").reset();
     void loadLiveJobs();
   });
 

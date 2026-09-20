@@ -25,7 +25,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Callable, Literal, Sequence
+from typing import Callable, Literal, Mapping, Sequence
 
 from gvai.postlabor.labor_providers import EvidenceCapability
 
@@ -82,6 +82,8 @@ class ProviderCapabilityStatus:
     attribution: str
     state: ProviderRuntimeState
     reason: str | None
+    supported_search_filters: tuple[str, ...] = ()
+    search_filter_options: Mapping[str, tuple[Mapping[str, str], ...]] | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -92,6 +94,8 @@ class ProviderCapabilityStatus:
             "attribution": self.attribution,
             "state": self.state,
             "reason": self.reason,
+            "supported_search_filters": list(self.supported_search_filters),
+            "search_filter_options": self.search_filter_options or {},
         }
 
 
@@ -203,6 +207,10 @@ class GlobalProviderRegistry:
             attribution=registration.attribution,
             state=state,
             reason=reason,
+            supported_search_filters=tuple(sorted(
+                getattr(registration.adapter, "supported_search_filters", ())
+            )),
+            search_filter_options=getattr(registration.adapter, "search_filter_options", {}),
         )
 
     def capability_report(
