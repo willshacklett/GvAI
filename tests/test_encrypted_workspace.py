@@ -218,6 +218,106 @@ time.sleep(10)
         os.kill(process_id, 0)
 
 
+def test_timed_out_worker_and_its_descendant_are_both_terminated(tmp_path):
+    """A worker that spawns a long-lived descendant must not leave that
+    descendant alive after the broker kills the worker for a protocol
+    timeout: both must die, and the direct child must be reaped."""
+
+    broker = build_broker(tmp_path)
+
+    leader_pid_path = tmp_path / "leader.pid"
+    descendant_pid_path = tmp_path / "descendant.pid"
+
+    source = f'''
+import os
+import subprocess
+import time
+
+descendant = subprocess.Popen(["sleep", "30"])
+
+with open({str(leader_pid_path)!r}, "w", encoding="utf-8") as handle:
+    handle.write(str(os.getpid()))
+    handle.flush()
+    os.fsync(handle.fileno())
+
+with open({str(descendant_pid_path)!r}, "w", encoding="utf-8") as handle:
+    handle.write(str(descendant.pid))
+    handle.flush()
+    os.fsync(handle.fileno())
+
+# Never speaks the WorkspaceBroker protocol -- forces a timeout.
+time.sleep(30)
+'''
+
+    started = time.monotonic()
+    with pytest.raises(WorkspaceWorkerError, match="workspace worker failed"):
+        run_worker(tmp_path, broker, source, timeout=1.0)
+    elapsed = time.monotonic() - started
+    assert elapsed < 4.0
+
+    deadline = time.monotonic() + 2.0
+    while (
+        not leader_pid_path.exists() or not descendant_pid_path.exists()
+    ) and time.monotonic() < deadline:
+        time.sleep(0.05)
+
+    leader_pid = int(leader_pid_path.read_text().strip())
+    descendant_pid = int(descendant_pid_path.read_text().strip())
+
+    # The broker's direct child is reaped -- no zombie left behind.
+    with pytest.raises(ChildProcessError):
+        os.waitpid(leader_pid, os.WNOHANG)
+    with pytest.raises(ProcessLookupError):
+        os.kill(leader_pid, 0)
+
+    deadline = time.monotonic() + 2.0
+    descendant_gone = False
+    while time.monotonic() < deadline:
+        try:
+            os.kill(descendant_pid, 0)
+        except ProcessLookupError:
+            descendant_gone = True
+            break
+        time.sleep(0.05)
+    assert descendant_gone
+
+
+def test_successful_worker_run_does_not_kill_anything(tmp_path):
+    broker = build_broker(tmp_path)
+    killed = []
+    real_killpg = os.killpg
+
+    def spy_killpg(pgid, sig):
+        killed.append((pgid, sig))
+        return real_killpg(pgid, sig)
+
+    import privacy.encrypted_workspace as ews
+
+    original = ews.os.killpg
+    ews.os.killpg = spy_killpg
+    try:
+        run_worker(tmp_path, broker, r'''
+import json
+import sys
+print(json.dumps({"operation": "write", "path": "ok.txt", "content_b64": "b2s="}), flush=True)
+assert json.loads(sys.stdin.readline()) == {"ok": True}
+''')
+    finally:
+        ews.os.killpg = original
+
+    assert killed == []
+
+
+def test_extra_env_cannot_override_broker_owned_variables(tmp_path):
+    broker = build_broker(tmp_path)
+    with pytest.raises(WorkspaceWorkerError, match="workspace worker failed"):
+        broker.run_worker(
+            [sys.executable, "-c", "pass"],
+            extra_env={"PATH": "/attacker-controlled"},
+        )
+
+
+
 def test_large_response_completes_across_partial_writes(tmp_path):
     broker = build_broker(tmp_path)
     run_worker(tmp_path, broker, r'''

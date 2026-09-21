@@ -323,9 +323,19 @@ class WorkspaceBroker:
         command: Sequence[str],
         *,
         timeout: float = 30.0,
+        extra_env: dict[str, str] | None = None,
     ) -> int:
         resolved_command = [str(part) for part in command]
         if not resolved_command:
+            raise WorkspaceWorkerError("workspace worker failed")
+
+        # extra_env may only add names the broker does not itself manage.
+        # A caller (bug or otherwise) attempting to override a broker-owned
+        # variable (e.g. PATH) through this channel fails closed instead of
+        # silently winning the collision.
+        if extra_env and any(
+            str(name) in self._ENV_ALLOWLIST for name in extra_env
+        ):
             raise WorkspaceWorkerError("workspace worker failed")
 
         environment = {
@@ -333,6 +343,13 @@ class WorkspaceBroker:
             for name, value in os.environ.items()
             if name in self._ENV_ALLOWLIST
         }
+        # Callers may add a narrow set of non-secret config values (e.g. an
+        # inference command name). This never widens beyond what the caller
+        # explicitly hands in; the full parent environment is still filtered
+        # through the allowlist above.
+        if extra_env:
+            for name, value in extra_env.items():
+                environment[str(name)] = str(value)
         environment.setdefault("PATH", os.defpath)
         environment["PYTHONUNBUFFERED"] = "1"
 
@@ -389,11 +406,8 @@ class WorkspaceBroker:
                 response_stream.close()
             if request_stream is not None:
                 request_stream.close()
-            try:
-                os.kill(process_id, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            os.waitpid(process_id, 0)
+            self.__terminate_worker_group(process_id)
+            self.__reap(process_id)
             raise WorkspaceWorkerError("workspace worker failed") from None
 
         selector = selectors.DefaultSelector()
@@ -446,11 +460,8 @@ class WorkspaceBroker:
                 raise WorkspaceWorkerError("workspace worker failed")
         except Exception:
             if not process_reaped:
-                try:
-                    os.kill(process_id, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                os.waitpid(process_id, 0)
+                self.__terminate_worker_group(process_id)
+                self.__reap(process_id)
                 process_reaped = True
             raise WorkspaceWorkerError("workspace worker failed") from None
         finally:
@@ -461,6 +472,41 @@ class WorkspaceBroker:
                 response_stream.close()
 
         return request_count
+
+    @staticmethod
+    def __terminate_worker_group(process_id: int) -> None:
+        """Kill the worker's entire process group/session, not just its leader.
+
+        ``run_worker`` always spawns with ``setsid=True``, so the worker
+        becomes the leader of a brand-new session and process group whose
+        id equals its own pid -- distinct from the broker's own process
+        group. Signaling that group (rather than only the leader pid)
+        reaches network-sandbox and local-model descendants the leader may
+        have spawned, so none of them can outlive a killed/timed-out
+        worker while holding decrypted request/result data.
+
+        This fails directly to SIGKILL (no graceful phase) to match the
+        existing fail-secure timeout/error handling in this method.
+        """
+
+        try:
+            os.killpg(process_id, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+
+        # Defensive fallback in case the leader was somehow not its own
+        # process group (should not happen with setsid=True).
+        try:
+            os.kill(process_id, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+    @staticmethod
+    def __reap(process_id: int) -> None:
+        try:
+            os.waitpid(process_id, 0)
+        except ChildProcessError:
+            pass
 
     def __write_response(
         self,
