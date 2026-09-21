@@ -101,13 +101,22 @@ def _build_prompt(
     )
 
 
-def run_local_model() -> Dict[str, Any]:
-    request = _read_request()
+def call_local_model(
+    system_prompt: str,
+    user_content: str,
+) -> Dict[str, Any]:
+    """Invoke the configured local inference engine directly.
+
+    This is the shared core used by both the stdin/stdout one-shot worker
+    protocol (``run_local_model``) and any broker-compatible worker that
+    receives its request through a different channel (e.g. WorkspaceClient).
+    """
+
     command = _model_command()
 
     prompt = _build_prompt(
-        request["system_prompt"],
-        request["user_content"],
+        system_prompt,
+        user_content,
     )
 
     timeout = float(
@@ -147,6 +156,14 @@ def run_local_model() -> Dict[str, Any]:
         ),
         "reply": reply,
     }
+
+
+def run_local_model() -> Dict[str, Any]:
+    request = _read_request()
+    return call_local_model(
+        request["system_prompt"],
+        request["user_content"],
+    )
 
 
 def main() -> int:
