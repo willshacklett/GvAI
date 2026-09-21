@@ -69,16 +69,43 @@ jobs:
           grep -E '^(NoNewPrivs|Seccomp|Seccomp_filters|CapInh|CapPrm|CapEff|CapBnd|CapAmb):' \
             /proc/self/status || true
 
+      - name: Install scoped CI user-namespace profile
+        if: >-
+          github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          if ! command -v aa-exec >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes apparmor-utils
+          fi
+
+          profile_path=/tmp/gvai-private-runtime-ci.apparmor
+          sudo tee "$profile_path" >/dev/null <<'EOF'
+          abi <abi/4.0>,
+          include <tunables/global>
+
+          profile gvai-private-runtime-ci flags=(unconfined) {
+            userns,
+          }
+          EOF
+
+          sudo apparmor_parser --replace "$profile_path"
+          aa-exec -p gvai-private-runtime-ci -- \
+            unshare --user --map-root-user -- \
+            python -c 'print("Scoped user namespace passed")'
+
       - name: Verify real sandbox execution
         run: |
-          timeout --kill-after=5s 15s \
-            privacy/run_network_sandbox.sh \
-            python -c 'print("Sandbox execution passed")'
+          aa-exec -p gvai-private-runtime-ci -- \
+            timeout --kill-after=5s 15s \
+              privacy/run_network_sandbox.sh \
+              python -c 'print("Sandbox execution passed")'
 
       - name: Run privacy tests
         run: |
           # These three exclusions predate this workflow. Do not add new
           # exclusions to conceal regressions or unsupported isolation.
+          aa-exec -p gvai-private-runtime-ci -- \
           timeout --kill-after=5s 180s python -m pytest -q \
             tests/test_staging_readiness.py \
             tests/test_encrypted_workspace.py \
@@ -111,3 +138,11 @@ jobs:
               raise SystemExit("Selected privacy tests must not be skipped.")
           print("Required smoke test ran; no selected tests were skipped.")
           PY
+
+      - name: Remove scoped CI user-namespace profile
+        if: always()
+        run: |
+          profile_path=/tmp/gvai-private-runtime-ci.apparmor
+          if [ -f "$profile_path" ]; then
+            sudo apparmor_parser --remove "$profile_path" || true
+          fi
