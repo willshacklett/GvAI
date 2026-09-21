@@ -1,5 +1,7 @@
 import json
+import os
 import sys
+import time
 
 import pytest
 
@@ -172,6 +174,72 @@ import time
 os.close(1)
 time.sleep(10)
     ''', timeout=0.1)
+
+
+def test_worker_not_reading_large_response_is_killed_and_reaped(tmp_path):
+    broker = build_broker(tmp_path)
+    run_worker(tmp_path, broker, r'''
+import base64
+import json
+import sys
+
+print(json.dumps({
+    "operation": "write",
+    "path": "large.bin",
+    "content_b64": base64.b64encode(b"x" * (1024 * 1024)).decode(),
+}), flush=True)
+assert json.loads(sys.stdin.readline()) == {"ok": True}
+''')
+
+    process_id_path = tmp_path / "worker.pid"
+    source = f'''
+import json
+import os
+import time
+
+with open({str(process_id_path)!r}, "w", encoding="utf-8") as handle:
+    handle.write(str(os.getpid()))
+    handle.flush()
+    os.fsync(handle.fileno())
+
+print(json.dumps({{"operation": "read", "path": "large.bin"}}), flush=True)
+time.sleep(10)
+'''
+    started = time.monotonic()
+    with pytest.raises(WorkspaceWorkerError, match="workspace worker failed"):
+        run_worker(tmp_path, broker, source, timeout=0.25)
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 2.0
+    process_id = int(process_id_path.read_text())
+    with pytest.raises(ChildProcessError):
+        os.waitpid(process_id, os.WNOHANG)
+    with pytest.raises(ProcessLookupError):
+        os.kill(process_id, 0)
+
+
+def test_large_response_completes_across_partial_writes(tmp_path):
+    broker = build_broker(tmp_path)
+    run_worker(tmp_path, broker, r'''
+import base64
+import json
+import sys
+
+content = b"y" * (1024 * 1024)
+print(json.dumps({
+    "operation": "write",
+    "path": "large-readable.bin",
+    "content_b64": base64.b64encode(content).decode(),
+}), flush=True)
+assert json.loads(sys.stdin.readline()) == {"ok": True}
+
+print(json.dumps({
+    "operation": "read",
+    "path": "large-readable.bin",
+}), flush=True)
+response = json.loads(sys.stdin.readline())
+assert base64.b64decode(response["content_b64"]) == content
+''')
 
 
 class ExplodingControlPlane:

@@ -302,6 +302,7 @@ class WorkspaceBroker:
     """Trusted parent that binds server-side session state to worker requests."""
 
     _MAX_REQUEST_BYTES = 16 * 1024 * 1024
+    _MAX_RESPONSE_BYTES = 16 * 1024 * 1024
     _ENV_ALLOWLIST = frozenset({"LANG", "LC_ALL", "PATH", "TZ"})
 
     def __init__(
@@ -371,6 +372,7 @@ class WorkspaceBroker:
             request_write = -1
             response_stream = os.fdopen(response_write, "wb", buffering=0)
             response_write = -1
+            os.set_blocking(response_stream.fileno(), False)
             request_stream = os.fdopen(request_read, "rb", buffering=0)
             request_read = -1
             process_descriptor = os.pidfd_open(process_id)
@@ -418,9 +420,10 @@ class WorkspaceBroker:
                 while b"\n" in pending:
                     line, pending = pending.split(b"\n", 1)
                     response = self.__handle_request(line)
-                    response_stream.write(
-                        json.dumps(response, sort_keys=True).encode("utf-8")
-                        + b"\n"
+                    self.__write_response(
+                        response_stream.fileno(),
+                        response,
+                        deadline,
                     )
                     request_count += 1
 
@@ -458,6 +461,33 @@ class WorkspaceBroker:
                 response_stream.close()
 
         return request_count
+
+    def __write_response(
+        self,
+        descriptor: int,
+        response: dict[str, object],
+        deadline: float,
+    ) -> None:
+        frame = json.dumps(response, sort_keys=True).encode("utf-8") + b"\n"
+        if len(frame) > self._MAX_RESPONSE_BYTES:
+            raise WorkspaceWorkerError("workspace worker failed")
+
+        pending = memoryview(frame)
+        with selectors.DefaultSelector() as write_selector:
+            write_selector.register(descriptor, selectors.EVENT_WRITE)
+            while pending:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0 or not write_selector.select(remaining):
+                    raise WorkspaceWorkerError("workspace worker failed")
+                try:
+                    written = os.write(descriptor, pending)
+                except (BlockingIOError, InterruptedError):
+                    continue
+                except OSError:
+                    raise WorkspaceWorkerError("workspace worker failed") from None
+                if written <= 0:
+                    raise WorkspaceWorkerError("workspace worker failed")
+                pending = pending[written:]
 
     def __handle_request(self, raw: bytes) -> dict[str, object]:
         try:
