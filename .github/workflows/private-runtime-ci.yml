@@ -1,0 +1,86 @@
+name: Private Runtime CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-runtime-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  privacy-tests:
+    name: Privacy tests and real sandbox
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GVAI_RUN_STAGING_SMOKE: "1"
+      PYTHONOPTIMIZE: "0"
+      PYTEST_ADDOPTS: ""
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install declared dependencies
+        run: |
+          python -m pip install \
+            -r requirements.txt \
+            -r requirements-dev.txt \
+            -r gateway/requirements.txt
+          python -m pip check
+
+      - name: Verify real sandbox execution
+        run: |
+          timeout --kill-after=5s 15s \
+            privacy/run_network_sandbox.sh \
+            python -c 'print("Sandbox execution passed")'
+
+      - name: Run privacy tests
+        run: |
+          # These three exclusions predate this workflow. Do not add new
+          # exclusions to conceal regressions or unsupported isolation.
+          timeout --kill-after=5s 180s python -m pytest -q \
+            tests/test_staging_readiness.py \
+            tests/test_encrypted_workspace.py \
+            tests/integration/test_private_build_encrypted_workspace.py \
+            tests/integration/test_private_runtime_staging_smoke.py \
+            tests/integration/test_private_build_runtime.py \
+            tests/integration/test_local_model_worker.py \
+            tests/integration/test_llama_cpp_engine.py \
+            tests/integration/test_private_build_network_boundary.py \
+            tests/test_privacy_side_doors.py \
+            --deselect=tests/integration/test_private_build_runtime.py::test_model_router_uses_network_isolated_private_worker \
+            --deselect=tests/integration/test_private_build_runtime.py::test_model_router_keeps_external_path_when_private_mode_disabled \
+            --deselect=tests/test_privacy_side_doors.py::test_model_router_blocked \
+            --junitxml=privacy-test-results.xml
+
+      - name: Reject skipped or missing smoke tests
+        run: |
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse("privacy-test-results.xml").getroot()
+          cases = list(root.iter("testcase"))
+          smoke = [
+              case for case in cases
+              if case.get("name") == "test_real_encrypted_runtime_boundary"
+          ]
+          if not cases or len(smoke) != 1:
+              raise SystemExit("Required smoke test was not collected.")
+          if any(case.find("skipped") is not None for case in cases):
+              raise SystemExit("Selected privacy tests must not be skipped.")
+          print("Required smoke test ran; no selected tests were skipped.")
+          PY
