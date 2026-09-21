@@ -1,5 +1,6 @@
 flask
 flask-cors
+cryptography>=43,<47
 openai
 python-dotenv
 numpy
