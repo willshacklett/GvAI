@@ -42,6 +42,33 @@ jobs:
             -r gateway/requirements.txt
           python -m pip check
 
+      - name: Report namespace policy diagnostics
+        shell: bash
+        run: |
+          uname -sr
+          id
+          unshare --version
+          python --version
+          for policy in \
+            /proc/sys/kernel/unprivileged_userns_clone \
+            /proc/sys/kernel/apparmor_restrict_unprivileged_userns \
+            /proc/sys/user/max_user_namespaces \
+            /proc/sys/user/max_net_namespaces \
+            /proc/self/attr/current \
+            /proc/self/uid_map \
+            /proc/self/gid_map \
+            /sys/module/apparmor/parameters/enabled
+          do
+            printf '\n%s\n' "$policy"
+            if [ -r "$policy" ]; then
+              cat "$policy" || true
+            else
+              printf 'Unavailable or unreadable\n'
+            fi
+          done
+          grep -E '^(NoNewPrivs|Seccomp|Seccomp_filters|CapInh|CapPrm|CapEff|CapBnd|CapAmb):' \
+            /proc/self/status || true
+
       - name: Verify real sandbox execution
         run: |
           timeout --kill-after=5s 15s \
