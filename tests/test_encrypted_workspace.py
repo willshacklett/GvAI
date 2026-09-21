@@ -282,6 +282,23 @@ time.sleep(30)
     assert descendant_gone
 
 
+def test_failed_worker_group_is_signaled_before_leader_is_reaped(tmp_path, monkeypatch):
+    broker = build_broker(tmp_path)
+    observed = []
+    real_killpg = os.killpg
+
+    def checked_killpg(pgid, sig):
+        status = os.waitid(os.P_PID, pgid, os.WEXITED | os.WNOWAIT)
+        observed.append((status.si_code, status.si_status))
+        return real_killpg(pgid, sig)
+
+    monkeypatch.setattr(os, "killpg", checked_killpg)
+    with pytest.raises(WorkspaceWorkerError, match="workspace worker failed"):
+        run_worker(tmp_path, broker, "import os; os._exit(7)")
+
+    assert observed == [(os.CLD_EXITED, 7)]
+
+
 def test_successful_worker_run_does_not_kill_anything(tmp_path):
     broker = build_broker(tmp_path)
     killed = []

@@ -454,10 +454,20 @@ class WorkspaceBroker:
             remaining = deadline - time.monotonic()
             if remaining <= 0 or not selector.select(remaining):
                 raise WorkspaceWorkerError("workspace worker failed")
-            _, status = os.waitpid(process_id, 0)
-            process_reaped = True
-            if os.waitstatus_to_exitcode(status) != 0:
+            # Inspect without reaping: failure cleanup must signal the
+            # group before releasing the leader's PID for reuse.
+            exit_info = os.waitid(
+                os.P_PID,
+                process_id,
+                os.WEXITED | os.WNOWAIT,
+            )
+            if (
+                exit_info.si_code != os.CLD_EXITED
+                or exit_info.si_status != 0
+            ):
                 raise WorkspaceWorkerError("workspace worker failed")
+            os.waitpid(process_id, 0)
+            process_reaped = True
         except Exception:
             if not process_reaped:
                 self.__terminate_worker_group(process_id)
@@ -475,15 +485,16 @@ class WorkspaceBroker:
 
     @staticmethod
     def __terminate_worker_group(process_id: int) -> None:
-        """Kill the worker's entire process group/session, not just its leader.
+        """Kill the worker's original process group, not just its leader.
 
         ``run_worker`` always spawns with ``setsid=True``, so the worker
         becomes the leader of a brand-new session and process group whose
         id equals its own pid -- distinct from the broker's own process
         group. Signaling that group (rather than only the leader pid)
-        reaches network-sandbox and local-model descendants the leader may
-        have spawned, so none of them can outlive a killed/timed-out
-        worker while holding decrypted request/result data.
+        reaches descendants that remain in that process group.
+        Descendants that create or join another process group are not
+        contained by this mechanism. This is not complete process-tree
+        containment.
 
         This fails directly to SIGKILL (no graceful phase) to match the
         existing fail-secure timeout/error handling in this method.
