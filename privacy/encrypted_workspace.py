@@ -13,12 +13,13 @@ from pathlib import Path, PurePosixPath
 from typing import Callable, FrozenSet, Protocol, Sequence
 import base64
 import binascii
+import errno
 import hashlib
 import json
 import os
 import selectors
 import signal
-import tempfile
+import stat
 import time
 
 from cryptography.exceptions import InvalidTag
@@ -144,6 +145,13 @@ class EncryptedProjectWorkspace:
     ):
         self.__root = Path(root).resolve()
         self.__root.mkdir(parents=True, exist_ok=True)
+        root_status = self.__root.stat()
+        if not stat.S_ISDIR(root_status.st_mode):
+            raise ValueError("workspace root must be a directory")
+        self.__root_identity = (
+            root_status.st_dev,
+            root_status.st_ino,
+        )
         self.__control_plane = control_plane
         self.__audit_log = audit_log
 
@@ -154,7 +162,7 @@ class EncryptedProjectWorkspace:
         content: bytes | None = None,
     ) -> bytes | None:
         try:
-            target, normalized = self.__resolve_path(
+            path_parts, normalized = self.__validate_path(
                 request.project_id,
                 request.path,
             )
@@ -194,7 +202,15 @@ class EncryptedProjectWorkspace:
                     "workspace operation failed"
                 ) from None
             try:
-                self.__atomic_write(target, self._FORMAT + sealed)
+                self.__atomic_write(
+                    path_parts,
+                    self._FORMAT + sealed,
+                )
+            except WorkspaceAccessDenied:
+                self.__audit_log.write(request, False, "invalid_path")
+                raise WorkspaceAccessDenied(
+                    "workspace request denied"
+                ) from None
             except Exception:
                 self.__audit_log.write(request, False, "storage_failure")
                 raise WorkspaceIntegrityError(
@@ -203,7 +219,12 @@ class EncryptedProjectWorkspace:
             result = None
         elif request.operation == "read":
             try:
-                encrypted = target.read_bytes()
+                encrypted = self.__read_file(path_parts)
+            except WorkspaceAccessDenied:
+                self.__audit_log.write(request, False, "invalid_path")
+                raise WorkspaceAccessDenied(
+                    "workspace request denied"
+                ) from None
             except OSError:
                 self.__audit_log.write(request, False, "data_unavailable")
                 raise WorkspaceIntegrityError(
@@ -243,34 +264,26 @@ class EncryptedProjectWorkspace:
             "invalid_request",
         )
 
-    def __resolve_path(self, project_id: str, relative_path: str) -> tuple[Path, str]:
+    def __validate_path(
+        self,
+        project_id: str,
+        relative_path: str,
+    ) -> tuple[tuple[str, ...], str]:
         project = PurePosixPath(str(project_id))
         requested = PurePosixPath(str(relative_path))
+        parts = (*project.parts, *requested.parts)
+
         if (
             project.is_absolute()
             or requested.is_absolute()
             or not project.parts
             or not requested.parts
-            or any(part in {"", ".", ".."} for part in (*project.parts, *requested.parts))
+            or any(part in {"", ".", ".."} for part in parts)
+            or any("\x00" in part for part in parts)
         ):
             raise WorkspaceAccessDenied("invalid workspace path")
 
-        project_root = self.__root.joinpath(*project.parts)
-        target = project_root.joinpath(*requested.parts)
-        resolved = target.resolve(strict=False)
-        try:
-            resolved.relative_to(project_root.resolve(strict=False))
-            resolved.relative_to(self.__root)
-        except ValueError as exc:
-            raise WorkspaceAccessDenied("invalid workspace path") from exc
-
-        current = self.__root
-        for part in (*project.parts, *requested.parts):
-            current = current / part
-            if current.is_symlink():
-                raise WorkspaceAccessDenied("invalid workspace path")
-
-        return resolved, requested.as_posix()
+        return parts, requested.as_posix()
 
     @staticmethod
     def __associated_data(project_id: str, path: str) -> bytes:
@@ -280,22 +293,181 @@ class EncryptedProjectWorkspace:
             separators=(",", ":"),
         ).encode("utf-8")
 
-    @staticmethod
-    def __atomic_write(target: Path, content: bytes) -> None:
-        target.parent.mkdir(parents=True, exist_ok=True)
-        descriptor, temp_name = tempfile.mkstemp(
-            prefix=f".{target.name}.",
-            dir=str(target.parent),
+    def __open_root(self) -> int:
+        flags = (
+            os.O_RDONLY
+            | os.O_DIRECTORY
+            | os.O_NOFOLLOW
+            | os.O_CLOEXEC
         )
         try:
-            with os.fdopen(descriptor, "wb") as handle:
-                handle.write(content)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temp_name, target)
+            descriptor = os.open(self.__root, flags)
+        except OSError as exc:
+            if exc.errno in {errno.ELOOP, errno.ENOTDIR}:
+                raise WorkspaceAccessDenied(
+                    "invalid workspace path"
+                ) from exc
+            raise
+
+        try:
+            root_status = os.fstat(descriptor)
+            identity = (root_status.st_dev, root_status.st_ino)
+            if identity != self.__root_identity:
+                raise WorkspaceAccessDenied(
+                    "invalid workspace path"
+                )
+            return descriptor
+        except Exception:
+            os.close(descriptor)
+            raise
+
+    def __open_parent(
+        self,
+        parts: tuple[str, ...],
+        *,
+        create: bool,
+    ) -> tuple[int, str]:
+        current = self.__open_root()
+        flags = (
+            os.O_RDONLY
+            | os.O_DIRECTORY
+            | os.O_NOFOLLOW
+            | os.O_CLOEXEC
+        )
+        try:
+            for part in parts[:-1]:
+                try:
+                    following = os.open(part, flags, dir_fd=current)
+                except FileNotFoundError:
+                    if not create:
+                        raise
+                    try:
+                        os.mkdir(part, 0o700, dir_fd=current)
+                    except FileExistsError:
+                        pass
+                    following = os.open(part, flags, dir_fd=current)
+
+                os.close(current)
+                current = following
+
+            return current, parts[-1]
+        except Exception as exc:
+            os.close(current)
+            if (
+                isinstance(exc, OSError)
+                and exc.errno in {errno.ELOOP, errno.ENOTDIR}
+            ):
+                raise WorkspaceAccessDenied(
+                    "invalid workspace path"
+                ) from exc
+            raise
+
+    def __read_file(
+        self,
+        parts: tuple[str, ...],
+    ) -> bytes:
+        parent, name = self.__open_parent(parts, create=False)
+        descriptor = -1
+        try:
+            try:
+                descriptor = os.open(
+                    name,
+                    os.O_RDONLY
+                    | os.O_NOFOLLOW
+                    | os.O_CLOEXEC
+                    | os.O_NONBLOCK,
+                    dir_fd=parent,
+                )
+            except OSError as exc:
+                if exc.errno in {errno.ELOOP, errno.ENOTDIR}:
+                    raise WorkspaceAccessDenied(
+                        "invalid workspace path"
+                    ) from exc
+                raise
+
+            file_status = os.fstat(descriptor)
+            if not stat.S_ISREG(file_status.st_mode):
+                raise WorkspaceAccessDenied(
+                    "invalid workspace path"
+                )
+
+            with os.fdopen(descriptor, "rb") as handle:
+                descriptor = -1
+                return handle.read()
         finally:
-            if os.path.exists(temp_name):
-                os.unlink(temp_name)
+            if descriptor >= 0:
+                os.close(descriptor)
+            os.close(parent)
+
+    def __atomic_write(
+        self,
+        parts: tuple[str, ...],
+        content: bytes,
+    ) -> None:
+        parent, name = self.__open_parent(parts, create=True)
+        descriptor = -1
+        temp_name: str | None = None
+
+        try:
+            try:
+                target_status = os.stat(
+                    name,
+                    dir_fd=parent,
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError:
+                target_status = None
+
+            if (
+                target_status is not None
+                and not stat.S_ISREG(target_status.st_mode)
+            ):
+                raise WorkspaceAccessDenied(
+                    "invalid workspace path"
+                )
+
+            temp_name = (
+                f".{name}.{os.urandom(16).hex()}.tmp"
+            )
+            descriptor = os.open(
+                temp_name,
+                os.O_WRONLY
+                | os.O_CREAT
+                | os.O_EXCL
+                | os.O_NOFOLLOW
+                | os.O_CLOEXEC,
+                0o600,
+                dir_fd=parent,
+            )
+
+            pending = memoryview(content)
+            while pending:
+                written = os.write(descriptor, pending)
+                if written <= 0:
+                    raise OSError("workspace write failed")
+                pending = pending[written:]
+
+            os.fsync(descriptor)
+            os.close(descriptor)
+            descriptor = -1
+
+            os.replace(
+                temp_name,
+                name,
+                src_dir_fd=parent,
+                dst_dir_fd=parent,
+            )
+            temp_name = None
+            os.fsync(parent)
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
+            if temp_name is not None:
+                try:
+                    os.unlink(temp_name, dir_fd=parent)
+                except FileNotFoundError:
+                    pass
+            os.close(parent)
 
 
 class WorkspaceBroker:
