@@ -1,57 +1,73 @@
-name: Auto Append History
+name: Prepare History Update
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+    paths-ignore:
+      - public_site/history.json
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: prepare-history-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  append-history:
+  prepare-history:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout main
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: main
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Ensure public_site exists
-        run: mkdir -p public_site
-
-      - name: Ensure history file exists
-        run: |
-          if [ ! -f public_site/history.json ]; then
-            echo "[]" > public_site/history.json
-          fi
-
-      - name: Append history entry
+      - name: Generate history entry
         env:
           GODSCORE: 5
           STATUS: collapse
           MEAN_STEP: 20
           COLLAPSE_STEP: 31
           LEAD_TIME: 11
-        run: python scripts/append_history.py
+        run: |
+          mkdir -p public_site
+          if [ ! -f public_site/history.json ]; then
+            echo "[]" > public_site/history.json
+          fi
+          python scripts/append_history.py
 
-      - name: Commit updated history
+      - name: Push protected history candidate
+        env:
+          HISTORY_BRANCH: automation/history-${{ github.sha }}-${{ github.run_attempt }}
         run: |
           if git diff --quiet -- public_site/history.json; then
-            echo "No history changes to commit."
+            echo "No history changes to prepare."
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git switch -c "$HISTORY_BRANCH"
           git add public_site/history.json
-          git commit -m "auto-append history [skip ci]"
-          git push
+          git commit -m "Prepare history update for ${GITHUB_SHA::7}"
+          git push origin "HEAD:refs/heads/$HISTORY_BRANCH"
+
+          {
+            echo "### History update ready"
+            echo
+            echo "Candidate branch: $HISTORY_BRANCH"
+            echo
+            echo "Open a protected pull request:"
+            echo "https://github.com/${GITHUB_REPOSITORY}/compare/main...${HISTORY_BRANCH}?expand=1"
+          } >> "$GITHUB_STEP_SUMMARY"
