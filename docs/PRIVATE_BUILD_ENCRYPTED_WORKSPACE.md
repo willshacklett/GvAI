@@ -23,10 +23,16 @@ instead of plaintext worker or project identifiers and omit paths, content,
 ciphertext, keys, environment secrets, and raw exceptions.
 
 This minimal broker assumes workers cannot directly access the trusted workspace
-root through some separate filesystem mount or host API. Static symlinks are
-rejected, but concurrent hostile filesystem mutation can race path validation;
-this is not yet fully protected. It also does not provide network isolation,
-resource limits, multi-process file locking, key rotation, deletion, directory
-listing, quotas, rollback detection, or protection from a compromised trusted
-broker. Deployments with hostile local users need OS-level filesystem isolation
-and race-resistant directory-handle traversal in the broker process.
+root through some separate filesystem mount or host API. Workspace traversal is
+anchored to directory descriptors, verifies the recorded root device and inode,
+and uses no-follow opens so concurrent symlink or rename swaps cannot redirect a
+read or write outside the opened workspace directories.
+
+This does not make the filesystem namespace private. A hostile local process
+with sufficient OS permissions can still inspect ciphertext, rename or delete
+workspace entries, cause denial of service, or tamper with an insufficiently
+protected audit destination. Deployments with hostile local users still require
+OS-level filesystem isolation and independently protected audit storage. The
+broker also does not provide network isolation, resource limits, multi-process
+file locking, key rotation, deletion, directory listing, quotas, rollback
+detection, or protection from a compromised trusted broker.

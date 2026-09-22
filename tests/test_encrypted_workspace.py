@@ -496,6 +496,170 @@ assert json.loads(sys.stdin.readline()) == {"error": "workspace request denied",
     assert not (tmp_path / "escape.txt").exists()
 
 
+def test_write_parent_swap_cannot_escape_open_directory(
+    tmp_path,
+    monkeypatch,
+):
+    broker = build_broker(tmp_path)
+    project = tmp_path / "storage" / "project-1"
+    safe = project / "safe"
+    original = project / "safe-original"
+    outside = tmp_path / "outside"
+    safe.mkdir(parents=True)
+    outside.mkdir()
+
+    real_replace = os.replace
+    swapped = False
+
+    def swap_before_replace(source, destination, **kwargs):
+        nonlocal swapped
+        if (
+            destination == "secret.txt"
+            and kwargs.get("dst_dir_fd") is not None
+            and not swapped
+        ):
+            swapped = True
+            safe.rename(original)
+            safe.symlink_to(outside, target_is_directory=True)
+
+        return real_replace(
+            source,
+            destination,
+            **kwargs,
+        )
+
+    monkeypatch.setattr(os, "replace", swap_before_replace)
+
+    run_worker(tmp_path, broker, r"""
+import json
+import sys
+
+print(json.dumps({
+    "operation": "write",
+    "path": "safe/secret.txt",
+    "content_b64": "c2VjcmV0",
+}), flush=True)
+assert json.loads(sys.stdin.readline()) == {"ok": True}
+""")
+
+    assert swapped is True
+    assert not (outside / "secret.txt").exists()
+    assert (original / "secret.txt").is_file()
+
+
+def test_read_parent_swap_uses_open_directory(
+    tmp_path,
+    monkeypatch,
+):
+    broker = build_broker(tmp_path)
+
+    run_worker(tmp_path, broker, r"""
+import json
+import sys
+
+print(json.dumps({
+    "operation": "write",
+    "path": "safe/secret.txt",
+    "content_b64": "c2VjcmV0",
+}), flush=True)
+assert json.loads(sys.stdin.readline()) == {"ok": True}
+""")
+
+    project = tmp_path / "storage" / "project-1"
+    safe = project / "safe"
+    original = project / "safe-original"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "secret.txt").write_bytes(b"attacker-controlled")
+
+    real_open = os.open
+    swapped = False
+
+    def swap_before_leaf_open(
+        file,
+        flags,
+        mode=0o777,
+        *,
+        dir_fd=None,
+    ):
+        nonlocal swapped
+        if (
+            file == "secret.txt"
+            and dir_fd is not None
+            and not swapped
+        ):
+            swapped = True
+            safe.rename(original)
+            safe.symlink_to(outside, target_is_directory=True)
+
+        if dir_fd is None:
+            return real_open(file, flags, mode)
+        return real_open(
+            file,
+            flags,
+            mode,
+            dir_fd=dir_fd,
+        )
+
+    monkeypatch.setattr(os, "open", swap_before_leaf_open)
+
+    run_worker(tmp_path, broker, r"""
+import base64
+import json
+import sys
+
+print(json.dumps({
+    "operation": "read",
+    "path": "safe/secret.txt",
+}), flush=True)
+response = json.loads(sys.stdin.readline())
+assert response["ok"] is True
+assert base64.b64decode(response["content_b64"]) == b"secret"
+""")
+
+    assert swapped is True
+    assert safe.is_symlink()
+    assert (outside / "secret.txt").read_bytes() == b"attacker-controlled"
+
+
+def test_replaced_workspace_root_is_rejected(
+    tmp_path,
+):
+    broker = build_broker(tmp_path)
+    storage = tmp_path / "storage"
+    original = tmp_path / "storage-original"
+
+    storage.rename(original)
+    storage.mkdir()
+
+    run_worker(tmp_path, broker, r"""
+import json
+import sys
+
+print(json.dumps({
+    "operation": "write",
+    "path": "escape.txt",
+    "content_b64": "c2VjcmV0",
+}), flush=True)
+assert json.loads(sys.stdin.readline()) == {
+    "error": "workspace request denied",
+    "ok": False,
+}
+""")
+
+    assert not (
+        storage / "project-1" / "escape.txt"
+    ).exists()
+
+    record = json.loads(
+        (tmp_path / "audit.jsonl")
+        .read_text()
+        .splitlines()[-1]
+    )
+    assert record["allowed"] is False
+    assert record["reason"] == "invalid_path"
+
+
 def test_denied_operation_audit_is_sanitized(tmp_path):
     broker = build_broker(
         tmp_path,
