@@ -14,8 +14,9 @@ python -m privacy.staging_readiness
 
 The command reports sanitized JSON and exits 0 only when all implemented
 preflight checks pass. Missing configuration, unsupported process APIs,
-Bubblewrap failures, namespace failures, or worker overrides yield exit 1.
-It does not print keys, environment values, approved paths, or raw exceptions.
+Bubblewrap failures, namespace failures, insecure audit destinations, or worker
+overrides yield exit 1. It does not print keys, environment values, approved
+paths, audit paths, or raw exceptions.
 
 Required configuration:
 
@@ -27,19 +28,25 @@ Required configuration:
 
 Optional configuration:
 
+- `GVAI_PRIVATE_WORKSPACE_AUDIT_DIR`: absolute local reference-audit directory;
+  when omitted, the runtime uses its private temporary-directory default
 - `GVAI_PRIVATE_SANDBOX_READ_PATHS`: operator-controlled, path-separated list
   of canonical absolute files or directories mounted read-only for the worker
 
 The preflight checks model-command syntax, not model availability or execution.
-It launches a bounded synthetic worker inside the stock Bubblewrap boundary.
+It initializes and validates the local reference audit destination, including
+canonical-path, ownership, permission, link-count, and descriptor-identity
+requirements. It launches a bounded synthetic worker inside the stock
+Bubblewrap boundary.
 The probe verifies separate network, mount, and PID namespaces; no non-loopback
 network interface; a private writable home and temporary directory; and absence
 of the repository and host home from the worker filesystem.
 
 `ready_for_smoke_test` covers only this preflight scope. `production_ready` is
 always false. Configured model execution, encrypted storage and audit round
-trips, approved model-asset content, escaped-descendant containment, production
-key management, and resource limits remain explicitly unverified.
+trips, independently protected audit storage, cross-resource audit atomicity,
+approved model-asset content, escaped-descendant containment, production key
+management, and resource limits remain explicitly unverified.
 
 ## Synthetic runtime smoke test
 
@@ -55,7 +62,8 @@ Python mock engine through the real encrypted runtime and Bubblewrap boundary.
 It verifies network, mount, and PID namespace separation; absence of the
 repository, host home, encrypted workspace, and audit destination; a private
 writable `/tmp`; selected secret-environment exclusion; broker-only encrypted
-workspace access; audit redaction; and workspace cleanup.
+workspace access; audit redaction and local audit permissions; and workspace
+cleanup.
 
 The test does not execute the operator's configured model. Without the opt-in
 variable, it is skipped and therefore not verified. Separate encrypted-workspace
@@ -74,9 +82,9 @@ anchored path traversal.
   failed leader; arbitrary escaped descendants are not yet fully verified.
 - The environment-based key loader is development-grade, not a production
   secret-management solution.
-- Independently protected audit storage, appropriate host permissions, cgroup
-  resource limits, rollback detection, key rotation, and stronger deployment
-  isolation remain separate work.
+- Independently protected audit storage, cross-resource audit reconciliation,
+  appropriate host permissions, cgroup resource limits, rollback detection, key
+  rotation, and stronger deployment isolation remain separate work.
 
 Never let the thing behind the switch own the switch: shutdown, authorization,
 permission contraction, rollback, and recovery authority must remain externally

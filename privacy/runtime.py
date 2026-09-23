@@ -52,6 +52,7 @@ from typing import Dict, Any, Optional
 from privacy.encrypted_workspace import (
     AESGCMControlPlane,
     EncryptedProjectWorkspace,
+    WorkspaceAuditError,
     WorkspaceAuditLog,
     WorkspaceAuthority,
     WorkspaceBroker,
@@ -339,8 +340,9 @@ def run_private_model_encrypted_workspace(
     The trusted parent (this function) owns the AES-GCM key, the control
     plane, and worker/project identity for the lifetime of this single
     request. It seals the request into a per-request encrypted workspace,
-    execs a network-isolated worker that can reach that workspace only
-    through WorkspaceClient, and opens the sealed result itself. The
+    execs a filesystem- and network-isolated worker that can reach the
+    workspace only through WorkspaceClient, and opens the sealed result
+    itself. The
     worker never receives the key, the control plane, the workspace root
     path, raw identity strings, or any external-model credential.
     """
@@ -357,6 +359,15 @@ def run_private_model_encrypted_workspace(
         or (Path(tempfile.gettempdir()) / "gvai-private-workspace-audit")
     )
 
+    try:
+        audit_log = WorkspaceAuditLog(
+            audit_dir / "audit.jsonl"
+        )
+    except WorkspaceAuditError:
+        raise RuntimeError(
+            "GVAI private model worker failed."
+        ) from None
+
     authority = WorkspaceAuthority(frozenset({"read", "write"}))
 
     storage_dir = Path(tempfile.mkdtemp(prefix="gvai-private-ws-"))
@@ -370,7 +381,7 @@ def run_private_model_encrypted_workspace(
         adapter = EncryptedProjectWorkspace(
             storage_dir,
             control_plane,
-            WorkspaceAuditLog(audit_dir / "audit.jsonl"),
+            audit_log,
         )
 
         request_bytes = json.dumps(

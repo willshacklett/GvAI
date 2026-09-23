@@ -27,6 +27,35 @@ root device and inode, and uses no-follow opens. Concurrent symlink or rename
 swaps therefore cannot redirect a workspace read or write outside the directory
 handles already opened by the trusted broker.
 
+## Audit storage boundary
+
+`WorkspaceAuditSink` is an externally supplied trusted interface. The encrypted
+workspace checks that the sink is available before creating its storage root and
+again before every operation. Audit failures raise a sanitized
+`WorkspaceAuditError`; authorization, worker execution, and workspace mutation
+do not begin when the audit preflight fails.
+
+`WorkspaceAuditLog` is the local development and test implementation. It
+requires an absolute canonical path in a directory owned by the trusted process
+and rejects group- or world-writable directories. Directory identity is recorded
+and rechecked through a no-follow directory descriptor. The audit file is opened
+relative to that descriptor with append, close-on-exec, and no-follow flags. It
+must be a regular file owned by the trusted process, have exactly one link, and
+have no group or other permissions. Each sanitized record is emitted with one
+append and both the file and directory are flushed before success is returned.
+
+This hardens the local reference sink against path replacement and permission
+weakening, but it does not make local storage independently protected from a
+privileged hostile host process. Production deployments should inject a
+`WorkspaceAuditSink` backed by a separately controlled account, process, or
+service with append-only retention and independent monitoring.
+
+Audit append and workspace mutation are not one cross-resource transaction.
+Preflight prevents an operation from starting with an unavailable sink, but a
+host crash or audit outage after a workspace mutation and before its outcome
+record may leave an incomplete audit trail. Transactional external storage or
+independent reconciliation remains a production deployment requirement.
+
 ## Worker filesystem boundary
 
 The encrypted runtime places the worker inside a Bubblewrap namespace with:
