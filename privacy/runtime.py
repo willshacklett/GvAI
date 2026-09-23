@@ -1,9 +1,10 @@
 """
 GVAI Private Build Runtime.
 
-Private Build Mode executes model work through the network-isolated
-sandbox. External model credentials are stripped from the worker
-environment.
+Private Build Mode executes model work through isolated worker
+processes. The encrypted-workspace path uses Bubblewrap filesystem,
+process, and network namespaces. External model credentials are stripped
+from the worker environment.
 
 Default (non-encrypted) worker protocol -- one-shot stdin/stdout:
 
@@ -24,8 +25,9 @@ Opt-in encrypted-workspace protocol (GVAI_PRIVATE_ENCRYPTED_WORKSPACE=1):
 This process (the trusted parent) owns the encryption control plane, the
 AES-GCM key, project/worker identity, and operation authority. It never
 hands any of those to the worker. It seals the request into an encrypted
-workspace, execs a network-isolated worker through the same sandbox that
-reads/writes exclusively through privacy.workspace_worker_client.WorkspaceClient
+workspace, execs a filesystem- and network-isolated worker through Bubblewrap.
+The worker reads and writes exclusively through
+privacy.workspace_worker_client.WorkspaceClient
 (see privacy/encrypted_workspace.py and privacy/encrypted_private_model_worker.py),
 and then opens the sealed result itself. The worker's stdin/stdout are the
 WorkspaceBroker's JSON-lines request/response channel -- they are never
@@ -55,6 +57,10 @@ from privacy.encrypted_workspace import (
     WorkspaceBroker,
     WorkspaceRequest,
     WorkspaceWorkerError,
+)
+from privacy.filesystem_sandbox import (
+    FilesystemSandboxError,
+    build_filesystem_sandbox_command,
 )
 
 
@@ -93,6 +99,11 @@ _LOCAL_MODEL_CONFIG_ENV = (
 
 ENCRYPTED_WORKSPACE_KEY_ENV = "GVAI_PRIVATE_WORKSPACE_KEY"
 ENCRYPTED_WORKSPACE_AUDIT_DIR_ENV = "GVAI_PRIVATE_WORKSPACE_AUDIT_DIR"
+FILESYSTEM_SANDBOX_READ_PATHS_ENV = "GVAI_PRIVATE_SANDBOX_READ_PATHS"
+
+_SANDBOXED_ENCRYPTED_WORKER = (
+    "/app/privacy/encrypted_private_model_worker.py"
+)
 
 # Defense-in-depth: even if a future edit widens _LOCAL_MODEL_CONFIG_ENV by
 # mistake, none of these may ever be handed to the worker through extra_env.
@@ -100,6 +111,7 @@ _FORBIDDEN_EXTRA_ENV_NAMES = frozenset(
     {
         ENCRYPTED_WORKSPACE_KEY_ENV,
         ENCRYPTED_WORKSPACE_AUDIT_DIR_ENV,
+        FILESYSTEM_SANDBOX_READ_PATHS_ENV,
         "GVAI_PRIVATE_ENCRYPTED_WORKER_COMMAND",
         "PYTHONPATH",
         "LD_PRELOAD",
@@ -230,7 +242,7 @@ def _encrypted_worker_command() -> list[str]:
     ).strip()
 
     if not raw:
-        return [sys.executable, str(ENCRYPTED_WORKER_SCRIPT)]
+        return [sys.executable, _SANDBOXED_ENCRYPTED_WORKER]
 
     parts = shlex.split(raw)
 
@@ -239,11 +251,55 @@ def _encrypted_worker_command() -> list[str]:
             "GVAI_PRIVATE_ENCRYPTED_WORKER_COMMAND is empty."
         )
 
-    # This only selects the worker command run *inside* the mandatory
-    # network sandbox (see run_private_model_encrypted_workspace, which
-    # always prefixes the command with SANDBOX). It can never replace or
-    # bypass the sandbox itself.
+    # This selects only the worker command run inside the mandatory
+    # Bubblewrap boundary. The trusted parent constructs that boundary
+    # separately, so this override cannot replace or bypass it.
     return parts
+
+
+def _normalize_local_model_command(raw: str) -> str:
+    """Use the canonical interpreter path inside the private namespace."""
+
+    try:
+        parts = shlex.split(raw)
+    except ValueError:
+        raise RuntimeError(
+            "GVAI private model worker configuration is invalid."
+        ) from None
+
+    if not parts:
+        raise RuntimeError(
+            "GVAI private model worker configuration is invalid."
+        )
+
+    executable = Path(parts[0])
+    if executable.is_absolute():
+        try:
+            configured = executable.resolve(strict=True)
+            current = Path(sys.executable).resolve(strict=True)
+        except OSError:
+            pass
+        else:
+            if configured == current:
+                parts[0] = str(current)
+
+    return shlex.join(parts)
+
+
+def _filesystem_sandbox_read_paths() -> list[Path]:
+    """Return operator-approved, read-only model and worker assets."""
+
+    raw = os.getenv(FILESYSTEM_SANDBOX_READ_PATHS_ENV, "")
+    if not raw:
+        return []
+
+    values = raw.split(os.pathsep)
+    if any(not value.strip() for value in values):
+        raise RuntimeError(
+            "GVAI private filesystem sandbox configuration is invalid."
+        )
+
+    return [Path(value.strip()) for value in values]
 
 
 def _local_model_extra_env() -> Dict[str, str]:
@@ -264,7 +320,10 @@ def _local_model_extra_env() -> Dict[str, str]:
             raise RuntimeError(
                 "GVAI private model worker configuration is invalid."
             )
-        local_model_env[name] = os.environ[name]
+        value = os.environ[name]
+        if name == "GVAI_LOCAL_MODEL_COMMAND":
+            value = _normalize_local_model_command(value)
+        local_model_env[name] = value
 
     return local_model_env
 
@@ -347,12 +406,21 @@ def run_private_model_encrypted_workspace(
         local_model_env = _local_model_extra_env()
 
         try:
-            broker.run_worker(
-                [str(SANDBOX), *_encrypted_worker_command()],
-                timeout=timeout,
-                extra_env=local_model_env,
+            sandbox_command = build_filesystem_sandbox_command(
+                _encrypted_worker_command(),
+                worker_environment=local_model_env,
+                read_only_paths=_filesystem_sandbox_read_paths(),
+                denied_paths=(
+                    ROOT,
+                    storage_dir,
+                    audit_dir,
+                ),
             )
-        except WorkspaceWorkerError:
+            broker.run_worker(
+                sandbox_command,
+                timeout=timeout,
+            )
+        except (FilesystemSandboxError, WorkspaceWorkerError):
             raise RuntimeError(
                 "GVAI private model worker failed."
             ) from None
@@ -412,17 +480,17 @@ def run_private_model(
             "GVAI_PRIVATE_BUILD_MODE is disabled."
         )
 
-    if not SANDBOX.exists():
-        raise RuntimeError(
-            "GVAI private network sandbox "
-            "is unavailable."
-        )
-
     if encrypted_workspace_enabled():
         return run_private_model_encrypted_workspace(
             system_prompt,
             user_content,
             timeout=timeout,
+        )
+
+    if not SANDBOX.exists():
+        raise RuntimeError(
+            "GVAI private network sandbox "
+            "is unavailable."
         )
 
     worker_command = (

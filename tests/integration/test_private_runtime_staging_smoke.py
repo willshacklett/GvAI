@@ -19,7 +19,11 @@ def test_real_encrypted_runtime_boundary(monkeypatch, tmp_path):
     import privacy.runtime as runtime
 
     root = Path(__file__).resolve().parents[2]
-    parent_namespace = os.readlink("/proc/self/ns/net")
+    parent_namespaces = {
+        name: os.readlink(f"/proc/self/ns/{name}")
+        for name in ("mnt", "net", "pid")
+    }
+    host_home = str(Path.home())
     marker = "synthetic-staging-" + secrets.token_hex(16)
     reply = "synthetic-reply-" + secrets.token_hex(16)
     key = base64.b64encode(secrets.token_bytes(32)).decode("ascii")
@@ -29,6 +33,7 @@ def test_real_encrypted_runtime_boundary(monkeypatch, tmp_path):
         | {
             runtime.ENCRYPTED_WORKSPACE_KEY_ENV,
             runtime.ENCRYPTED_WORKSPACE_AUDIT_DIR_ENV,
+            runtime.FILESYSTEM_SANDBOX_READ_PATHS_ENV,
         }
     )
 
@@ -36,12 +41,25 @@ def test_real_encrypted_runtime_boundary(monkeypatch, tmp_path):
     # Namespace/interface checks do not contact any external endpoint.
     engine = f"""
 import os
+from pathlib import Path
 import socket
 import sys
 
-assert os.readlink("/proc/self/ns/net") != {parent_namespace!r}
+for name, parent in {parent_namespaces!r}.items():
+    assert os.readlink("/proc/self/ns/" + name) != parent
+
 assert set(name for _, name in socket.if_nameindex()) <= {{"lo"}}
 assert all(name not in os.environ for name in {forbidden!r})
+assert os.environ["GVAI_FILESYSTEM_ISOLATED"] == "1"
+assert os.environ["HOME"] == "/tmp"
+assert not Path({str(root)!r}).exists()
+assert not Path({host_home!r}).exists()
+assert not Path({str(audit_dir)!r}).exists()
+
+private_temp = Path("/tmp/staging-private.txt")
+private_temp.write_text("private", encoding="utf-8")
+assert private_temp.read_text(encoding="utf-8") == "private"
+
 prompt = sys.stdin.read()
 assert {marker!r} in prompt
 assert "System:" in prompt and "Assistant:" in prompt
