@@ -34,6 +34,14 @@ jobs:
         with:
           python-version: "3.14"
 
+      - name: Install filesystem sandbox
+        run: |
+          if ! command -v bwrap >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes bubblewrap
+          fi
+          bwrap --version
+
       - name: Install declared dependencies
         run: |
           python -m pip install \

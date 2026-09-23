@@ -22,17 +22,50 @@ path with AES-GCM associated data. Audit records use stable SHA-256 references
 instead of plaintext worker or project identifiers and omit paths, content,
 ciphertext, keys, environment secrets, and raw exceptions.
 
-This minimal broker assumes workers cannot directly access the trusted workspace
-root through some separate filesystem mount or host API. Workspace traversal is
-anchored to directory descriptors, verifies the recorded root device and inode,
-and uses no-follow opens so concurrent symlink or rename swaps cannot redirect a
-read or write outside the opened workspace directories.
+Workspace traversal is anchored to directory descriptors, verifies the recorded
+root device and inode, and uses no-follow opens. Concurrent symlink or rename
+swaps therefore cannot redirect a workspace read or write outside the directory
+handles already opened by the trusted broker.
 
-This does not make the filesystem namespace private. A hostile local process
-with sufficient OS permissions can still inspect ciphertext, rename or delete
-workspace entries, cause denial of service, or tamper with an insufficiently
-protected audit destination. Deployments with hostile local users still require
-OS-level filesystem isolation and independently protected audit storage. The
-broker also does not provide network isolation, resource limits, multi-process
-file locking, key rotation, deletion, directory listing, quotas, rollback
-detection, or protection from a compromised trusted broker.
+## Worker filesystem boundary
+
+The encrypted runtime places the worker inside a Bubblewrap namespace with:
+
+- separate user, mount, PID, network, IPC, and UTS namespaces;
+- all worker capabilities dropped and nested user namespaces disabled;
+- a private writable `/tmp`;
+- a cleared environment rebuilt from a fixed launcher-owned allowlist;
+- read-only system and Python runtime mounts;
+- only the four required GVAI worker modules mounted at `/app/privacy`;
+- optional operator-approved model or worker assets mounted read-only; and
+- no mount for the repository, encrypted workspace, audit destination, or
+  general host home contents.
+
+`GVAI_PRIVATE_SANDBOX_READ_PATHS` is an operator-controlled, colon-separated
+list of canonical absolute files or directories. These paths are not inferred
+from worker input. Missing, relative, non-canonical, special, root-wide, or
+protected-boundary paths fail closed. Approving a directory exposes that entire
+directory read-only, so deployments should prefer exact files.
+
+The worker cannot add mounts or environment entries. It receives neither the
+workspace path nor the audit path, and it can reach encrypted data only through
+the broker protocol. The component behind the boundary does not own the
+boundary.
+
+## Remaining deployment requirements
+
+This isolates the encrypted worker; it does not make the trusted host immune to
+other local processes. A hostile host process with sufficient OS permissions
+may still inspect ciphertext, rename or delete host files, cause denial of
+service, or tamper with an audit destination. Production deployments therefore
+still require independently protected audit storage, appropriate host account
+and filesystem permissions, and an external secret manager.
+
+The implementation is Linux-specific and depends on permitted unprivileged user
+namespaces plus a root-owned, executable Bubblewrap binary that is not group-
+or world-writable. Approved model assets remain trusted deployment
+inputs and require independent provenance review. The broker also does not yet
+provide cgroup resource limits, verified containment of every possible escaped
+descendant, multi-process file locking, key rotation, deletion, directory
+listing, quotas, rollback detection, or protection from a compromised trusted
+broker.

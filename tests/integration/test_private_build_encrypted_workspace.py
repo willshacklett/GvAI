@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -34,6 +35,24 @@ print("ENCRYPTED-REPLY:top-secret-project-plan")
     return engine
 
 
+def _allow_sandbox_reads(monkeypatch, *paths: Path) -> None:
+    """Grant explicit read-only access to exact test assets."""
+
+    name = runtime.FILESYSTEM_SANDBOX_READ_PATHS_ENV
+    configured = [
+        value
+        for value in os.environ.get(name, "").split(os.pathsep)
+        if value
+    ]
+
+    for item in paths:
+        canonical = str(Path(item).resolve(strict=True))
+        if canonical not in configured:
+            configured.append(canonical)
+
+    monkeypatch.setenv(name, os.pathsep.join(configured))
+
+
 def _base_env(monkeypatch, tmp_path, *, fake_engine=True):
     monkeypatch.setenv("GVAI_PRIVATE_BUILD_MODE", "1")
     monkeypatch.setenv("GVAI_PRIVATE_ENCRYPTED_WORKSPACE", "1")
@@ -50,6 +69,7 @@ def _base_env(monkeypatch, tmp_path, *, fake_engine=True):
             "GVAI_LOCAL_MODEL_COMMAND",
             f"{sys.executable} {engine}",
         )
+        _allow_sandbox_reads(monkeypatch, engine)
         monkeypatch.setenv("GVAI_LOCAL_MODEL_NAME", "gvai-encrypted-test")
 
 
@@ -77,6 +97,30 @@ def test_encrypted_round_trip_through_exec_worker(monkeypatch, tmp_path):
     _base_env(monkeypatch, tmp_path)
 
     result = runtime.run_private_model_encrypted_workspace(
+        "You are GVAI.",
+        "top-secret-project-plan",
+    )
+
+    assert result == {
+        "provider": "local",
+        "model": "gvai-encrypted-test",
+        "reply": "ENCRYPTED-REPLY:top-secret-project-plan",
+        "network_isolated": True,
+    }
+
+
+def test_encrypted_dispatch_does_not_require_legacy_network_sandbox(
+    monkeypatch,
+    tmp_path,
+):
+    _base_env(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        runtime,
+        "SANDBOX",
+        tmp_path / "missing-legacy-network-sandbox",
+    )
+
+    result = runtime.run_private_model(
         "You are GVAI.",
         "top-secret-project-plan",
     )
@@ -130,6 +174,7 @@ print("engine-ran")
         "GVAI_LOCAL_MODEL_COMMAND",
         f"{sys.executable} {checker}",
     )
+    _allow_sandbox_reads(monkeypatch, checker)
 
     worker_script = tmp_path / "env_check_worker.py"
     root = Path(__file__).resolve().parents[2]
@@ -160,6 +205,7 @@ client.write_bytes("result.json", json.dumps(response).encode("utf-8"))
         "GVAI_PRIVATE_ENCRYPTED_WORKER_COMMAND",
         f"{sys.executable} {worker_script}",
     )
+    _allow_sandbox_reads(monkeypatch, worker_script)
 
     result = runtime.run_private_model_encrypted_workspace(
         "sys prompt",
@@ -210,6 +256,7 @@ assert json.loads(sys.stdin.readline()) == {"ok": True}
         "GVAI_PRIVATE_ENCRYPTED_WORKER_COMMAND",
         f"{sys.executable} {worker_script}",
     )
+    _allow_sandbox_reads(monkeypatch, worker_script)
 
     result = runtime.run_private_model_encrypted_workspace(
         "sys",
@@ -261,6 +308,7 @@ assert json.loads(sys.stdin.readline()) == {"ok": True}
         "GVAI_PRIVATE_ENCRYPTED_WORKER_COMMAND",
         f"{sys.executable} {worker_script}",
     )
+    _allow_sandbox_reads(monkeypatch, worker_script)
 
     result = runtime.run_private_model_encrypted_workspace(
         "sys",
@@ -295,6 +343,7 @@ print("no-network-ok")
         "GVAI_LOCAL_MODEL_COMMAND",
         f"{sys.executable} {engine}",
     )
+    _allow_sandbox_reads(monkeypatch, engine)
 
     result = runtime.run_private_model_encrypted_workspace(
         "sys",
@@ -346,6 +395,7 @@ raise SystemExit(1)
         "GVAI_LOCAL_MODEL_COMMAND",
         f"{sys.executable} {engine}",
     )
+    _allow_sandbox_reads(monkeypatch, engine)
 
     with pytest.raises(RuntimeError) as excinfo:
         runtime.run_private_model_encrypted_workspace(
@@ -380,6 +430,7 @@ def test_feature_flag_disabled_preserves_existing_private_build_behavior(
         "GVAI_LOCAL_MODEL_COMMAND",
         f"{sys.executable} {engine}",
     )
+    _allow_sandbox_reads(monkeypatch, engine)
 
     def _forbidden(*args, **kwargs):
         raise AssertionError("encrypted path must not run when flag is off")
@@ -434,3 +485,179 @@ def test_audit_entries_contain_only_sanitized_references(monkeypatch, tmp_path):
             "allowed",
             "reason",
         }
+
+
+def test_worker_filesystem_namespace_hides_host_paths(
+    monkeypatch,
+    tmp_path,
+):
+    _base_env(monkeypatch, tmp_path, fake_engine=False)
+    storage = _redirect_storage(monkeypatch, tmp_path)
+
+    canary = tmp_path / "host-canary.txt"
+    canary.write_text("host-only-secret", encoding="utf-8")
+
+    audit_dir = tmp_path / "audit"
+    parent_namespaces = {
+        name: os.readlink(f"/proc/self/ns/{name}")
+        for name in ("mnt", "net", "pid")
+    }
+    forbidden_paths = {
+        "repository": str(runtime.ROOT),
+        "home": str(Path.home()),
+        "storage": str(storage),
+        "audit": str(audit_dir),
+        "canary": str(canary),
+    }
+
+    worker_script = tmp_path / "filesystem_probe_worker.py"
+    worker_script.write_text(
+        f"""
+import json
+import os
+from pathlib import Path
+
+from privacy.workspace_worker_client import WorkspaceClient
+
+checks = {{
+    "filesystem_flag": (
+        os.environ.get("GVAI_FILESYSTEM_ISOLATED") == "1"
+    ),
+    "private_home": os.environ.get("HOME") == "/tmp",
+    "mount_policy_hidden": (
+        "GVAI_PRIVATE_SANDBOX_READ_PATHS" not in os.environ
+    ),
+}}
+
+checks["namespaces"] = {{
+    name: os.readlink("/proc/self/ns/" + name) != parent
+    for name, parent in {parent_namespaces!r}.items()
+}}
+
+checks["hidden_paths"] = {{
+    name: not Path(value).exists()
+    for name, value in {forbidden_paths!r}.items()
+}}
+
+approved_worker = Path(__file__)
+checks["approved_worker_visible"] = approved_worker.is_file()
+
+try:
+    handle = approved_worker.open("a", encoding="utf-8")
+except OSError:
+    checks["approved_worker_read_only"] = True
+else:
+    handle.close()
+    checks["approved_worker_read_only"] = False
+
+private_temp = Path("/tmp/worker-private.txt")
+private_temp.write_text("private", encoding="utf-8")
+checks["private_tmp"] = (
+    private_temp.read_text(encoding="utf-8") == "private"
+)
+
+client = WorkspaceClient()
+request = json.loads(
+    client.read_bytes("request.json").decode("utf-8")
+)
+checks["broker_protocol"] = (
+    request["user_content"] == "filesystem-probe"
+)
+
+client.write_bytes(
+    "result.json",
+    json.dumps({{
+        "model": "filesystem-probe",
+        "reply": json.dumps(checks, sort_keys=True),
+    }}).encode("utf-8"),
+)
+""",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv(
+        "GVAI_PRIVATE_ENCRYPTED_WORKER_COMMAND",
+        f"{sys.executable} {worker_script}",
+    )
+    _allow_sandbox_reads(monkeypatch, worker_script)
+
+    result = runtime.run_private_model_encrypted_workspace(
+        "synthetic",
+        "filesystem-probe",
+    )
+    checks = json.loads(result["reply"])
+
+    assert checks == {
+        "filesystem_flag": True,
+        "private_home": True,
+        "mount_policy_hidden": True,
+        "namespaces": {
+            "mnt": True,
+            "net": True,
+            "pid": True,
+        },
+        "hidden_paths": {
+            "repository": True,
+            "home": True,
+            "storage": True,
+            "audit": True,
+            "canary": True,
+        },
+        "approved_worker_visible": True,
+        "approved_worker_read_only": True,
+        "private_tmp": True,
+        "broker_protocol": True,
+    }
+    assert canary.read_text(encoding="utf-8") == "host-only-secret"
+
+def test_unapproved_model_asset_fails_closed(monkeypatch, tmp_path):
+    _base_env(monkeypatch, tmp_path, fake_engine=False)
+
+    engine = tmp_path / "unapproved_engine.py"
+    engine.write_text(
+        'import sys; sys.stdin.read(); print("must-not-run")\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(
+        "GVAI_LOCAL_MODEL_COMMAND",
+        f"{sys.executable} {engine}",
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="GVAI private model worker failed",
+    ) as excinfo:
+        runtime.run_private_model_encrypted_workspace(
+            "synthetic",
+            "unapproved-asset",
+        )
+
+    assert str(engine) not in str(excinfo.value)
+    assert "must-not-run" not in str(excinfo.value)
+
+
+def test_audit_path_cannot_be_approved_as_worker_input(
+    monkeypatch,
+    tmp_path,
+):
+    _base_env(monkeypatch, tmp_path, fake_engine=False)
+
+    audit_dir = tmp_path / "audit"
+    audit_dir.mkdir(exist_ok=True)
+    monkeypatch.setenv(
+        runtime.FILESYSTEM_SANDBOX_READ_PATHS_ENV,
+        str(audit_dir.resolve(strict=True)),
+    )
+    monkeypatch.setenv(
+        "GVAI_LOCAL_MODEL_COMMAND",
+        f"{sys.executable} -c pass",
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="GVAI private model worker failed",
+    ):
+        runtime.run_private_model_encrypted_workspace(
+            "synthetic",
+            "protected-audit",
+        )

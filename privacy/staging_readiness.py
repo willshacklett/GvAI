@@ -20,6 +20,10 @@ def check_readiness():
 
     try:
         from privacy import runtime
+        from privacy.filesystem_sandbox import (
+            build_filesystem_sandbox_command,
+            resolve_filesystem_sandbox_executable,
+        )
     except Exception:
         checks["runtime_import"] = False
         return _report(checks)
@@ -45,26 +49,64 @@ def check_readiness():
 
     # An override needs its own review; this preflight covers the stock worker.
     checks["stock_worker"] = (
-        not os.environ.get("GVAI_PRIVATE_ENCRYPTED_WORKER_COMMAND", "").strip()
+        not os.environ.get(
+            "GVAI_PRIVATE_ENCRYPTED_WORKER_COMMAND",
+            "",
+        ).strip()
         and runtime.ENCRYPTED_WORKER_SCRIPT.is_file()
     )
-    checks["sandbox_executable"] = (
-        runtime.SANDBOX.is_file()
-        and os.access(runtime.SANDBOX, os.X_OK)
-    )
-    checks["network_namespace"] = False
+    try:
+        resolve_filesystem_sandbox_executable()
+        checks["filesystem_sandbox_executable"] = True
+    except Exception:
+        checks["filesystem_sandbox_executable"] = False
 
-    if checks["process_api"] and checks["sandbox_executable"]:
+    for name in (
+        "network_namespace",
+        "mount_namespace",
+        "pid_namespace",
+        "filesystem_isolation",
+    ):
+        checks[name] = False
+
+    prerequisites = (
+        checks["process_api"]
+        and checks["stock_worker"]
+        and checks["filesystem_sandbox_executable"]
+    )
+
+    if prerequisites:
         try:
-            parent_ns = os.readlink("/proc/self/ns/net")
+            namespace_names = ("net", "mnt", "pid")
+            parent_namespaces = {
+                name: os.readlink(f"/proc/self/ns/{name}")
+                for name in namespace_names
+            }
+            host_root = str(runtime.ROOT)
+            host_home = os.path.expanduser("~")
+
             probe = (
-                "import os,socket,sys;"
-                f"separate=os.readlink('/proc/self/ns/net')!={parent_ns!r};"
-                "interfaces={name for _,name in socket.if_nameindex()};"
-                "sys.exit(0 if separate and interfaces <= {'lo'} else 1)"
+                "import os,socket,sys\n"
+                f"parents={parent_namespaces!r}\n"
+                "separate=all("
+                "os.readlink('/proc/self/ns/'+name)!=parent "
+                "for name,parent in parents.items())\n"
+                "interfaces={name for _,name in socket.if_nameindex()}\n"
+                f"host_hidden=not os.path.exists({host_root!r})\n"
+                f"home_hidden=not os.path.exists({host_home!r})\n"
+                "private_tmp=os.environ.get('HOME')=='/tmp'\n"
+                "sys.exit(0 if ("
+                "separate and interfaces <= {'lo'} and host_hidden "
+                "and home_hidden and private_tmp"
+                ") else 1)\n"
+            )
+
+            command = build_filesystem_sandbox_command(
+                [sys.executable, "-I", "-c", probe],
+                denied_paths=(runtime.ROOT,),
             )
             result = subprocess.run(
-                [str(runtime.SANDBOX), sys.executable, "-I", "-c", probe],
+                command,
                 env={"PATH": os.defpath, "LANG": "C"},
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
@@ -73,16 +115,23 @@ def check_readiness():
                 check=False,
                 close_fds=True,
             )
-            checks["network_namespace"] = result.returncode == 0
+            passed = result.returncode == 0
+            for name in (
+                "network_namespace",
+                "mount_namespace",
+                "pid_namespace",
+                "filesystem_isolation",
+            ):
+                checks[name] = passed
         except Exception:
-            checks["network_namespace"] = False
+            pass
 
     return _report(checks)
 
 
 def _report(checks):
     return {
-        "scope": "configuration_and_network_preflight",
+        "scope": "configuration_and_namespace_preflight",
         "ready_for_smoke_test": bool(checks) and all(checks.values()),
         "production_ready": False,
         "checks": {
@@ -92,9 +141,10 @@ def _report(checks):
         "not_verified": [
             "configured_model_execution",
             "encrypted_storage_and_audit_round_trip",
-            "filesystem_isolation",
+            "approved_model_asset_content",
             "escaped_descendant_containment",
             "production_key_management",
+            "resource_limits",
         ],
     }
 
