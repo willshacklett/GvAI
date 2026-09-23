@@ -111,7 +111,10 @@ print({reply!r})
     assert allocated
     assert all(not directory.exists() for directory in allocated)
 
-    audit = (audit_dir / "audit.jsonl").read_text(encoding="utf-8")
+    audit_file = audit_dir / "audit.jsonl"
+    assert audit_dir.stat().st_mode & 0o777 == 0o700
+    assert audit_file.stat().st_mode & 0o777 == 0o600
+    audit = audit_file.read_text(encoding="utf-8")
     records = [json.loads(line) for line in audit.splitlines()]
     assert records
     for forbidden_value in (marker, reply, key, "synthetic-not-a-credential"):

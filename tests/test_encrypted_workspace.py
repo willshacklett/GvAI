@@ -1,5 +1,6 @@
 import json
 import os
+import stat
 import sys
 import time
 
@@ -8,9 +9,11 @@ import pytest
 from privacy.encrypted_workspace import (
     AESGCMControlPlane,
     EncryptedProjectWorkspace,
+    WorkspaceAuditError,
     WorkspaceAuditLog,
     WorkspaceAuthority,
     WorkspaceBroker,
+    WorkspaceRequest,
     WorkspaceWorkerError,
 )
 
@@ -658,6 +661,140 @@ assert json.loads(sys.stdin.readline()) == {
     )
     assert record["allowed"] is False
     assert record["reason"] == "invalid_path"
+
+
+def test_audit_symlink_destination_is_rejected(tmp_path):
+    outside = tmp_path / "outside-audit.jsonl"
+    outside.write_text("attacker-controlled\n", encoding="utf-8")
+
+    audit_path = tmp_path / "audit.jsonl"
+    audit_path.symlink_to(outside)
+
+    with pytest.raises(WorkspaceAuditError, match="unavailable"):
+        WorkspaceAuditLog(audit_path)
+
+    assert outside.read_text(encoding="utf-8") == (
+        "attacker-controlled\n"
+    )
+
+
+def test_audit_file_with_public_permissions_is_rejected(tmp_path):
+    audit_path = tmp_path / "audit.jsonl"
+    audit_path.write_text("", encoding="utf-8")
+    audit_path.chmod(0o644)
+
+    with pytest.raises(WorkspaceAuditError, match="invalid"):
+        WorkspaceAuditLog(audit_path)
+
+
+def test_audit_hardlink_is_rejected(tmp_path):
+    audit_path = tmp_path / "audit.jsonl"
+    audit_log = WorkspaceAuditLog(audit_path)
+    os.link(audit_path, tmp_path / "audit-copy.jsonl")
+
+    with pytest.raises(WorkspaceAuditError, match="invalid"):
+        audit_log.ensure_available()
+
+
+def test_replaced_audit_directory_fails_before_workspace_mutation(
+    tmp_path,
+):
+    audit_dir = tmp_path / "audit"
+    audit_log = WorkspaceAuditLog(audit_dir / "audit.jsonl")
+
+    original = tmp_path / "audit-original"
+    audit_dir.rename(original)
+    audit_dir.mkdir(mode=0o700)
+
+    storage = tmp_path / "storage"
+    control_plane = AESGCMControlPlane(
+        KEY,
+        lambda request: True,
+    )
+
+    with pytest.raises(WorkspaceAuditError, match="unavailable"):
+        EncryptedProjectWorkspace(
+            storage,
+            control_plane,
+            audit_log,
+        )
+
+    assert not storage.exists()
+    assert not (audit_dir / "audit.jsonl").exists()
+
+
+def test_unavailable_injected_audit_sink_fails_closed(tmp_path):
+    authorization_calls = []
+
+    class ControlledAuditSink:
+        available = True
+
+        def ensure_available(self):
+            if not self.available:
+                raise OSError("synthetic audit outage")
+
+        def write(self, request, allowed, reason):
+            raise AssertionError(
+                "audit write must not run after failed preflight"
+            )
+
+    sink = ControlledAuditSink()
+    control_plane = AESGCMControlPlane(
+        KEY,
+        lambda request: authorization_calls.append(request) or True,
+    )
+    storage = tmp_path / "storage"
+    adapter = EncryptedProjectWorkspace(
+        storage,
+        control_plane,
+        sink,
+    )
+
+    sink.available = False
+
+    with pytest.raises(WorkspaceAuditError, match="unavailable"):
+        adapter.execute(
+            WorkspaceRequest(
+                "worker-1",
+                "project-1",
+                "write",
+                "secret.txt",
+            ),
+            WorkspaceAuthority(frozenset({"write"})),
+            b"secret",
+        )
+
+    assert authorization_calls == []
+    assert not (storage / "project-1" / "secret.txt").exists()
+
+
+def test_audit_append_flushes_file_and_directory(
+    tmp_path,
+    monkeypatch,
+):
+    audit_log = WorkspaceAuditLog(tmp_path / "audit.jsonl")
+    flushed_modes = []
+    real_fsync = os.fsync
+
+    def tracking_fsync(descriptor):
+        flushed_modes.append(os.fstat(descriptor).st_mode)
+        return real_fsync(descriptor)
+
+    monkeypatch.setattr(os, "fsync", tracking_fsync)
+
+    audit_log.write(
+        WorkspaceRequest(
+            "worker-1",
+            "project-1",
+            "read",
+            "secret.txt",
+        ),
+        True,
+        "authorized",
+    )
+
+    assert any(stat.S_ISREG(mode) for mode in flushed_modes)
+    assert any(stat.S_ISDIR(mode) for mode in flushed_modes)
 
 
 def test_denied_operation_audit_is_sanitized(tmp_path):

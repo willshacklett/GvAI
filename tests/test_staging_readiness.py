@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+from pathlib import Path
 import subprocess
 from types import SimpleNamespace
 
@@ -49,6 +50,10 @@ def configured(monkeypatch, tmp_path):
         base64.b64encode(bytes(range(32))).decode("ascii"),
     )
     monkeypatch.setenv("GVAI_LOCAL_MODEL_COMMAND", "synthetic-engine")
+    monkeypatch.setenv(
+        runtime.ENCRYPTED_WORKSPACE_AUDIT_DIR_ENV,
+        str(tmp_path / "audit"),
+    )
     monkeypatch.setenv("OPENAI_API_KEY", "synthetic-secret")
     monkeypatch.delenv(
         "GVAI_PRIVATE_ENCRYPTED_WORKER_COMMAND",
@@ -71,7 +76,22 @@ def test_configured_preflight_passes_without_claiming_production(configured):
     assert report["scope"] == "configuration_and_namespace_preflight"
     assert report["ready_for_smoke_test"] is True
     assert report["production_ready"] is False
+    assert report["checks"]["audit_destination"] == "pass"
     assert "filesystem_isolation" not in report["not_verified"]
+    assert (
+        "independently_protected_audit_storage"
+        in report["not_verified"]
+    )
+    assert (
+        "cross_resource_audit_atomicity"
+        in report["not_verified"]
+    )
+
+    audit_dir = Path(
+        os.environ[runtime.ENCRYPTED_WORKSPACE_AUDIT_DIR_ENV]
+    )
+    assert audit_dir.is_dir()
+    assert (audit_dir / "audit.jsonl").is_file()
 
     for name in (
         "network_namespace",
@@ -112,6 +132,47 @@ def test_malformed_key_is_not_reported(configured, monkeypatch):
     report = readiness.check_readiness()
     assert report["checks"]["key_configuration"] == "fail"
     assert "secret-invalid-key!" not in json.dumps(report)
+
+
+def test_insecure_audit_destination_fails_sanitized(
+    configured,
+    monkeypatch,
+):
+    audit_dir = Path(
+        os.environ[runtime.ENCRYPTED_WORKSPACE_AUDIT_DIR_ENV]
+    )
+    audit_dir.mkdir(mode=0o700)
+    audit_file = audit_dir / "audit.jsonl"
+    audit_file.write_text(
+        "SENSITIVE-AUDIT-CANARY",
+        encoding="utf-8",
+    )
+    audit_file.chmod(0o644)
+
+    report = readiness.check_readiness()
+
+    assert report["checks"]["audit_destination"] == "fail"
+    assert report["ready_for_smoke_test"] is False
+    serialized = json.dumps(report)
+    assert "SENSITIVE-AUDIT-CANARY" not in serialized
+    assert str(audit_file) not in serialized
+
+
+def test_relative_audit_destination_fails_sanitized(
+    configured,
+    monkeypatch,
+):
+    configured_path = "SENSITIVE-RELATIVE-AUDIT-PATH"
+    monkeypatch.setenv(
+        runtime.ENCRYPTED_WORKSPACE_AUDIT_DIR_ENV,
+        configured_path,
+    )
+
+    report = readiness.check_readiness()
+
+    assert report["checks"]["audit_destination"] == "fail"
+    assert report["ready_for_smoke_test"] is False
+    assert configured_path not in json.dumps(report)
 
 
 def test_sandbox_nonzero_fails(configured, monkeypatch):

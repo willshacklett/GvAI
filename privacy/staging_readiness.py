@@ -2,8 +2,10 @@
 
 import json
 import os
+from pathlib import Path
 import subprocess
 import sys
+import tempfile
 
 
 def check_readiness():
@@ -20,6 +22,7 @@ def check_readiness():
 
     try:
         from privacy import runtime
+        from privacy.encrypted_workspace import WorkspaceAuditLog
         from privacy.filesystem_sandbox import (
             build_filesystem_sandbox_command,
             resolve_filesystem_sandbox_executable,
@@ -38,6 +41,22 @@ def check_readiness():
         checks["key_configuration"] = True
     except Exception:
         checks["key_configuration"] = False
+
+    try:
+        audit_dir = Path(
+            os.getenv(runtime.ENCRYPTED_WORKSPACE_AUDIT_DIR_ENV)
+            or (
+                Path(tempfile.gettempdir())
+                / "gvai-private-workspace-audit"
+            )
+        )
+        audit_log = WorkspaceAuditLog(
+            audit_dir / "audit.jsonl"
+        )
+        del audit_log
+        checks["audit_destination"] = True
+    except Exception:
+        checks["audit_destination"] = False
 
     # Validate syntax only; never execute an operator's model command.
     try:
@@ -141,6 +160,8 @@ def _report(checks):
         "not_verified": [
             "configured_model_execution",
             "encrypted_storage_and_audit_round_trip",
+            "independently_protected_audit_storage",
+            "cross_resource_audit_atomicity",
             "approved_model_asset_content",
             "escaped_descendant_containment",
             "production_key_management",

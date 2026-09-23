@@ -38,6 +38,10 @@ class WorkspaceWorkerError(RuntimeError):
     pass
 
 
+class WorkspaceAuditError(WorkspaceIntegrityError):
+    pass
+
+
 @dataclass(frozen=True)
 class WorkspaceRequest:
     worker_id: str
@@ -106,14 +110,92 @@ class WorkspaceAuthority:
         return WorkspaceAuthority(self.operations.intersection(operations))
 
 
+class WorkspaceAuditSink(Protocol):
+    """Externally controlled destination for sanitized audit metadata."""
+
+    def ensure_available(self) -> None:
+        ...
+
+    def write(
+        self,
+        request: WorkspaceRequest,
+        allowed: bool,
+        reason: str,
+    ) -> None:
+        ...
+
+
 class WorkspaceAuditLog:
-    """Append-only metadata audit; paths and contents are deliberately absent."""
+    """Durable descriptor-anchored reference audit sink.
+
+    This local-file implementation is suitable for development and testing.
+    Production deployments should provide a WorkspaceAuditSink backed by
+    independently protected storage.
+    """
 
     def __init__(self, path: str | Path):
-        self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        configured = Path(path)
+        if not configured.is_absolute():
+            raise WorkspaceAuditError(
+                "workspace audit destination is invalid"
+            )
 
-    def write(self, request: WorkspaceRequest, allowed: bool, reason: str) -> None:
+        try:
+            configured.parent.mkdir(
+                mode=0o700,
+                parents=True,
+                exist_ok=True,
+            )
+            directory = configured.parent.resolve(strict=True)
+            directory_status = directory.stat()
+        except OSError as exc:
+            raise WorkspaceAuditError(
+                "workspace audit destination is unavailable"
+            ) from exc
+
+        if configured.parent != directory:
+            raise WorkspaceAuditError(
+                "workspace audit destination is invalid"
+            )
+        if (
+            not configured.name
+            or configured.name in {".", ".."}
+            or not stat.S_ISDIR(directory_status.st_mode)
+            or directory_status.st_uid != os.geteuid()
+            or directory_status.st_mode
+            & (stat.S_IWGRP | stat.S_IWOTH)
+        ):
+            raise WorkspaceAuditError(
+                "workspace audit destination is invalid"
+            )
+
+        self.path = directory / configured.name
+        self.__directory = directory
+        self.__name = configured.name
+        self.__directory_identity = (
+            directory_status.st_dev,
+            directory_status.st_ino,
+        )
+        self.ensure_available()
+
+    def ensure_available(self) -> None:
+        directory = self.__open_directory()
+        descriptor = -1
+        try:
+            descriptor = self.__open_file(directory)
+            os.fsync(descriptor)
+            os.fsync(directory)
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
+            os.close(directory)
+
+    def write(
+        self,
+        request: WorkspaceRequest,
+        allowed: bool,
+        reason: str,
+    ) -> None:
         record = {
             "timestamp": time.time(),
             "worker_ref": self._reference("worker", request.worker_id),
@@ -122,8 +204,101 @@ class WorkspaceAuditLog:
             "allowed": allowed,
             "reason": reason,
         }
-        with self.path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(record, sort_keys=True) + "\n")
+        payload = (
+            json.dumps(record, sort_keys=True) + "\n"
+        ).encode("utf-8")
+
+        directory = self.__open_directory()
+        descriptor = -1
+        try:
+            descriptor = self.__open_file(directory)
+            written = os.write(descriptor, payload)
+            if written != len(payload):
+                raise WorkspaceAuditError(
+                    "workspace audit append was incomplete"
+                )
+            os.fsync(descriptor)
+            os.fsync(directory)
+        except WorkspaceAuditError:
+            raise
+        except OSError as exc:
+            raise WorkspaceAuditError(
+                "workspace audit destination is unavailable"
+            ) from exc
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
+            os.close(directory)
+
+    def __open_directory(self) -> int:
+        flags = (
+            os.O_RDONLY
+            | os.O_DIRECTORY
+            | os.O_NOFOLLOW
+            | os.O_CLOEXEC
+        )
+        try:
+            descriptor = os.open(self.__directory, flags)
+        except OSError as exc:
+            raise WorkspaceAuditError(
+                "workspace audit destination is unavailable"
+            ) from exc
+
+        try:
+            status = os.fstat(descriptor)
+            identity = (status.st_dev, status.st_ino)
+            if (
+                identity != self.__directory_identity
+                or not stat.S_ISDIR(status.st_mode)
+                or status.st_uid != os.geteuid()
+                or status.st_mode
+                & (stat.S_IWGRP | stat.S_IWOTH)
+            ):
+                raise WorkspaceAuditError(
+                    "workspace audit destination is invalid"
+                )
+            return descriptor
+        except Exception:
+            os.close(descriptor)
+            raise
+
+    def __open_file(self, directory: int) -> int:
+        flags = (
+            os.O_WRONLY
+            | os.O_APPEND
+            | os.O_CREAT
+            | os.O_NOFOLLOW
+            | os.O_CLOEXEC
+            | os.O_NONBLOCK
+        )
+        try:
+            descriptor = os.open(
+                self.__name,
+                flags,
+                0o600,
+                dir_fd=directory,
+            )
+        except OSError as exc:
+            raise WorkspaceAuditError(
+                "workspace audit destination is unavailable"
+            ) from exc
+
+        try:
+            status = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(status.st_mode)
+                or status.st_uid != os.geteuid()
+                or status.st_nlink != 1
+                or status.st_mode
+                & (stat.S_IRWXG | stat.S_IRWXO)
+            ):
+                raise WorkspaceAuditError(
+                    "workspace audit destination is invalid"
+                )
+            return descriptor
+        except Exception:
+            os.close(descriptor)
+            raise
 
     @staticmethod
     def _reference(kind: str, value: str) -> str:
@@ -141,8 +316,11 @@ class EncryptedProjectWorkspace:
         self,
         root: str | Path,
         control_plane: WorkspaceControlPlane,
-        audit_log: WorkspaceAuditLog,
+        audit_log: WorkspaceAuditSink,
     ):
+        self.__audit_log = audit_log
+        self.__ensure_audit_available()
+
         self.__root = Path(root).resolve()
         self.__root.mkdir(parents=True, exist_ok=True)
         root_status = self.__root.stat()
@@ -153,7 +331,27 @@ class EncryptedProjectWorkspace:
             root_status.st_ino,
         )
         self.__control_plane = control_plane
-        self.__audit_log = audit_log
+
+    def __ensure_audit_available(self) -> None:
+        try:
+            self.__audit_log.ensure_available()
+        except Exception:
+            raise WorkspaceAuditError(
+                "workspace audit destination is unavailable"
+            ) from None
+
+    def __audit(
+        self,
+        request: WorkspaceRequest,
+        allowed: bool,
+        reason: str,
+    ) -> None:
+        try:
+            self.__audit_log.write(request, allowed, reason)
+        except Exception:
+            raise WorkspaceAuditError(
+                "workspace audit destination is unavailable"
+            ) from None
 
     def execute(
         self,
@@ -161,27 +359,28 @@ class EncryptedProjectWorkspace:
         authority: WorkspaceAuthority,
         content: bytes | None = None,
     ) -> bytes | None:
+        self.__ensure_audit_available()
         try:
             path_parts, normalized = self.__validate_path(
                 request.project_id,
                 request.path,
             )
         except Exception:
-            self.__audit_log.write(request, False, "invalid_path")
+            self.__audit(request, False, "invalid_path")
             raise WorkspaceAccessDenied("workspace request denied") from None
 
         if request.operation not in authority.operations:
-            self.__audit_log.write(request, False, "worker_scope_denied")
+            self.__audit(request, False, "worker_scope_denied")
             raise WorkspaceAccessDenied("workspace operation denied")
 
         try:
             authorized = self.__control_plane.authorize(request) is True
         except Exception:
-            self.__audit_log.write(request, False, "control_plane_error")
+            self.__audit(request, False, "control_plane_error")
             raise WorkspaceAccessDenied("workspace request denied") from None
 
         if not authorized:
-            self.__audit_log.write(request, False, "control_plane_denied")
+            self.__audit(request, False, "control_plane_denied")
             raise WorkspaceAccessDenied("workspace operation denied")
 
         associated_data = self.__associated_data(
@@ -197,7 +396,7 @@ class EncryptedProjectWorkspace:
                 if not isinstance(sealed, bytes):
                     raise TypeError("invalid sealed data")
             except Exception:
-                self.__audit_log.write(request, False, "seal_failure")
+                self.__audit(request, False, "seal_failure")
                 raise WorkspaceIntegrityError(
                     "workspace operation failed"
                 ) from None
@@ -207,12 +406,12 @@ class EncryptedProjectWorkspace:
                     self._FORMAT + sealed,
                 )
             except WorkspaceAccessDenied:
-                self.__audit_log.write(request, False, "invalid_path")
+                self.__audit(request, False, "invalid_path")
                 raise WorkspaceAccessDenied(
                     "workspace request denied"
                 ) from None
             except Exception:
-                self.__audit_log.write(request, False, "storage_failure")
+                self.__audit(request, False, "storage_failure")
                 raise WorkspaceIntegrityError(
                     "workspace operation failed"
                 ) from None
@@ -221,17 +420,17 @@ class EncryptedProjectWorkspace:
             try:
                 encrypted = self.__read_file(path_parts)
             except WorkspaceAccessDenied:
-                self.__audit_log.write(request, False, "invalid_path")
+                self.__audit(request, False, "invalid_path")
                 raise WorkspaceAccessDenied(
                     "workspace request denied"
                 ) from None
             except OSError:
-                self.__audit_log.write(request, False, "data_unavailable")
+                self.__audit(request, False, "data_unavailable")
                 raise WorkspaceIntegrityError(
                     "encrypted workspace data unavailable"
                 ) from None
             if not encrypted.startswith(self._FORMAT):
-                self.__audit_log.write(request, False, "integrity_failure")
+                self.__audit(request, False, "integrity_failure")
                 raise WorkspaceIntegrityError("invalid encrypted workspace data")
             try:
                 result = self.__control_plane.open(
@@ -241,24 +440,24 @@ class EncryptedProjectWorkspace:
                 if not isinstance(result, bytes):
                     raise TypeError("invalid opened data")
             except WorkspaceIntegrityError:
-                self.__audit_log.write(request, False, "integrity_failure")
+                self.__audit(request, False, "integrity_failure")
                 raise WorkspaceIntegrityError(
                     "encrypted workspace authentication failed"
                 ) from None
             except Exception:
-                self.__audit_log.write(request, False, "open_failure")
+                self.__audit(request, False, "open_failure")
                 raise WorkspaceIntegrityError(
                     "workspace operation failed"
                 ) from None
         else:
-            self.__audit_log.write(request, False, "invalid_operation")
+            self.__audit(request, False, "invalid_operation")
             raise WorkspaceAccessDenied("workspace operation denied")
 
-        self.__audit_log.write(request, True, "authorized")
+        self.__audit(request, True, "authorized")
         return result
 
     def audit_invalid_request(self, *, worker_id: str, project_id: str) -> None:
-        self.__audit_log.write(
+        self.__audit(
             WorkspaceRequest(worker_id, project_id, "invalid", ""),
             False,
             "invalid_request",

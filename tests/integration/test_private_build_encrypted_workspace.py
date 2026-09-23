@@ -636,6 +636,40 @@ def test_unapproved_model_asset_fails_closed(monkeypatch, tmp_path):
     assert "must-not-run" not in str(excinfo.value)
 
 
+def test_invalid_audit_destination_fails_before_storage_allocation(
+    monkeypatch,
+    tmp_path,
+):
+    _base_env(monkeypatch, tmp_path, fake_engine=False)
+
+    audit_dir = tmp_path / "audit"
+    audit_dir.mkdir(mode=0o700)
+    audit_file = audit_dir / "audit.jsonl"
+    audit_file.write_text("", encoding="utf-8")
+    audit_file.chmod(0o644)
+
+    def forbidden_storage_allocation(*args, **kwargs):
+        raise AssertionError(
+            "workspace storage must not be allocated "
+            "before audit preflight"
+        )
+
+    monkeypatch.setattr(
+        runtime.tempfile,
+        "mkdtemp",
+        forbidden_storage_allocation,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="GVAI private model worker failed",
+    ):
+        runtime.run_private_model_encrypted_workspace(
+            "synthetic",
+            "audit-boundary",
+        )
+
+
 def test_audit_path_cannot_be_approved_as_worker_input(
     monkeypatch,
     tmp_path,
@@ -644,6 +678,7 @@ def test_audit_path_cannot_be_approved_as_worker_input(
 
     audit_dir = tmp_path / "audit"
     audit_dir.mkdir(exist_ok=True)
+    audit_dir.chmod(0o700)
     monkeypatch.setenv(
         runtime.FILESYSTEM_SANDBOX_READ_PATHS_ENV,
         str(audit_dir.resolve(strict=True)),
