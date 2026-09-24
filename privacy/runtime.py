@@ -63,6 +63,12 @@ from privacy.filesystem_sandbox import (
     FilesystemSandboxError,
     build_filesystem_sandbox_command,
 )
+from privacy.resource_containment import (
+    CgroupV2Boundary,
+    RESOURCE_POLICY_ENV_NAMES,
+    ResourceContainmentError,
+    load_worker_resource_configuration,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -126,6 +132,7 @@ _FORBIDDEN_EXTRA_ENV_NAMES = frozenset(
         "WORKSPACE_ROOT",
     }
     | EXTERNAL_SECRET_ENV
+    | RESOURCE_POLICY_ENV_NAMES
 )
 
 _ENCRYPTED_REQUEST_PATH = "request.json"
@@ -342,8 +349,8 @@ def run_private_model_encrypted_workspace(
     request. It seals the request into a per-request encrypted workspace,
     execs a filesystem- and network-isolated worker that can reach the
     workspace only through WorkspaceClient, and opens the sealed result
-    itself. The
-    worker never receives the key, the control plane, the workspace root
+    itself. The worker never receives the key, the control plane, the
+    workspace root
     path, raw identity strings, or any external-model credential.
     """
 
@@ -370,8 +377,20 @@ def run_private_model_encrypted_workspace(
 
     authority = WorkspaceAuthority(frozenset({"read", "write"}))
 
-    storage_dir = Path(tempfile.mkdtemp(prefix="gvai-private-ws-"))
     try:
+        resource_boundary = CgroupV2Boundary(
+            load_worker_resource_configuration()
+        )
+    except ResourceContainmentError:
+        raise RuntimeError(
+            "GVAI private model worker failed."
+        ) from None
+
+    storage_dir = None
+    try:
+        storage_dir = Path(
+            tempfile.mkdtemp(prefix="gvai-private-ws-")
+        )
         control_plane = AESGCMControlPlane(
             key,
             lambda request, _wid=worker_id, _pid=project_id: (
@@ -430,6 +449,7 @@ def run_private_model_encrypted_workspace(
             broker.run_worker(
                 sandbox_command,
                 timeout=timeout,
+                resource_boundary=resource_boundary,
             )
         except (FilesystemSandboxError, WorkspaceWorkerError):
             raise RuntimeError(
@@ -451,7 +471,14 @@ def run_private_model_encrypted_workspace(
                 "GVAI private model worker failed."
             ) from None
     finally:
-        shutil.rmtree(storage_dir, ignore_errors=True)
+        if storage_dir is not None:
+            shutil.rmtree(storage_dir, ignore_errors=True)
+        try:
+            resource_boundary.close()
+        except ResourceContainmentError:
+            raise RuntimeError(
+                "GVAI private model worker failed."
+            ) from None
 
     try:
         response = json.loads((result_bytes or b"").decode("utf-8"))

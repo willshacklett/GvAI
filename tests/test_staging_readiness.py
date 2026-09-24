@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from privacy import filesystem_sandbox
+from privacy import resource_containment
 from privacy import runtime
 from privacy import staging_readiness as readiness
 
@@ -18,6 +19,8 @@ def configured(monkeypatch, tmp_path):
     sandbox.touch(mode=0o700)
     worker = tmp_path / "worker.py"
     worker.touch()
+    cgroup_root = tmp_path / "cgroup"
+    cgroup_root.mkdir(mode=0o700)
 
     monkeypatch.setattr(runtime, "SANDBOX", sandbox)
     monkeypatch.setattr(runtime, "ENCRYPTED_WORKER_SCRIPT", worker)
@@ -28,9 +31,28 @@ def configured(monkeypatch, tmp_path):
         lambda name: "/usr/bin/bwrap" if name == "bwrap" else None,
     )
 
+    class FakeResourceBoundary:
+        def __init__(self, configuration):
+            self.configuration = configuration
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    monkeypatch.setattr(
+        resource_containment,
+        "CgroupV2Boundary",
+        FakeResourceBoundary,
+    )
+    monkeypatch.setenv(
+        resource_containment.CGROUP_ROOT_ENV,
+        str(cgroup_root),
+    )
+
     for name in (
         "posix_spawnp", "POSIX_SPAWN_CLOSEFROM", "pidfd_open",
         "killpg", "waitid", "P_PID", "WEXITED", "WNOWAIT", "CLD_EXITED",
+        "WSTOPPED", "WNOHANG", "CLD_STOPPED",
     ):
         if not hasattr(os, name):
             monkeypatch.setattr(os, name, object(), raising=False)
@@ -77,7 +99,14 @@ def test_configured_preflight_passes_without_claiming_production(configured):
     assert report["ready_for_smoke_test"] is True
     assert report["production_ready"] is False
     assert report["checks"]["audit_destination"] == "pass"
+    assert report["checks"]["resource_policy"] == "pass"
+    assert report["checks"]["resource_containment"] == "pass"
     assert "filesystem_isolation" not in report["not_verified"]
+    assert "resource_limits" not in report["not_verified"]
+    assert (
+        "escaped_descendant_containment"
+        not in report["not_verified"]
+    )
     assert (
         "independently_protected_audit_storage"
         in report["not_verified"]
@@ -269,4 +298,51 @@ def test_untrusted_bubblewrap_blocks_probe(
         == "fail"
     )
     assert report["ready_for_smoke_test"] is False
+    assert configured == []
+
+
+
+def test_invalid_resource_policy_fails_sanitized(
+    configured,
+    monkeypatch,
+):
+    canary = "SENSITIVE-RESOURCE-POLICY-CANARY"
+    monkeypatch.setenv(
+        resource_containment.PIDS_MAX_ENV,
+        canary,
+    )
+
+    report = readiness.check_readiness()
+
+    assert report["checks"]["resource_policy"] == "fail"
+    assert report["checks"]["resource_containment"] == "fail"
+    assert report["ready_for_smoke_test"] is False
+    assert canary not in json.dumps(report)
+    assert configured == []
+
+
+def test_unavailable_resource_boundary_fails_sanitized(
+    configured,
+    monkeypatch,
+):
+    def unavailable(*args, **kwargs):
+        raise PermissionError(
+            "SENSITIVE-CGROUP-FAILURE-CANARY"
+        )
+
+    monkeypatch.setattr(
+        resource_containment,
+        "CgroupV2Boundary",
+        unavailable,
+    )
+
+    report = readiness.check_readiness()
+
+    assert report["checks"]["resource_policy"] == "pass"
+    assert report["checks"]["resource_containment"] == "fail"
+    assert report["ready_for_smoke_test"] is False
+    assert (
+        "SENSITIVE-CGROUP-FAILURE-CANARY"
+        not in json.dumps(report)
+    )
     assert configured == []

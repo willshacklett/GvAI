@@ -696,3 +696,32 @@ def test_audit_path_cannot_be_approved_as_worker_input(
             "synthetic",
             "protected-audit",
         )
+
+
+
+def test_invalid_resource_policy_fails_before_storage_allocation(
+    monkeypatch,
+    tmp_path,
+):
+    _base_env(monkeypatch, tmp_path)
+    monkeypatch.setenv("GVAI_PRIVATE_PIDS_MAX", "1")
+
+    def forbidden_storage_allocation(*args, **kwargs):
+        raise AssertionError(
+            "storage must not be allocated before resource validation"
+        )
+
+    monkeypatch.setattr(
+        runtime.tempfile,
+        "mkdtemp",
+        forbidden_storage_allocation,
+    )
+
+    with pytest.raises(RuntimeError) as excinfo:
+        runtime.run_private_model_encrypted_workspace(
+            "synthetic",
+            "invalid-resource-policy",
+        )
+
+    assert str(excinfo.value) == "GVAI private model worker failed."
+    assert "GVAI_PRIVATE_PIDS_MAX" not in str(excinfo.value)
