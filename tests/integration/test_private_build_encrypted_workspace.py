@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import sys
 from pathlib import Path
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey,
+)
 
 import privacy.runtime as runtime
 from privacy.encrypted_workspace import WorkspaceBroker
+from privacy.model_asset_provenance import MANIFEST_SCHEMA
 
 
 VALID_KEY_B64 = base64.b64encode(bytes(range(32))).decode("ascii")
@@ -51,6 +57,59 @@ def _allow_sandbox_reads(monkeypatch, *paths: Path) -> None:
             configured.append(canonical)
 
     monkeypatch.setenv(name, os.pathsep.join(configured))
+
+    entries = []
+    for configured_path in configured:
+        asset = Path(configured_path)
+        content = asset.read_bytes()
+        entries.append(
+            {
+                "path": str(asset),
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "size": len(content),
+            }
+        )
+
+    private_key = Ed25519PrivateKey.generate()
+    payload = json.dumps(
+        {
+            "assets": entries,
+            "schema": MANIFEST_SCHEMA,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    signature = base64.b64encode(
+        private_key.sign(payload)
+    ).decode("ascii")
+    manifest = (
+        Path(configured[0]).parent
+        / ".gvai-test-model-assets.json"
+    )
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema": MANIFEST_SCHEMA,
+                "assets": entries,
+                "signature": signature,
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    public_key = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    monkeypatch.setenv(
+        runtime.MODEL_ASSET_MANIFEST_ENV,
+        str(manifest.resolve(strict=True)),
+    )
+    monkeypatch.setenv(
+        runtime.MODEL_ASSET_PUBLIC_KEY_ENV,
+        base64.b64encode(public_key).decode("ascii"),
+    )
 
 
 def _base_env(monkeypatch, tmp_path, *, fake_engine=True):
@@ -634,6 +693,135 @@ def test_unapproved_model_asset_fails_closed(monkeypatch, tmp_path):
 
     assert str(engine) not in str(excinfo.value)
     assert "must-not-run" not in str(excinfo.value)
+
+
+def test_invalid_model_asset_signature_fails_before_private_allocation(
+    monkeypatch,
+    tmp_path,
+):
+    _base_env(monkeypatch, tmp_path)
+
+    # A correctly encoded but unrelated public key cannot authenticate
+    # the signed manifest.
+    monkeypatch.setenv(
+        runtime.MODEL_ASSET_PUBLIC_KEY_ENV,
+        base64.b64encode(bytes(32)).decode("ascii"),
+    )
+
+    def forbidden_private_allocation(*args, **kwargs):
+        raise AssertionError(
+            "private resources must not be allocated before "
+            "model-asset provenance verification"
+        )
+
+    monkeypatch.setattr(
+        runtime,
+        "WorkspaceAuditLog",
+        forbidden_private_allocation,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "CgroupV2Boundary",
+        forbidden_private_allocation,
+    )
+    monkeypatch.setattr(
+        runtime.tempfile,
+        "mkdtemp",
+        forbidden_private_allocation,
+    )
+
+    with pytest.raises(RuntimeError) as excinfo:
+        runtime.run_private_model_encrypted_workspace(
+            "synthetic",
+            "invalid-model-signature",
+        )
+
+    assert str(excinfo.value) == "GVAI private model worker failed."
+    assert "signature" not in str(excinfo.value).lower()
+    assert str(tmp_path) not in str(excinfo.value)
+
+
+def test_model_asset_mount_mismatch_fails_before_private_allocation(
+    monkeypatch,
+    tmp_path,
+):
+    _base_env(monkeypatch, tmp_path)
+
+    undeclared = tmp_path / "undeclared-model-asset.bin"
+    undeclared.write_bytes(b"not-covered-by-the-signed-manifest")
+
+    configured = os.environ[
+        runtime.FILESYSTEM_SANDBOX_READ_PATHS_ENV
+    ]
+    monkeypatch.setenv(
+        runtime.FILESYSTEM_SANDBOX_READ_PATHS_ENV,
+        configured + os.pathsep + str(undeclared.resolve(strict=True)),
+    )
+
+    def forbidden_private_allocation(*args, **kwargs):
+        raise AssertionError(
+            "private resources must not be allocated before "
+            "the signed manifest matches the mount policy"
+        )
+
+    monkeypatch.setattr(
+        runtime,
+        "WorkspaceAuditLog",
+        forbidden_private_allocation,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "CgroupV2Boundary",
+        forbidden_private_allocation,
+    )
+    monkeypatch.setattr(
+        runtime.tempfile,
+        "mkdtemp",
+        forbidden_private_allocation,
+    )
+
+    with pytest.raises(RuntimeError) as excinfo:
+        runtime.run_private_model_encrypted_workspace(
+            "synthetic",
+            "undeclared-model-asset",
+        )
+
+    assert str(excinfo.value) == "GVAI private model worker failed."
+    assert str(undeclared) not in str(excinfo.value)
+
+
+def test_model_asset_mutation_after_worker_is_rejected(
+    monkeypatch,
+    tmp_path,
+):
+    _base_env(monkeypatch, tmp_path)
+    engine = tmp_path / "fake_engine.py"
+
+    original_run_worker = WorkspaceBroker.run_worker
+
+    def run_worker_then_mutate_asset(self, *args, **kwargs):
+        result = original_run_worker(self, *args, **kwargs)
+        engine.write_bytes(
+            engine.read_bytes()
+            + b"\n# hostile post-execution mutation\n"
+        )
+        return result
+
+    monkeypatch.setattr(
+        WorkspaceBroker,
+        "run_worker",
+        run_worker_then_mutate_asset,
+    )
+
+    with pytest.raises(RuntimeError) as excinfo:
+        runtime.run_private_model_encrypted_workspace(
+            "You are GVAI.",
+            "top-secret-project-plan",
+        )
+
+    assert str(excinfo.value) == "GVAI private model worker failed."
+    assert str(engine) not in str(excinfo.value)
+    assert "top-secret-project-plan" not in str(excinfo.value)
 
 
 def test_invalid_audit_destination_fails_before_storage_allocation(

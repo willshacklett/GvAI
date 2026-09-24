@@ -63,6 +63,13 @@ from privacy.filesystem_sandbox import (
     FilesystemSandboxError,
     build_filesystem_sandbox_command,
 )
+from privacy.model_asset_provenance import (
+    MANIFEST_ENV as MODEL_ASSET_MANIFEST_ENV,
+    PUBLIC_KEY_ENV as MODEL_ASSET_PUBLIC_KEY_ENV,
+    ModelAssetProvenanceError,
+    load_verified_model_assets,
+    reverify_model_assets,
+)
 from privacy.resource_containment import (
     CgroupV2Boundary,
     RESOURCE_POLICY_ENV_NAMES,
@@ -119,6 +126,8 @@ _FORBIDDEN_EXTRA_ENV_NAMES = frozenset(
         ENCRYPTED_WORKSPACE_KEY_ENV,
         ENCRYPTED_WORKSPACE_AUDIT_DIR_ENV,
         FILESYSTEM_SANDBOX_READ_PATHS_ENV,
+        MODEL_ASSET_MANIFEST_ENV,
+        MODEL_ASSET_PUBLIC_KEY_ENV,
         "GVAI_PRIVATE_ENCRYPTED_WORKER_COMMAND",
         "PYTHONPATH",
         "LD_PRELOAD",
@@ -358,6 +367,16 @@ def run_private_model_encrypted_workspace(
     # is missing/malformed -- never fall back to plaintext or external.
     key = load_trusted_workspace_key()
 
+    try:
+        configured_asset_paths = _filesystem_sandbox_read_paths()
+        verified_model_assets = load_verified_model_assets(
+            expected_paths=configured_asset_paths,
+        )
+    except (ModelAssetProvenanceError, RuntimeError):
+        raise RuntimeError(
+            "GVAI private model worker failed."
+        ) from None
+
     worker_id = uuid.uuid4().hex
     project_id = uuid.uuid4().hex
 
@@ -439,7 +458,7 @@ def run_private_model_encrypted_workspace(
             sandbox_command = build_filesystem_sandbox_command(
                 _encrypted_worker_command(),
                 worker_environment=local_model_env,
-                read_only_paths=_filesystem_sandbox_read_paths(),
+                read_only_paths=verified_model_assets.paths,
                 denied_paths=(
                     ROOT,
                     storage_dir,
@@ -451,7 +470,12 @@ def run_private_model_encrypted_workspace(
                 timeout=timeout,
                 resource_boundary=resource_boundary,
             )
-        except (FilesystemSandboxError, WorkspaceWorkerError):
+            reverify_model_assets(verified_model_assets)
+        except (
+            FilesystemSandboxError,
+            ModelAssetProvenanceError,
+            WorkspaceWorkerError,
+        ):
             raise RuntimeError(
                 "GVAI private model worker failed."
             ) from None

@@ -28,6 +28,9 @@ def check_readiness():
             build_filesystem_sandbox_command,
             resolve_filesystem_sandbox_executable,
         )
+        from privacy.model_asset_provenance import (
+            load_verified_model_assets,
+        )
         from privacy.resource_containment import (
             CgroupV2Boundary,
             load_worker_resource_configuration,
@@ -46,6 +49,15 @@ def check_readiness():
         checks["key_configuration"] = True
     except Exception:
         checks["key_configuration"] = False
+
+    try:
+        verified_model_assets = load_verified_model_assets(
+            expected_paths=runtime._filesystem_sandbox_read_paths(),
+        )
+        del verified_model_assets
+        checks["model_asset_provenance"] = True
+    except Exception:
+        checks["model_asset_provenance"] = False
 
     try:
         audit_dir = Path(
@@ -123,6 +135,7 @@ def check_readiness():
         checks["process_api"]
         and checks["stock_worker"]
         and checks["filesystem_sandbox_executable"]
+        and checks["model_asset_provenance"]
         and checks["resource_policy"]
         and checks["resource_containment"]
     )
@@ -195,7 +208,7 @@ def _report(checks):
             "encrypted_storage_and_audit_round_trip",
             "independently_protected_audit_storage",
             "cross_resource_audit_atomicity",
-            "approved_model_asset_content",
+            "concurrent_host_asset_mutation",
             "production_key_management",
         ],
     }
