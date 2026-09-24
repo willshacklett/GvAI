@@ -66,15 +66,35 @@ The encrypted runtime places the worker inside a Bubblewrap namespace with:
 - a cleared environment rebuilt from a fixed launcher-owned allowlist;
 - read-only system and Python runtime mounts;
 - only the four required GVAI worker modules mounted at `/app/privacy`;
-- optional operator-approved model or worker assets mounted read-only; and
-- no mount for the repository, encrypted workspace, audit destination, or
-  general host home contents.
+- only exact operator-approved model or worker files mounted read-only; and
+- no mount for the repository, encrypted workspace, audit destination, signed
+  manifest, or general host home contents.
+
+## Signed model-asset provenance
 
 `GVAI_PRIVATE_SANDBOX_READ_PATHS` is an operator-controlled, colon-separated
-list of canonical absolute files or directories. These paths are not inferred
-from worker input. Missing, relative, non-canonical, special, root-wide, or
-protected-boundary paths fail closed. Approving a directory exposes that entire
-directory read-only, so deployments should prefer exact files.
+list of canonical absolute regular files. Directories, symlinks, hard links,
+special files, missing files, relative paths, non-canonical paths, root-wide
+paths, and protected-boundary paths fail closed.
+
+`GVAI_PRIVATE_MODEL_ASSET_MANIFEST` names a canonical JSON manifest signed with
+Ed25519. Its signature covers the schema and the complete ordered asset list,
+including each canonical path, byte size, and SHA-256 digest.
+`GVAI_PRIVATE_MODEL_ASSET_PUBLIC_KEY` contains the base64-encoded 32-byte
+Ed25519 verification key. The signing private key is not a runtime setting and
+must remain in an independently controlled provisioning or release system.
+
+Before creating the audit sink, resource cgroup, encrypted workspace, or worker,
+the trusted parent verifies the manifest signature, requires the manifest and
+mount-policy path sets to match exactly, and verifies every asset through a
+no-follow descriptor. After the worker exits, the parent reopens and reverifies
+every asset before accepting the encrypted result. Signature failures, content
+changes, identity changes, and policy mismatches fail closed with sanitized
+errors.
+
+The signed manifest, public-key setting, digests, and host policy remain outside
+the worker environment and filesystem. The worker receives only the verified
+files as read-only mounts.
 
 The worker cannot add mounts or environment entries. It receives neither the
 workspace path nor the audit path, and it can reach encrypted data only through
@@ -132,8 +152,16 @@ and filesystem permissions, and an external secret manager.
 The implementation is Linux-specific and depends on permitted unprivileged user
 namespaces, a root-owned executable Bubblewrap binary that is not group- or
 world-writable, and a securely delegated cgroup-v2 directory with `cpu`,
-`memory`, `pids`, and `cgroup.kill` support. Approved model assets remain trusted
-deployment inputs and require independent provenance review.
+`memory`, `pids`, and `cgroup.kill` support. The configured Ed25519 public key
+must itself be provisioned through an independently trusted release process.
+
+Pre-execution verification and post-execution revalidation detect ordinary
+asset replacement or mutation. They do not make the host immutable: a
+privileged hostile host process could modify an asset during execution and
+restore the approved bytes before the final verification. Immutable image
+layers, read-only verified storage, fs-verity, or an equivalent externally
+administered content boundary remains a production requirement where that
+threat is in scope.
 
 A privileged hostile host process can still alter cgroup policy, migrate
 processes, or interfere with termination. The externally administered cgroup

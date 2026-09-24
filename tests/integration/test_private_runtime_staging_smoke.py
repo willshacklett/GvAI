@@ -1,6 +1,7 @@
 """Opt-in Linux smoke test: real sandbox, synthetic data, no model service."""
 
 import base64
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -9,6 +10,12 @@ import shlex
 import sys
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey,
+)
+
+from privacy.model_asset_provenance import MANIFEST_SCHEMA
 
 
 @pytest.mark.skipif(
@@ -38,6 +45,51 @@ def test_real_encrypted_runtime_boundary(monkeypatch, tmp_path):
         entry.name
         for entry in cgroup_root.glob("gvai-worker-*")
     }
+    model_asset = tmp_path / "synthetic-model.asset"
+    asset_content = (
+        "synthetic-approved-model-asset-"
+        + secrets.token_hex(16)
+    ).encode("ascii")
+    model_asset.write_bytes(asset_content)
+    canonical_asset = str(model_asset.resolve(strict=True))
+
+    entries = [
+        {
+            "path": canonical_asset,
+            "sha256": hashlib.sha256(asset_content).hexdigest(),
+            "size": len(asset_content),
+        }
+    ]
+    signed_payload = json.dumps(
+        {
+            "assets": entries,
+            "schema": MANIFEST_SCHEMA,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    private_key = Ed25519PrivateKey.generate()
+    manifest = tmp_path / "signed-model-assets.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema": MANIFEST_SCHEMA,
+                "assets": entries,
+                "signature": base64.b64encode(
+                    private_key.sign(signed_payload)
+                ).decode("ascii"),
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    public_key = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    public_key_b64 = base64.b64encode(public_key).decode("ascii")
+
     forbidden = sorted(
         runtime.EXTERNAL_SECRET_ENV
         | runtime.RESOURCE_POLICY_ENV_NAMES
@@ -45,6 +97,8 @@ def test_real_encrypted_runtime_boundary(monkeypatch, tmp_path):
             runtime.ENCRYPTED_WORKSPACE_KEY_ENV,
             runtime.ENCRYPTED_WORKSPACE_AUDIT_DIR_ENV,
             runtime.FILESYSTEM_SANDBOX_READ_PATHS_ENV,
+            runtime.MODEL_ASSET_MANIFEST_ENV,
+            runtime.MODEL_ASSET_PUBLIC_KEY_ENV,
         }
     )
 
@@ -66,6 +120,16 @@ assert os.environ["HOME"] == "/tmp"
 assert not Path({str(root)!r}).exists()
 assert not Path({host_home!r}).exists()
 assert not Path({str(audit_dir)!r}).exists()
+assert not Path({str(manifest)!r}).exists()
+
+model_asset = Path({canonical_asset!r})
+assert model_asset.read_bytes() == {asset_content!r}
+try:
+    model_asset.write_bytes(b"worker-mutation-must-fail")
+except OSError:
+    pass
+else:
+    raise AssertionError("approved model asset was writable")
 
 private_temp = Path("/tmp/staging-private.txt")
 private_temp.write_text("private", encoding="utf-8")
@@ -88,6 +152,18 @@ print({reply!r})
     monkeypatch.setenv("GVAI_PRIVATE_ENCRYPTED_WORKSPACE", "1")
     monkeypatch.setenv("GVAI_PRIVATE_WORKSPACE_KEY", key)
     monkeypatch.setenv("GVAI_PRIVATE_WORKSPACE_AUDIT_DIR", str(audit_dir))
+    monkeypatch.setenv(
+        runtime.FILESYSTEM_SANDBOX_READ_PATHS_ENV,
+        canonical_asset,
+    )
+    monkeypatch.setenv(
+        runtime.MODEL_ASSET_MANIFEST_ENV,
+        str(manifest.resolve(strict=True)),
+    )
+    monkeypatch.setenv(
+        runtime.MODEL_ASSET_PUBLIC_KEY_ENV,
+        public_key_b64,
+    )
     monkeypatch.setenv(
         "GVAI_LOCAL_MODEL_COMMAND",
         shlex.join([sys.executable, "-I", "-c", engine]),
@@ -133,5 +209,12 @@ print({reply!r})
     audit = audit_file.read_text(encoding="utf-8")
     records = [json.loads(line) for line in audit.splitlines()]
     assert records
-    for forbidden_value in (marker, reply, key, "synthetic-not-a-credential"):
+    for forbidden_value in (
+        marker,
+        reply,
+        key,
+        public_key_b64,
+        asset_content.decode("ascii"),
+        "synthetic-not-a-credential",
+    ):
         assert forbidden_value not in audit

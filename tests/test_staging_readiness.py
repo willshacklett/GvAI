@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -6,11 +7,16 @@ import subprocess
 from types import SimpleNamespace
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey,
+)
 
 from privacy import filesystem_sandbox
 from privacy import resource_containment
 from privacy import runtime
 from privacy import staging_readiness as readiness
+from privacy.model_asset_provenance import MANIFEST_SCHEMA
 
 
 @pytest.fixture
@@ -82,6 +88,59 @@ def configured(monkeypatch, tmp_path):
         raising=False,
     )
 
+    model_asset = tmp_path / "synthetic-model.asset"
+    model_content = b"synthetic-approved-model-asset"
+    model_asset.write_bytes(model_content)
+    canonical_asset = str(model_asset.resolve(strict=True))
+    monkeypatch.setenv(
+        runtime.FILESYSTEM_SANDBOX_READ_PATHS_ENV,
+        canonical_asset,
+    )
+
+    entries = [
+        {
+            "path": canonical_asset,
+            "sha256": hashlib.sha256(model_content).hexdigest(),
+            "size": len(model_content),
+        }
+    ]
+    payload = json.dumps(
+        {
+            "assets": entries,
+            "schema": MANIFEST_SCHEMA,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    private_key = Ed25519PrivateKey.generate()
+    manifest = tmp_path / "signed-model-assets.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema": MANIFEST_SCHEMA,
+                "assets": entries,
+                "signature": base64.b64encode(
+                    private_key.sign(payload)
+                ).decode("ascii"),
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    public_key = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    monkeypatch.setenv(
+        runtime.MODEL_ASSET_MANIFEST_ENV,
+        str(manifest.resolve(strict=True)),
+    )
+    monkeypatch.setenv(
+        runtime.MODEL_ASSET_PUBLIC_KEY_ENV,
+        base64.b64encode(public_key).decode("ascii"),
+    )
+
     calls = []
 
     def fake_run(command, **kwargs):
@@ -101,6 +160,9 @@ def test_configured_preflight_passes_without_claiming_production(configured):
     assert report["checks"]["audit_destination"] == "pass"
     assert report["checks"]["resource_policy"] == "pass"
     assert report["checks"]["resource_containment"] == "pass"
+    assert report["checks"]["model_asset_provenance"] == "pass"
+    assert "approved_model_asset_content" not in report["not_verified"]
+    assert "concurrent_host_asset_mutation" in report["not_verified"]
     assert "filesystem_isolation" not in report["not_verified"]
     assert "resource_limits" not in report["not_verified"]
     assert (
@@ -154,6 +216,25 @@ def test_missing_configuration_fails(configured, monkeypatch, name, check):
     report = readiness.check_readiness()
     assert report["checks"][check] == "fail"
     assert report["ready_for_smoke_test"] is False
+
+
+def test_invalid_model_asset_provenance_fails_sanitized(
+    configured,
+    monkeypatch,
+):
+    model_asset = Path(
+        os.environ[runtime.FILESYSTEM_SANDBOX_READ_PATHS_ENV]
+    )
+    sensitive_content = "SENSITIVE-MUTATED-MODEL-ASSET"
+    model_asset.write_text(sensitive_content, encoding="utf-8")
+
+    report = readiness.check_readiness()
+
+    assert report["checks"]["model_asset_provenance"] == "fail"
+    assert report["ready_for_smoke_test"] is False
+    serialized = json.dumps(report)
+    assert sensitive_content not in serialized
+    assert str(model_asset) not in serialized
 
 
 def test_malformed_key_is_not_reported(configured, monkeypatch):
