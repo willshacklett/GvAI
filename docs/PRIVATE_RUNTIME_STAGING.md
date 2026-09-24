@@ -1,8 +1,9 @@
 # Private runtime staging checks
 
 These checks do not activate Private Build or establish production readiness.
-Use synthetic data only until deployment isolation, approved model assets, key
-management, and audit storage have been independently reviewed.
+Use synthetic data only until deployment isolation, cgroup delegation, approved
+model assets, key management, and audit storage have been independently
+reviewed.
 
 ## Configuration and namespace preflight
 
@@ -14,9 +15,10 @@ python -m privacy.staging_readiness
 
 The command reports sanitized JSON and exits 0 only when all implemented
 preflight checks pass. Missing configuration, unsupported process APIs,
-Bubblewrap failures, namespace failures, insecure audit destinations, or worker
-overrides yield exit 1. It does not print keys, environment values, approved
-paths, audit paths, or raw exceptions.
+Bubblewrap failures, namespace failures, insecure audit destinations, invalid
+resource policies, unavailable cgroup containment, or worker overrides yield
+exit 1. It does not print keys, environment values, approved paths, audit paths,
+resource-policy values, or raw exceptions.
 
 Required configuration:
 
@@ -24,7 +26,12 @@ Required configuration:
 - `GVAI_PRIVATE_ENCRYPTED_WORKSPACE=1`
 - `GVAI_PRIVATE_WORKSPACE_KEY`: base64 encoding of exactly 32 bytes
 - `GVAI_LOCAL_MODEL_COMMAND`: syntactically valid local engine command
-- Linux with permitted unprivileged user namespaces and a root-owned, executable Bubblewrap binary that is not group- or world-writable
+- Linux with permitted unprivileged user namespaces
+- a root-owned executable Bubblewrap binary that is not group- or world-writable
+- cgroup v2 with `cpu`, `memory`, and `pids` controllers enabled for
+  child cgroups plus `cgroup.kill`
+- a canonical cgroup root owned by root or the trusted broker account, with no
+  group or world write permission
 
 Optional configuration:
 
@@ -32,21 +39,31 @@ Optional configuration:
   when omitted, the runtime uses its private temporary-directory default
 - `GVAI_PRIVATE_SANDBOX_READ_PATHS`: operator-controlled, path-separated list
   of canonical absolute files or directories mounted read-only for the worker
+- `GVAI_PRIVATE_CGROUP_ROOT`: externally administered cgroup-v2 directory;
+  defaults to `/sys/fs/cgroup`
+- `GVAI_PRIVATE_MEMORY_MAX_BYTES`: aggregate worker-tree memory limit; defaults
+  to 8 GiB
+- `GVAI_PRIVATE_PIDS_MAX`: aggregate worker-tree process limit; defaults to 64
+- `GVAI_PRIVATE_CPU_QUOTA_US`: aggregate CPU quota; defaults to 400,000
+  microseconds
+- `GVAI_PRIVATE_CPU_PERIOD_US`: CPU accounting period; defaults to 100,000
+  microseconds
 
 The preflight checks model-command syntax, not model availability or execution.
 It initializes and validates the local reference audit destination, including
 canonical-path, ownership, permission, link-count, and descriptor-identity
-requirements. It launches a bounded synthetic worker inside the stock
-Bubblewrap boundary.
-The probe verifies separate network, mount, and PID namespaces; no non-loopback
-network interface; a private writable home and temporary directory; and absence
-of the repository and host home from the worker filesystem.
+requirements. It validates the resource policy, creates a real empty cgroup-v2
+boundary, verifies its controls and independent kill interface, and removes it.
+It then launches a bounded synthetic worker inside the stock Bubblewrap
+boundary. The probe verifies separate network, mount, and PID namespaces; no
+non-loopback network interface; a private writable home and temporary directory;
+and absence of the repository and host home from the worker filesystem.
 
 `ready_for_smoke_test` covers only this preflight scope. `production_ready` is
 always false. Configured model execution, encrypted storage and audit round
 trips, independently protected audit storage, cross-resource audit atomicity,
-approved model-asset content, escaped-descendant containment, production key
-management, and resource limits remain explicitly unverified.
+approved model-asset content, production key management, and protection from a
+privileged hostile host remain explicitly unverified.
 
 ## Synthetic runtime smoke test
 
@@ -62,8 +79,9 @@ Python mock engine through the real encrypted runtime and Bubblewrap boundary.
 It verifies network, mount, and PID namespace separation; absence of the
 repository, host home, encrypted workspace, and audit destination; a private
 writable `/tmp`; selected secret-environment exclusion; broker-only encrypted
-workspace access; audit redaction and local audit permissions; and workspace
-cleanup.
+workspace access; audit redaction and local audit permissions; aggregate
+cgroup-v2 containment; and cleanup of both workspace storage and the exact
+per-worker cgroup.
 
 The test does not execute the operator's configured model. Without the opt-in
 variable, it is skipped and therefore not verified. Separate encrypted-workspace
@@ -78,12 +96,16 @@ anchored path traversal.
   insufficiently protected audit destination.
 - Operator-approved model assets are trusted deployment inputs and require
   independent provenance and content review.
-- Failure cleanup signals the original worker process group before reaping the
-  failed leader; arbitrary escaped descendants are not yet fully verified.
+- The broker-owned cgroup applies aggregate CPU, memory, and process limits and
+  uses `cgroup.kill` to terminate the complete contained tree. Process-group
+  signaling remains fallback cleanup.
+- A privileged hostile host process can still alter cgroup controls, migrate
+  processes, or interfere with termination. The delegated cgroup root must
+  remain externally administered and independently verifiable.
 - The environment-based key loader is development-grade, not a production
   secret-management solution.
 - Independently protected audit storage, cross-resource audit reconciliation,
-  appropriate host permissions, cgroup resource limits, rollback detection, key
+  appropriate host permissions, storage quotas, rollback detection, key
   rotation, and stronger deployment isolation remain separate work.
 
 Never let the thing behind the switch own the switch: shutdown, authorization,

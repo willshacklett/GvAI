@@ -25,6 +25,12 @@ import time
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from privacy.resource_containment import (
+    CgroupV2Boundary,
+    ResourceContainmentError,
+    build_staged_worker_command,
+)
+
 
 class WorkspaceAccessDenied(PermissionError):
     pass
@@ -695,10 +701,21 @@ class WorkspaceBroker:
         *,
         timeout: float = 30.0,
         extra_env: dict[str, str] | None = None,
+        resource_boundary: CgroupV2Boundary | None = None,
     ) -> int:
         resolved_command = [str(part) for part in command]
         if not resolved_command:
             raise WorkspaceWorkerError("workspace worker failed")
+
+        if resource_boundary is not None:
+            try:
+                resolved_command = build_staged_worker_command(
+                    resolved_command
+                )
+            except ResourceContainmentError:
+                raise WorkspaceWorkerError(
+                    "workspace worker failed"
+                ) from None
 
         # extra_env may only add names the broker does not itself manage.
         # A caller (bug or otherwise) attempting to override a broker-owned
@@ -732,6 +749,7 @@ class WorkspaceBroker:
             (os.POSIX_SPAWN_OPEN, 2, os.devnull, os.O_WRONLY, 0o600),
             (os.POSIX_SPAWN_CLOSEFROM, 3),
         ]
+        process_id = None
         try:
             process_id = os.posix_spawnp(
                 resolved_command[0],
@@ -740,6 +758,12 @@ class WorkspaceBroker:
                 file_actions=file_actions,
                 setsid=True,
             )
+            if resource_boundary is not None:
+                self.__activate_resource_boundary(
+                    resource_boundary,
+                    process_id,
+                    timeout,
+                )
         except Exception:
             for descriptor in (
                 response_read,
@@ -748,6 +772,12 @@ class WorkspaceBroker:
                 request_write,
             ):
                 os.close(descriptor)
+            if process_id is not None:
+                self.__terminate_contained_worker(
+                    process_id,
+                    resource_boundary,
+                )
+                self.__reap(process_id)
             raise WorkspaceWorkerError("workspace worker failed") from None
 
         response_stream = None
@@ -777,7 +807,10 @@ class WorkspaceBroker:
                 response_stream.close()
             if request_stream is not None:
                 request_stream.close()
-            self.__terminate_worker_group(process_id)
+            self.__terminate_contained_worker(
+                process_id,
+                resource_boundary,
+            )
             self.__reap(process_id)
             raise WorkspaceWorkerError("workspace worker failed") from None
 
@@ -839,11 +872,24 @@ class WorkspaceBroker:
                 raise WorkspaceWorkerError("workspace worker failed")
             os.waitpid(process_id, 0)
             process_reaped = True
+
+            if resource_boundary is not None:
+                # Successful leader exit is not enough: independently
+                # verify that no descendant remains in the cgroup.
+                resource_boundary.terminate()
         except Exception:
             if not process_reaped:
-                self.__terminate_worker_group(process_id)
+                self.__terminate_contained_worker(
+                    process_id,
+                    resource_boundary,
+                )
                 self.__reap(process_id)
                 process_reaped = True
+            elif resource_boundary is not None:
+                try:
+                    resource_boundary.terminate()
+                except ResourceContainmentError:
+                    pass
             raise WorkspaceWorkerError("workspace worker failed") from None
         finally:
             selector.close()
@@ -853,6 +899,65 @@ class WorkspaceBroker:
                 response_stream.close()
 
         return request_count
+
+    @staticmethod
+    def __activate_resource_boundary(
+        resource_boundary: CgroupV2Boundary,
+        process_id: int,
+        timeout: float,
+    ) -> None:
+        """Attach the stopped launcher before worker execution."""
+
+        deadline = time.monotonic() + min(
+            5.0,
+            max(0.0, float(timeout)),
+        )
+
+        while True:
+            status = os.waitid(
+                os.P_PID,
+                process_id,
+                os.WSTOPPED
+                | os.WEXITED
+                | os.WNOWAIT
+                | os.WNOHANG,
+            )
+
+            if status is not None and getattr(status, "si_pid", 0):
+                if (
+                    status.si_code == os.CLD_STOPPED
+                    and status.si_status == signal.SIGSTOP
+                ):
+                    resource_boundary.attach_stopped(process_id)
+                    os.kill(process_id, signal.SIGCONT)
+                    return
+
+                raise WorkspaceWorkerError(
+                    "workspace worker failed"
+                )
+
+            if time.monotonic() >= deadline:
+                raise WorkspaceWorkerError(
+                    "workspace worker failed"
+                )
+
+            time.sleep(0.005)
+
+    @classmethod
+    def __terminate_contained_worker(
+        cls,
+        process_id: int,
+        resource_boundary: CgroupV2Boundary | None,
+    ) -> None:
+        # The cgroup is the authoritative whole-tree kill switch.
+        if resource_boundary is not None:
+            try:
+                resource_boundary.terminate()
+            except ResourceContainmentError:
+                pass
+
+        # Retain process-group termination as a fallback.
+        cls.__terminate_worker_group(process_id)
 
     @staticmethod
     def __terminate_worker_group(process_id: int) -> None:

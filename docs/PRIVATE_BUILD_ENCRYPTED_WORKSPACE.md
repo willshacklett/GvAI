@@ -81,6 +81,45 @@ workspace path nor the audit path, and it can reach encrypted data only through
 the broker protocol. The component behind the boundary does not own the
 boundary.
 
+## Worker resource containment
+
+Each encrypted worker receives a unique cgroup-v2 boundary owned by the trusted
+broker. A trusted launcher stops before executing the worker. The broker first
+attaches that stopped process to the cgroup and verifies membership, then
+continues it. Descendants inherit the same boundary before worker code can run.
+
+The boundary applies aggregate `memory.max`, `pids.max`, and `cpu.max` limits.
+Defaults are:
+
+- 8 GiB aggregate memory;
+- 64 aggregate processes; and
+- 400,000 microseconds of CPU time per 100,000-microsecond period, equivalent
+  to four continuously available CPU cores.
+
+Trusted-parent configuration may override these values with:
+
+- `GVAI_PRIVATE_MEMORY_MAX_BYTES`
+- `GVAI_PRIVATE_PIDS_MAX`
+- `GVAI_PRIVATE_CPU_QUOTA_US`
+- `GVAI_PRIVATE_CPU_PERIOD_US`
+
+`GVAI_PRIVATE_CGROUP_ROOT` selects the canonical delegated cgroup-v2 directory;
+the default is `/sys/fs/cgroup`. Deployments should provide a dedicated
+externally administered directory with the `cpu`, `memory`, and `pids`
+controllers available and enabled in `cgroup.subtree_control`. The directory must be owned by root or the trusted
+broker account and must not be group- or world-writable.
+
+Resource-policy variables are consumed only by the trusted parent and are
+forbidden from the worker environment. Invalid limits, unavailable controllers,
+unsafe roots, failed attachment, failed termination, or incomplete cleanup fail
+closed with sanitized errors.
+
+On every success or failure path, the broker uses the host-controlled
+`cgroup.kill` interface, waits for the cgroup to become unpopulated, and removes
+the exact per-worker cgroup. Process-group signaling remains fallback cleanup;
+it is not the authoritative containment boundary. A worker cannot expand its
+limits or own its kill switch.
+
 ## Remaining deployment requirements
 
 This isolates the encrypted worker; it does not make the trusted host immune to
@@ -91,10 +130,14 @@ still require independently protected audit storage, appropriate host account
 and filesystem permissions, and an external secret manager.
 
 The implementation is Linux-specific and depends on permitted unprivileged user
-namespaces plus a root-owned, executable Bubblewrap binary that is not group-
-or world-writable. Approved model assets remain trusted deployment
-inputs and require independent provenance review. The broker also does not yet
-provide cgroup resource limits, verified containment of every possible escaped
-descendant, multi-process file locking, key rotation, deletion, directory
-listing, quotas, rollback detection, or protection from a compromised trusted
-broker.
+namespaces, a root-owned executable Bubblewrap binary that is not group- or
+world-writable, and a securely delegated cgroup-v2 directory with `cpu`,
+`memory`, `pids`, and `cgroup.kill` support. Approved model assets remain trusted
+deployment inputs and require independent provenance review.
+
+A privileged hostile host process can still alter cgroup policy, migrate
+processes, or interfere with termination. The externally administered cgroup
+root, host permissions, and broker integrity therefore remain part of the
+trusted deployment boundary. The broker also does not yet provide multi-process
+workspace locking, key rotation, deletion, directory listing, storage quotas,
+rollback detection, or protection from a compromised trusted broker.

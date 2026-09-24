@@ -14,6 +14,7 @@ def check_readiness():
     required = (
         "posix_spawnp", "POSIX_SPAWN_CLOSEFROM", "pidfd_open",
         "killpg", "waitid", "P_PID", "WEXITED", "WNOWAIT", "CLD_EXITED",
+        "WSTOPPED", "WNOHANG", "CLD_STOPPED",
     )
     checks["process_api"] = (
         sys.platform == "linux"
@@ -26,6 +27,10 @@ def check_readiness():
         from privacy.filesystem_sandbox import (
             build_filesystem_sandbox_command,
             resolve_filesystem_sandbox_executable,
+        )
+        from privacy.resource_containment import (
+            CgroupV2Boundary,
+            load_worker_resource_configuration,
         )
     except Exception:
         checks["runtime_import"] = False
@@ -57,6 +62,32 @@ def check_readiness():
         checks["audit_destination"] = True
     except Exception:
         checks["audit_destination"] = False
+
+    checks["resource_policy"] = False
+    checks["resource_containment"] = False
+    resource_boundary = None
+
+    try:
+        resource_configuration = (
+            load_worker_resource_configuration()
+        )
+        checks["resource_policy"] = True
+        resource_boundary = CgroupV2Boundary(
+            resource_configuration
+        )
+        resource_boundary.close()
+        checks["resource_containment"] = True
+    except Exception:
+        checks["resource_containment"] = False
+    finally:
+        if (
+            resource_boundary is not None
+            and not getattr(resource_boundary, "closed", True)
+        ):
+            try:
+                resource_boundary.close()
+            except Exception:
+                checks["resource_containment"] = False
 
     # Validate syntax only; never execute an operator's model command.
     try:
@@ -92,6 +123,8 @@ def check_readiness():
         checks["process_api"]
         and checks["stock_worker"]
         and checks["filesystem_sandbox_executable"]
+        and checks["resource_policy"]
+        and checks["resource_containment"]
     )
 
     if prerequisites:
@@ -163,9 +196,7 @@ def _report(checks):
             "independently_protected_audit_storage",
             "cross_resource_audit_atomicity",
             "approved_model_asset_content",
-            "escaped_descendant_containment",
             "production_key_management",
-            "resource_limits",
         ],
     }
 

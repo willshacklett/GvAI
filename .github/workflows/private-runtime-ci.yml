@@ -20,6 +20,8 @@ jobs:
     timeout-minutes: 10
     env:
       GVAI_RUN_STAGING_SMOKE: "1"
+      GVAI_RUN_RESOURCE_CONTAINMENT_TEST: "1"
+      GVAI_PRIVATE_CGROUP_ROOT: /sys/fs/cgroup/gvai-private-runtime-ci
       PYTHONOPTIMIZE: "0"
       PYTEST_ADDOPTS: ""
 
@@ -77,6 +79,63 @@ jobs:
           grep -E '^(NoNewPrivs|Seccomp|Seccomp_filters|CapInh|CapPrm|CapEff|CapBnd|CapAmb):' \
             /proc/self/status || true
 
+      - name: Prepare delegated resource boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          parent=/sys/fs/cgroup
+          root="$GVAI_PRIVATE_CGROUP_ROOT"
+
+          if [ "$(stat -fc %T "$parent")" != "cgroup2fs" ]; then
+            echo "cgroup v2 is required." >&2
+            exit 1
+          fi
+
+          requested=()
+          for controller in cpu memory pids; do
+            if ! grep -qw "$controller" "$parent/cgroup.controllers"; then
+              echo "Required cgroup controller is unavailable: $controller" >&2
+              exit 1
+            fi
+            if ! grep -qw "$controller" "$parent/cgroup.subtree_control"; then
+              requested+=("+$controller")
+            fi
+          done
+
+          if [ "${#requested[@]}" -gt 0 ]; then
+            printf '%s\n' "${requested[*]}" |
+              sudo tee "$parent/cgroup.subtree_control" >/dev/null
+          fi
+
+          sudo install -d -o "$(id -u)" -g "$(id -g)" -m 0700 "$root"
+
+          test "$(stat -c %u "$root")" = "$(id -u)"
+          test "$(stat -c %a "$root")" = "700"
+
+          delegated=()
+          for controller in cpu memory pids; do
+            grep -qw "$controller" "$root/cgroup.controllers"
+            if ! grep -qw "$controller" "$root/cgroup.subtree_control"; then
+              delegated+=("+$controller")
+            fi
+          done
+
+          if [ "${#delegated[@]}" -gt 0 ]; then
+            printf '%s\n' "${delegated[*]}" |
+              sudo tee "$root/cgroup.subtree_control" >/dev/null
+          fi
+
+          for controller in cpu memory pids; do
+            grep -qw "$controller" "$root/cgroup.subtree_control"
+          done
+
+          sudo chown "$(id -u):$(id -g)" "$root/cgroup.procs" "$root/cgroup.threads" "$root/cgroup.subtree_control"
+
+          broker_group="$root/gvai-ci-broker"
+          mkdir -m 0700 "$broker_group"
+          sudo chown "$(id -u):$(id -g)" "$broker_group/cgroup.procs" "$broker_group/cgroup.threads"
+
       - name: Install scoped CI user-namespace profile
         if: >-
           github.event_name != 'pull_request' ||
@@ -109,13 +168,50 @@ jobs:
               privacy/run_network_sandbox.sh \
               python -c 'print("Sandbox execution passed")'
 
+      - name: Harden CI Python executable
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          resolved_python="$(
+            python -c 'from pathlib import Path; import sys; print(Path(sys.executable).resolve(strict=True))'
+          )"
+          chmod go-w "$resolved_python"
+
+          python - "$resolved_python" <<'PY'
+          from pathlib import Path
+          import os
+          import stat
+          import sys
+
+          executable = Path(sys.argv[1]).resolve(strict=True)
+          status = executable.stat()
+          mode = stat.S_IMODE(status.st_mode)
+
+          assert status.st_uid == os.geteuid()
+          assert mode & 0o022 == 0
+          assert os.access(executable, os.X_OK)
+          print("Trusted CI Python:", executable, oct(mode))
+          PY
+
       - name: Run privacy tests
         run: |
+          # Run the test shell in a process-only leaf beneath the delegated
+          # root. The broker can then move its descendants into sibling
+          # per-worker cgroups without placing a process in the controller-owning
+          # root cgroup.
+          broker_group="$GVAI_PRIVATE_CGROUP_ROOT/gvai-ci-broker"
+          printf '%s\n' "$$" |
+            sudo tee "$broker_group/cgroup.procs" >/dev/null
+          grep -qx "$$" "$broker_group/cgroup.procs"
+
           # These three exclusions predate this workflow. Do not add new
           # exclusions to conceal regressions or unsupported isolation.
           aa-exec -p gvai-private-runtime-ci -- \
-          timeout --kill-after=5s 180s python -m pytest -q \
+            timeout --kill-after=5s 180s python -m pytest -q \
             tests/test_staging_readiness.py \
+            tests/test_resource_staging_launcher.py \
+            tests/test_resource_containment.py \
             tests/test_encrypted_workspace.py \
             tests/integration/test_private_build_encrypted_workspace.py \
             tests/integration/test_private_runtime_staging_smoke.py \
@@ -136,16 +232,63 @@ jobs:
 
           root = ET.parse("privacy-test-results.xml").getroot()
           cases = list(root.iter("testcase"))
-          smoke = [
-              case for case in cases
-              if case.get("name") == "test_real_encrypted_runtime_boundary"
-          ]
-          if not cases or len(smoke) != 1:
-              raise SystemExit("Required smoke test was not collected.")
+          required = {
+              "test_real_encrypted_runtime_boundary",
+              "test_real_cgroup_boundary_contains_and_kills_tree",
+              "test_broker_stages_worker_inside_resource_boundary",
+          }
+          collected = [case.get("name") for case in cases]
+
+          if not cases:
+              raise SystemExit("No privacy tests were collected.")
+
+          for name in sorted(required):
+              if collected.count(name) != 1:
+                  raise SystemExit(
+                      f"Required containment test was not collected: {name}"
+                  )
+
           if any(case.find("skipped") is not None for case in cases):
               raise SystemExit("Selected privacy tests must not be skipped.")
-          print("Required smoke test ran; no selected tests were skipped.")
+
+          print(
+              "Required sandbox and containment tests ran; "
+              "no selected tests were skipped."
+          )
           PY
+
+      - name: Verify and remove delegated resource boundary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          root="$GVAI_PRIVATE_CGROUP_ROOT"
+          if [ ! -d "$root" ]; then
+            exit 0
+          fi
+
+          broker_group="$root/gvai-ci-broker"
+          if [ -d "$broker_group" ]; then
+            if grep -q . "$broker_group/cgroup.procs"; then
+              echo "CI broker cgroup is still populated." >&2
+              cat "$broker_group/cgroup.procs" >&2
+              exit 1
+            fi
+            sudo rmdir "$broker_group"
+          fi
+
+          children="$(
+            find "$root" -mindepth 1 -maxdepth 1 -type d -print
+          )"
+
+          if [ -n "$children" ]; then
+            echo "Leaked private-worker cgroups:" >&2
+            printf '%s\n' "$children" >&2
+            exit 1
+          fi
+
+          sudo rmdir "$root"
 
       - name: Remove scoped CI user-namespace profile
         if: always()

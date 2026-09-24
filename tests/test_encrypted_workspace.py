@@ -1,10 +1,21 @@
 import json
 import os
+from pathlib import Path
 import stat
 import sys
 import time
 
 import pytest
+
+from privacy.resource_containment import (
+    CGROUP_ROOT_ENV,
+    CPU_PERIOD_ENV,
+    CPU_QUOTA_ENV,
+    MEMORY_MAX_ENV,
+    PIDS_MAX_ENV,
+    CgroupV2Boundary,
+    load_worker_resource_configuration,
+)
 
 from privacy.encrypted_workspace import (
     AESGCMControlPlane,
@@ -831,3 +842,64 @@ assert json.loads(sys.stdin.readline()) == {"error": "workspace request denied",
 
 def base64_key_fragment():
     return "AAECAwQFBgcICQ"
+
+
+
+@pytest.mark.skipif(
+    os.getenv("GVAI_RUN_RESOURCE_CONTAINMENT_TEST") != "1",
+    reason="real cgroup containment test is opt-in",
+)
+def test_broker_stages_worker_inside_resource_boundary(tmp_path):
+    broker = build_broker(tmp_path)
+    script = tmp_path / "contained-workspace-worker.py"
+    script.write_text(
+        r"""
+import json
+import sys
+
+request = {
+    "operation": "write",
+    "path": "contained.txt",
+    "content_b64": "Y29udGFpbmVk",
+}
+print(json.dumps(request), flush=True)
+assert json.loads(sys.stdin.readline()) == {"ok": True}
+""",
+        encoding="utf-8",
+    )
+
+    root = Path(
+        os.getenv(CGROUP_ROOT_ENV, "/sys/fs/cgroup")
+    ).resolve(strict=True)
+
+    configuration = load_worker_resource_configuration(
+        {
+            CGROUP_ROOT_ENV: str(root),
+            MEMORY_MAX_ENV: str(128 * 1024 * 1024),
+            PIDS_MAX_ENV: "8",
+            CPU_QUOTA_ENV: "20000",
+            CPU_PERIOD_ENV: "100000",
+        }
+    )
+
+    boundary = CgroupV2Boundary(configuration)
+    group_path = boundary.path
+
+    try:
+        request_count = broker.run_worker(
+            [
+                str(Path(sys.executable).resolve(strict=True)),
+                str(script),
+            ],
+            timeout=10,
+            resource_boundary=boundary,
+        )
+
+        assert request_count == 1
+        assert boundary.current_process_count() == 0
+        assert group_path.exists()
+    finally:
+        boundary.close()
+
+    assert boundary.closed
+    assert not group_path.exists()

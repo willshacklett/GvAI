@@ -28,8 +28,19 @@ def test_real_encrypted_runtime_boundary(monkeypatch, tmp_path):
     reply = "synthetic-reply-" + secrets.token_hex(16)
     key = base64.b64encode(secrets.token_bytes(32)).decode("ascii")
     audit_dir = tmp_path / "audit"
+    cgroup_root = Path(
+        os.environ.get(
+            "GVAI_PRIVATE_CGROUP_ROOT",
+            "/sys/fs/cgroup",
+        )
+    ).resolve(strict=True)
+    cgroups_before = {
+        entry.name
+        for entry in cgroup_root.glob("gvai-worker-*")
+    }
     forbidden = sorted(
         runtime.EXTERNAL_SECRET_ENV
+        | runtime.RESOURCE_POLICY_ENV_NAMES
         | {
             runtime.ENCRYPTED_WORKSPACE_KEY_ENV,
             runtime.ENCRYPTED_WORKSPACE_AUDIT_DIR_ENV,
@@ -110,6 +121,11 @@ print({reply!r})
     }
     assert allocated
     assert all(not directory.exists() for directory in allocated)
+    cgroups_after = {
+        entry.name
+        for entry in cgroup_root.glob("gvai-worker-*")
+    }
+    assert cgroups_after == cgroups_before
 
     audit_file = audit_dir / "audit.jsonl"
     assert audit_dir.stat().st_mode & 0o777 == 0o700
