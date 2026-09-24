@@ -70,6 +70,13 @@ from privacy.model_asset_provenance import (
     load_verified_model_assets,
     reverify_model_assets,
 )
+from privacy.key_provider import (
+    KEY_PROVIDER_ENV_NAMES,
+    WORKSPACE_KEY_PROVIDER_UID_ENV,
+    WORKSPACE_KEY_SOCKET_ENV,
+    WorkspaceKeyProviderError,
+    load_workspace_key_from_provider,
+)
 from privacy.resource_containment import (
     CgroupV2Boundary,
     RESOURCE_POLICY_ENV_NAMES,
@@ -141,6 +148,7 @@ _FORBIDDEN_EXTRA_ENV_NAMES = frozenset(
         "WORKSPACE_ROOT",
     }
     | EXTERNAL_SECRET_ENV
+    | KEY_PROVIDER_ENV_NAMES
     | RESOURCE_POLICY_ENV_NAMES
 )
 
@@ -173,17 +181,21 @@ def encrypted_workspace_enabled() -> bool:
 def load_trusted_workspace_key(
     env_var: str = ENCRYPTED_WORKSPACE_KEY_ENV,
 ) -> bytes:
-    """Load the 32-byte AES-GCM workspace key.
+    """Load the 32-byte AES-GCM workspace key in the trusted parent.
 
-    This reference loader must run only in the trusted parent process --
-    never inside the worker. It fails closed on any missing or malformed
-    key rather than falling back to plaintext or an external model.
-
-    Reading a raw secret from process environment is a development-grade
-    convenience only. Production deployments should replace this loader
-    with a call to a real secret manager (e.g. a cloud KMS/Vault-backed
-    provider) that never places the key in process environment at all.
+    If any external-provider configuration is present, the Unix-socket
+    provider is mandatory. Provider failure never falls back to an
+    environment secret. The raw environment key remains a development-only
+    compatibility path when no provider configuration is present.
     """
+
+    if any(name in os.environ for name in KEY_PROVIDER_ENV_NAMES):
+        try:
+            return load_workspace_key_from_provider()
+        except WorkspaceKeyProviderError:
+            raise RuntimeError(
+                "GVAI encrypted workspace key provider failed."
+            ) from None
 
     raw = os.environ.get(env_var)
 

@@ -27,6 +27,40 @@ root device and inode, and uses no-follow opens. Concurrent symlink or rename
 swaps therefore cannot redirect a workspace read or write outside the directory
 handles already opened by the trusted broker.
 
+## External workspace-key boundary
+
+Production key material is obtained from an externally controlled Unix-domain
+socket provider selected by `GVAI_PRIVATE_WORKSPACE_KEY_SOCKET`. The optional
+`GVAI_PRIVATE_WORKSPACE_KEY_PROVIDER_UID` setting restricts the endpoint owner
+and connected peer to one exact operator-approved UID. Without that setting,
+only root or the trusted broker account is accepted.
+
+Before requesting a key, the trusted parent requires an absolute canonical
+socket path, a non-symlink socket with one link, an approved owner, and no
+group- or world-write permission. It records the socket identity, connects,
+checks the identity again, and authenticates the connected process with Linux
+`SO_PEERCRED`. Endpoint replacement or an unapproved peer fails before the
+request is sent.
+
+The request is a fixed protocol constant containing no prompt, project,
+worker, path, authority, or key data. The provider must return exactly 32 raw
+bytes. Short, empty, oversized, malformed, unavailable, or timed-out responses
+fail closed with a sanitized error.
+
+If any provider setting is present, the provider is mandatory. Failure never
+falls back to `GVAI_PRIVATE_WORKSPACE_KEY`. That environment variable remains
+a development-only compatibility path when no provider configuration exists
+and does not satisfy staging readiness.
+
+Provider configuration, the provider socket, and key bytes are not mounted or
+exported into the worker. The trusted parent necessarily holds the returned key
+in process memory while performing AES-GCM operations. Python does not provide
+reliable zeroization of immutable byte objects, so a compromised trusted broker
+or sufficiently privileged host remains capable of observing transient key
+material. Production deployments must isolate the broker and place key
+issuance, rotation, revocation, availability, and recovery under the external
+provider's independently administered control.
+
 ## Audit storage boundary
 
 `WorkspaceAuditSink` is an externally supplied trusted interface. The encrypted

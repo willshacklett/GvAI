@@ -25,7 +25,10 @@ Required configuration:
 
 - `GVAI_PRIVATE_BUILD_MODE=1`
 - `GVAI_PRIVATE_ENCRYPTED_WORKSPACE=1`
-- `GVAI_PRIVATE_WORKSPACE_KEY`: base64 encoding of exactly 32 bytes
+- `GVAI_PRIVATE_WORKSPACE_KEY_SOCKET`: absolute canonical path to the
+  externally controlled Unix-domain key-provider socket
+- `GVAI_PRIVATE_WORKSPACE_KEY_PROVIDER_UID`: optional exact provider UID;
+  otherwise only root or the trusted broker account is accepted
 - `GVAI_LOCAL_MODEL_COMMAND`: syntactically valid local engine command
 - `GVAI_PRIVATE_SANDBOX_READ_PATHS`: colon-separated canonical absolute
   regular files, exactly matching the signed manifest
@@ -83,8 +86,11 @@ GVAI_RUN_STAGING_SMOKE=1 timeout 60s python -m pytest -q \
   tests/integration/test_private_runtime_staging_smoke.py
 ```
 
-This opt-in Linux test uses a generated temporary key, synthetic prompts, and a
-Python mock engine through the real encrypted runtime and Bubblewrap boundary.
+This opt-in Linux test uses a temporary externally controlled Unix-domain
+key provider, a generated key, synthetic prompts, and a Python mock engine
+through the real encrypted runtime and Bubblewrap boundary. It verifies the
+fixed provider request, exact raw-key response, authenticated provider use, and
+exclusion of the provider socket and configuration from the worker.
 It verifies network, mount, and PID namespace separation; absence of the
 repository, host home, encrypted workspace, and audit destination; a private
 writable `/tmp`; selected secret-environment exclusion; broker-only encrypted
@@ -118,8 +124,16 @@ anchored path traversal.
 - A privileged hostile host process can still alter cgroup controls, migrate
   processes, or interfere with termination. The delegated cgroup root must
   remain externally administered and independently verifiable.
-- The environment-based key loader is development-grade, not a production
-  secret-management solution.
+- `GVAI_PRIVATE_WORKSPACE_KEY` is a development-only fallback and does not
+  satisfy staging readiness. Once any provider setting is present, provider
+  failure never falls back to that environment key.
+- The external socket boundary authenticates the endpoint and peer but does not
+  itself provide key rotation, revocation, high availability, backup, recovery,
+  or hardware-backed custody. Those remain operator-controlled deployment
+  requirements.
+- The trusted broker necessarily holds the active key transiently in process
+  memory, and Python cannot guarantee zeroization of immutable byte objects.
+  A compromised broker or sufficiently privileged host remains in scope.
 - Independently protected audit storage, cross-resource audit reconciliation,
   appropriate host permissions, storage quotas, rollback detection, key
   rotation, and stronger deployment isolation remain separate work.

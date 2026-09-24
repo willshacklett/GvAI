@@ -695,6 +695,70 @@ def test_unapproved_model_asset_fails_closed(monkeypatch, tmp_path):
     assert "must-not-run" not in str(excinfo.value)
 
 
+def test_key_provider_failure_fails_before_private_allocation(
+    monkeypatch,
+    tmp_path,
+):
+    _base_env(monkeypatch, tmp_path)
+
+    # A valid development fallback must never be used after any external
+    # provider configuration has selected the production key boundary.
+    monkeypatch.setenv(
+        runtime.WORKSPACE_KEY_SOCKET_ENV,
+        str(tmp_path / "unavailable-provider.sock"),
+    )
+
+    def failed_provider():
+        raise runtime.WorkspaceKeyProviderError(
+            "sensitive provider detail must not escape"
+        )
+
+    def forbidden_private_allocation(*args, **kwargs):
+        raise AssertionError(
+            "private resources must not be allocated before "
+            "external key acquisition succeeds"
+        )
+
+    monkeypatch.setattr(
+        runtime,
+        "load_workspace_key_from_provider",
+        failed_provider,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "load_verified_model_assets",
+        forbidden_private_allocation,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "WorkspaceAuditLog",
+        forbidden_private_allocation,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "CgroupV2Boundary",
+        forbidden_private_allocation,
+    )
+    monkeypatch.setattr(
+        runtime.tempfile,
+        "mkdtemp",
+        forbidden_private_allocation,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=r"^GVAI encrypted workspace key provider failed\.$",
+    ) as excinfo:
+        runtime.run_private_model_encrypted_workspace(
+            "You are GVAI.",
+            "top-secret-project-plan",
+        )
+
+    message = str(excinfo.value)
+    assert "sensitive provider detail" not in message
+    assert VALID_KEY_B64 not in message
+
+
 def test_invalid_model_asset_signature_fails_before_private_allocation(
     monkeypatch,
     tmp_path,
