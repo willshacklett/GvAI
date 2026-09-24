@@ -130,6 +130,8 @@ jobs:
             grep -qw "$controller" "$root/cgroup.subtree_control"
           done
 
+          sudo chown             "$(id -u):$(id -g)"             "$root/cgroup.procs"             "$root/cgroup.threads"             "$root/cgroup.subtree_control"
+
       - name: Install scoped CI user-namespace profile
         if: >-
           github.event_name != 'pull_request' ||
@@ -162,8 +164,59 @@ jobs:
               privacy/run_network_sandbox.sh \
               python -c 'print("Sandbox execution passed")'
 
+      - name: Report staging trust diagnostics
+        run: |
+          aa-exec -p gvai-private-runtime-ci --           python - <<'PY'
+          from pathlib import Path
+          import os
+          import shutil
+          import stat
+          import sys
+
+          candidates = {
+              "python": Path(sys.executable),
+              "resolved_python": Path(sys.executable).resolve(strict=True),
+              "launcher": Path(
+                  "privacy/resource_staging_launcher.py"
+              ).resolve(strict=True),
+              "bubblewrap": Path(
+                  shutil.which("bwrap") or "/missing-bwrap"
+              ),
+          }
+
+          print("effective_uid:", os.geteuid())
+          print("effective_gid:", os.getegid())
+          print("supplementary_groups:", os.getgroups())
+
+          for label, candidate in candidates.items():
+              print(label)
+              print("  path:", candidate)
+              try:
+                  resolved = candidate.resolve(strict=True)
+                  status = resolved.stat()
+              except OSError as exc:
+                  print("  unavailable:", type(exc).__name__)
+                  continue
+
+              print("  resolved:", resolved)
+              print("  canonical:", candidate == resolved)
+              print("  uid:", status.st_uid)
+              print("  gid:", status.st_gid)
+              print("  mode:", oct(stat.S_IMODE(status.st_mode)))
+              print("  regular:", stat.S_ISREG(status.st_mode))
+              print("  executable:", os.access(resolved, os.X_OK))
+          PY
+
       - name: Run privacy tests
         run: |
+          # Enter the externally delegated root before spawning workers.
+          # This allows the unprivileged broker to move its own descendants
+          # into per-worker child cgroups without crossing the delegation
+          # boundary.
+          printf '%s\n' "$$" |
+            sudo tee "$GVAI_PRIVATE_CGROUP_ROOT/cgroup.procs" >/dev/null
+          grep -qx "$$" "$GVAI_PRIVATE_CGROUP_ROOT/cgroup.procs"
+
           # These three exclusions predate this workflow. Do not add new
           # exclusions to conceal regressions or unsupported isolation.
           aa-exec -p gvai-private-runtime-ci -- \
