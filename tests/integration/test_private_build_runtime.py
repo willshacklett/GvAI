@@ -128,8 +128,10 @@ print(json.dumps({
                 "Build Mode."
             )
 
+    import openai
+
     monkeypatch.setattr(
-        mod,
+        openai,
         "OpenAI",
         ForbiddenOpenAI,
     )
@@ -232,8 +234,10 @@ def test_model_router_keeps_external_path_when_private_mode_disabled(
     class FakeClient:
         chat = FakeChat()
 
+    import openai
+
     monkeypatch.setattr(
-        mod,
+        openai,
         "OpenAI",
         lambda *a, **k: FakeClient(),
     )
