@@ -43,10 +43,15 @@ def check_readiness():
     checks["private_mode"] = runtime.private_build_enabled()
     checks["encrypted_mode"] = runtime.encrypted_workspace_enabled()
 
+    checks["external_key_provider"] = False
     try:
         key = runtime.load_trusted_workspace_key()
         del key
         checks["key_configuration"] = True
+        checks["external_key_provider"] = (
+            runtime.WORKSPACE_KEY_SOCKET_ENV in os.environ
+            and runtime.ENCRYPTED_WORKSPACE_KEY_ENV not in os.environ
+        )
     except Exception:
         checks["key_configuration"] = False
 
@@ -133,6 +138,7 @@ def check_readiness():
 
     prerequisites = (
         checks["process_api"]
+        and checks["external_key_provider"]
         and checks["stock_worker"]
         and checks["filesystem_sandbox_executable"]
         and checks["model_asset_provenance"]

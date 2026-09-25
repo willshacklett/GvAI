@@ -73,9 +73,22 @@ def configured(monkeypatch, tmp_path):
     monkeypatch.setattr(os, "readlink", synthetic_readlink)
     monkeypatch.setenv("GVAI_PRIVATE_BUILD_MODE", "1")
     monkeypatch.setenv("GVAI_PRIVATE_ENCRYPTED_WORKSPACE", "1")
+    monkeypatch.delenv(
+        runtime.ENCRYPTED_WORKSPACE_KEY_ENV,
+        raising=False,
+    )
     monkeypatch.setenv(
-        "GVAI_PRIVATE_WORKSPACE_KEY",
-        base64.b64encode(bytes(range(32))).decode("ascii"),
+        runtime.WORKSPACE_KEY_SOCKET_ENV,
+        "/synthetic/trusted-key-provider.sock",
+    )
+    monkeypatch.setenv(
+        runtime.WORKSPACE_KEY_PROVIDER_UID_ENV,
+        str(os.geteuid()),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "load_workspace_key_from_provider",
+        lambda: bytes(range(32)),
     )
     monkeypatch.setenv("GVAI_LOCAL_MODEL_COMMAND", "synthetic-engine")
     monkeypatch.setenv(
@@ -158,6 +171,8 @@ def test_configured_preflight_passes_without_claiming_production(configured):
     assert report["ready_for_smoke_test"] is True
     assert report["production_ready"] is False
     assert report["checks"]["audit_destination"] == "pass"
+    assert report["checks"]["key_configuration"] == "pass"
+    assert report["checks"]["external_key_provider"] == "pass"
     assert report["checks"]["resource_policy"] == "pass"
     assert report["checks"]["resource_containment"] == "pass"
     assert report["checks"]["model_asset_provenance"] == "pass"
@@ -208,7 +223,6 @@ def test_configured_preflight_passes_without_claiming_production(configured):
 @pytest.mark.parametrize("name,check", [
     ("GVAI_PRIVATE_BUILD_MODE", "private_mode"),
     ("GVAI_PRIVATE_ENCRYPTED_WORKSPACE", "encrypted_mode"),
-    ("GVAI_PRIVATE_WORKSPACE_KEY", "key_configuration"),
     ("GVAI_LOCAL_MODEL_COMMAND", "model_command_syntax"),
 ])
 def test_missing_configuration_fails(configured, monkeypatch, name, check):
@@ -216,6 +230,56 @@ def test_missing_configuration_fails(configured, monkeypatch, name, check):
     report = readiness.check_readiness()
     assert report["checks"][check] == "fail"
     assert report["ready_for_smoke_test"] is False
+
+
+def test_missing_external_key_provider_fails(
+    configured,
+    monkeypatch,
+):
+    monkeypatch.delenv(
+        runtime.WORKSPACE_KEY_SOCKET_ENV,
+        raising=False,
+    )
+    monkeypatch.delenv(
+        runtime.WORKSPACE_KEY_PROVIDER_UID_ENV,
+        raising=False,
+    )
+    monkeypatch.delenv(
+        runtime.ENCRYPTED_WORKSPACE_KEY_ENV,
+        raising=False,
+    )
+
+    report = readiness.check_readiness()
+
+    assert report["checks"]["key_configuration"] == "fail"
+    assert report["checks"]["external_key_provider"] == "fail"
+    assert report["ready_for_smoke_test"] is False
+    assert configured == []
+
+
+def test_environment_key_fallback_is_not_staging_ready(
+    configured,
+    monkeypatch,
+):
+    monkeypatch.delenv(
+        runtime.WORKSPACE_KEY_SOCKET_ENV,
+        raising=False,
+    )
+    monkeypatch.delenv(
+        runtime.WORKSPACE_KEY_PROVIDER_UID_ENV,
+        raising=False,
+    )
+    monkeypatch.setenv(
+        runtime.ENCRYPTED_WORKSPACE_KEY_ENV,
+        base64.b64encode(bytes(range(32))).decode("ascii"),
+    )
+
+    report = readiness.check_readiness()
+
+    assert report["checks"]["key_configuration"] == "pass"
+    assert report["checks"]["external_key_provider"] == "fail"
+    assert report["ready_for_smoke_test"] is False
+    assert configured == []
 
 
 def test_invalid_model_asset_provenance_fails_sanitized(
@@ -237,11 +301,24 @@ def test_invalid_model_asset_provenance_fails_sanitized(
     assert str(model_asset) not in serialized
 
 
-def test_malformed_key_is_not_reported(configured, monkeypatch):
-    monkeypatch.setenv("GVAI_PRIVATE_WORKSPACE_KEY", "secret-invalid-key!")
+def test_provider_failure_is_not_reported(configured, monkeypatch):
+    sensitive_error = "SENSITIVE-PROVIDER-FAILURE"
+
+    def fail_provider():
+        raise RuntimeError(sensitive_error)
+
+    monkeypatch.setattr(
+        runtime,
+        "load_workspace_key_from_provider",
+        fail_provider,
+    )
+
     report = readiness.check_readiness()
+
     assert report["checks"]["key_configuration"] == "fail"
-    assert "secret-invalid-key!" not in json.dumps(report)
+    assert report["checks"]["external_key_provider"] == "fail"
+    assert report["ready_for_smoke_test"] is False
+    assert sensitive_error not in json.dumps(report)
 
 
 def test_insecure_audit_destination_fails_sanitized(
@@ -348,7 +425,7 @@ def test_cli_exit_codes(configured, monkeypatch, capsys):
         capsys.readouterr().out
     )["ready_for_smoke_test"] is True
 
-    monkeypatch.delenv("GVAI_PRIVATE_WORKSPACE_KEY")
+    monkeypatch.delenv(runtime.WORKSPACE_KEY_SOCKET_ENV)
     assert readiness.main() == 1
     assert json.loads(
         capsys.readouterr().out

@@ -7,7 +7,9 @@ import os
 from pathlib import Path
 import secrets
 import shlex
+import socket
 import sys
+import threading
 
 import pytest
 from cryptography.hazmat.primitives import serialization
@@ -33,8 +35,46 @@ def test_real_encrypted_runtime_boundary(monkeypatch, tmp_path):
     host_home = str(Path.home())
     marker = "synthetic-staging-" + secrets.token_hex(16)
     reply = "synthetic-reply-" + secrets.token_hex(16)
-    key = base64.b64encode(secrets.token_bytes(32)).decode("ascii")
+    key_bytes = secrets.token_bytes(32)
+    key = base64.b64encode(key_bytes).decode("ascii")
     audit_dir = tmp_path / "audit"
+
+    provider_socket = tmp_path / "workspace-key-provider.sock"
+    provider_listener = socket.socket(
+        socket.AF_UNIX,
+        socket.SOCK_STREAM,
+    )
+    provider_listener.bind(str(provider_socket))
+    provider_socket.chmod(0o600)
+    provider_listener.listen(1)
+
+    provider_state = {
+        "request": None,
+        "errors": [],
+    }
+
+    def serve_workspace_key():
+        try:
+            connection, _ = provider_listener.accept()
+            with connection:
+                request = bytearray()
+                while True:
+                    chunk = connection.recv(4096)
+                    if not chunk:
+                        break
+                    request.extend(chunk)
+                provider_state["request"] = bytes(request)
+                connection.sendall(key_bytes)
+        except BaseException as exc:
+            provider_state["errors"].append(exc)
+        finally:
+            provider_listener.close()
+
+    provider_thread = threading.Thread(
+        target=serve_workspace_key,
+        daemon=True,
+    )
+    provider_thread.start()
     cgroup_root = Path(
         os.environ.get(
             "GVAI_PRIVATE_CGROUP_ROOT",
@@ -92,6 +132,7 @@ def test_real_encrypted_runtime_boundary(monkeypatch, tmp_path):
 
     forbidden = sorted(
         runtime.EXTERNAL_SECRET_ENV
+        | runtime.KEY_PROVIDER_ENV_NAMES
         | runtime.RESOURCE_POLICY_ENV_NAMES
         | {
             runtime.ENCRYPTED_WORKSPACE_KEY_ENV,
@@ -121,6 +162,7 @@ assert not Path({str(root)!r}).exists()
 assert not Path({host_home!r}).exists()
 assert not Path({str(audit_dir)!r}).exists()
 assert not Path({str(manifest)!r}).exists()
+assert not Path({str(provider_socket)!r}).exists()
 
 model_asset = Path({canonical_asset!r})
 assert model_asset.read_bytes() == {asset_content!r}
@@ -150,7 +192,18 @@ print({reply!r})
     monkeypatch.delenv("GVAI_PRIVATE_ENCRYPTED_WORKER_COMMAND", raising=False)
     monkeypatch.setenv("GVAI_PRIVATE_BUILD_MODE", "1")
     monkeypatch.setenv("GVAI_PRIVATE_ENCRYPTED_WORKSPACE", "1")
-    monkeypatch.setenv("GVAI_PRIVATE_WORKSPACE_KEY", key)
+    monkeypatch.delenv(
+        runtime.ENCRYPTED_WORKSPACE_KEY_ENV,
+        raising=False,
+    )
+    monkeypatch.setenv(
+        runtime.WORKSPACE_KEY_SOCKET_ENV,
+        str(provider_socket.resolve(strict=True)),
+    )
+    monkeypatch.setenv(
+        runtime.WORKSPACE_KEY_PROVIDER_UID_ENV,
+        str(os.geteuid()),
+    )
     monkeypatch.setenv("GVAI_PRIVATE_WORKSPACE_AUDIT_DIR", str(audit_dir))
     monkeypatch.setenv(
         runtime.FILESYSTEM_SANDBOX_READ_PATHS_ENV,
@@ -189,6 +242,14 @@ print({reply!r})
         marker,
         timeout=10,
     )
+
+    provider_thread.join(timeout=3)
+    assert not provider_thread.is_alive()
+    assert provider_state["errors"] == []
+    assert provider_state["request"] == (
+        b"GVAI-PRIVATE-WORKSPACE-KEY-V1\n"
+    )
+
     assert result == {
         "provider": "local",
         "model": "staging-synthetic",
