@@ -48,8 +48,10 @@ def test_model_router_blocked(monkeypatch):
                 "PRIVACY BYPASS DETECTED"
             )
 
+    import openai
+
     monkeypatch.setattr(
-        mod,
+        openai,
         "OpenAI",
         ForbiddenOpenAI,
     )
