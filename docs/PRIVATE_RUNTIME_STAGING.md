@@ -105,6 +105,29 @@ variable, it is skipped and therefore not verified. Separate encrypted-workspace
 tests cover ciphertext storage, authentication, tampering, and descriptor-
 anchored path traversal.
 
+## Configured model execution verification
+
+After the staging preflight and synthetic runtime smoke test pass, an operator
+may explicitly verify one execution of the configured private model through the
+protected encrypted-workspace runtime:
+
+```bash
+python -m privacy.configured_model_verification
+```
+
+This command uses fixed synthetic, non-sensitive input and executes through the
+normal private runtime. It reports only a sanitized pass/fail result. It does
+not print the model reply, configured command, model name, asset paths,
+environment values, secrets, or raw exception text.
+
+A passing result verifies only that the configured model completed that
+protected execution attempt as a local, network-isolated runtime. It does not
+establish production readiness, persist a certification state, or verify the
+remaining production boundaries.
+
+`production_ready` remains false until the independently reviewed production
+requirements are satisfied.
+
 ## Limits and deployment blockers
 
 - Bubblewrap isolates the encrypted worker, not the trusted broker or host.
