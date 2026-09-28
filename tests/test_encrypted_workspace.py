@@ -92,6 +92,20 @@ assert base64.b64decode(read["content_b64"]) == plaintext
     assert b"worker-1" not in audit
     assert b"project-1" not in audit
 
+    audit_records = [
+        json.loads(line)
+        for line in (tmp_path / "audit.jsonl").read_text().splitlines()
+    ]
+    assert [record["operation"] for record in audit_records] == [
+        "write",
+        "read",
+    ]
+    assert all(record["allowed"] is True for record in audit_records)
+    assert all(record["reason"] == "authorized" for record in audit_records)
+    assert audit_records[0]["resource_ref"] == audit_records[1]["resource_ref"]
+    assert len(audit_records[0]["resource_ref"]) == 64
+    assert "src/secret.txt" not in audit.decode()
+
 
 def test_worker_client_uses_serialized_pipe_channel(tmp_path):
     broker = build_broker(tmp_path)
@@ -135,6 +149,16 @@ assert json.loads(sys.stdin.readline()) == {"error": "workspace operation failed
     ]
     assert audit_records[-1]["allowed"] is False
     assert audit_records[-1]["reason"] == "integrity_failure"
+    assert "resource_ref" not in audit_records[-1]
+
+    failed_reads = [
+        record
+        for record in audit_records
+        if record["operation"] == "read" and not record["allowed"]
+    ]
+    assert len(failed_reads) == 2
+    assert all(record["reason"] == "integrity_failure" for record in failed_reads)
+    assert all("resource_ref" not in record for record in failed_reads)
 
 
 def test_malicious_exec_worker_cannot_reach_or_forge_broker_state(tmp_path, monkeypatch):

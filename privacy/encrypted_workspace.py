@@ -127,6 +127,7 @@ class WorkspaceAuditSink(Protocol):
         request: WorkspaceRequest,
         allowed: bool,
         reason: str,
+        resource_ref: str | None = None,
     ) -> None:
         ...
 
@@ -201,6 +202,7 @@ class WorkspaceAuditLog:
         request: WorkspaceRequest,
         allowed: bool,
         reason: str,
+        resource_ref: str | None = None,
     ) -> None:
         record = {
             "timestamp": time.time(),
@@ -210,6 +212,8 @@ class WorkspaceAuditLog:
             "allowed": allowed,
             "reason": reason,
         }
+        if resource_ref is not None:
+            record["resource_ref"] = resource_ref
         payload = (
             json.dumps(record, sort_keys=True) + "\n"
         ).encode("utf-8")
@@ -351,9 +355,15 @@ class EncryptedProjectWorkspace:
         request: WorkspaceRequest,
         allowed: bool,
         reason: str,
+        resource_ref: str | None = None,
     ) -> None:
         try:
-            self.__audit_log.write(request, allowed, reason)
+            self.__audit_log.write(
+                request,
+                allowed,
+                reason,
+                resource_ref=resource_ref,
+            )
         except Exception:
             raise WorkspaceAuditError(
                 "workspace audit destination is unavailable"
@@ -421,6 +431,9 @@ class EncryptedProjectWorkspace:
                 raise WorkspaceIntegrityError(
                     "workspace operation failed"
                 ) from None
+            resource_ref = hashlib.sha256(
+                self._FORMAT + sealed
+            ).hexdigest()
             result = None
         elif request.operation == "read":
             try:
@@ -438,6 +451,7 @@ class EncryptedProjectWorkspace:
             if not encrypted.startswith(self._FORMAT):
                 self.__audit(request, False, "integrity_failure")
                 raise WorkspaceIntegrityError("invalid encrypted workspace data")
+            resource_ref = hashlib.sha256(encrypted).hexdigest()
             try:
                 result = self.__control_plane.open(
                     encrypted[len(self._FORMAT):],
@@ -459,7 +473,12 @@ class EncryptedProjectWorkspace:
             self.__audit(request, False, "invalid_operation")
             raise WorkspaceAccessDenied("workspace operation denied")
 
-        self.__audit(request, True, "authorized")
+        self.__audit(
+            request,
+            True,
+            "authorized",
+            resource_ref=resource_ref,
+        )
         return result
 
     def audit_invalid_request(self, *, worker_id: str, project_id: str) -> None:
