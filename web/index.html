@@ -2297,8 +2297,21 @@
       .layer-bar {
         left: 14px;
         right: 14px;
-        bottom: calc(70vh + 24px);
+        bottom: 14px;
         max-width: none;
+        max-height: 102px;
+        overflow-y: auto;
+        z-index: 11;
+      }
+
+      .labor-map-controls {
+        flex: 1 1 100%;
+        margin-left: 0;
+      }
+
+      .labor-map-controls select {
+        min-width: 0;
+        max-width: 100%;
       }
 
       .hint {
