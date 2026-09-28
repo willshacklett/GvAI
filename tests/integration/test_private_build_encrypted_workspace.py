@@ -543,7 +543,10 @@ def test_audit_entries_contain_only_sanitized_references(monkeypatch, tmp_path):
             "operation",
             "allowed",
             "reason",
+            "resource_ref",
         }
+        assert len(record["resource_ref"]) == 64
+        int(record["resource_ref"], 16)
 
 
 def test_worker_filesystem_namespace_hides_host_paths(
