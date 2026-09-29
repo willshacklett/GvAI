@@ -4,9 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GVAI — Post-Labor Capitalism Intelligence</title>
-  <link rel="icon" type="image/svg+xml" href="/gv-carl-logo.svg?v=3" />
-  <link rel="shortcut icon" href="/gv-carl-logo.svg?v=3" />
-  <link rel="apple-touch-icon" href="/gv-carl-logo.svg?v=3" />
+  <link rel="icon" type="image/svg+xml" href="/gv-carl-logo.svg?v=4" />
+  <link rel="shortcut icon" type="image/svg+xml" href="/gv-carl-logo.svg?v=4" />
 
   <style>
     :root {
@@ -2308,6 +2307,8 @@
         color: inherit;
         text-align: left;
         cursor: pointer;
+        touch-action: none;
+        user-select: none;
       }
 
       .regional-outlook-grabber {
@@ -10548,9 +10549,112 @@ function setRegionalOutlookCollapsed(collapsed) {
   );
 }
 
+let regionalOutlookDragStartY = null;
+let regionalOutlookDragLastY = null;
+let regionalOutlookDragged = false;
+const REGIONAL_OUTLOOK_DRAG_THRESHOLD = 36;
+
+regionalOutlookToggle.addEventListener(
+  "pointerdown",
+  event => {
+    if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+
+    regionalOutlookDragStartY = event.clientY;
+    regionalOutlookDragLastY = event.clientY;
+    regionalOutlookDragged = false;
+
+    regionalOutlookToggle.setPointerCapture(
+      event.pointerId
+    );
+  }
+);
+
+regionalOutlookToggle.addEventListener(
+  "pointermove",
+  event => {
+    if (regionalOutlookDragStartY === null) {
+      return;
+    }
+
+    regionalOutlookDragLastY = event.clientY;
+
+    if (
+      Math.abs(
+        regionalOutlookDragLastY -
+        regionalOutlookDragStartY
+      ) >= REGIONAL_OUTLOOK_DRAG_THRESHOLD
+    ) {
+      regionalOutlookDragged = true;
+    }
+  }
+);
+
+function finishRegionalOutlookDrag(event) {
+  if (regionalOutlookDragStartY === null) {
+    return;
+  }
+
+  const endY =
+    regionalOutlookDragLastY ??
+    event.clientY;
+  const deltaY =
+    endY - regionalOutlookDragStartY;
+
+  if (
+    regionalOutlookToggle.hasPointerCapture(
+      event.pointerId
+    )
+  ) {
+    regionalOutlookToggle.releasePointerCapture(
+      event.pointerId
+    );
+  }
+
+  regionalOutlookDragStartY = null;
+  regionalOutlookDragLastY = null;
+
+  if (
+    Math.abs(deltaY) >=
+    REGIONAL_OUTLOOK_DRAG_THRESHOLD
+  ) {
+    setRegionalOutlookCollapsed(deltaY > 0);
+  }
+}
+
+regionalOutlookToggle.addEventListener(
+  "pointerup",
+  finishRegionalOutlookDrag
+);
+
+regionalOutlookToggle.addEventListener(
+  "pointercancel",
+  event => {
+    if (
+      regionalOutlookToggle.hasPointerCapture(
+        event.pointerId
+      )
+    ) {
+      regionalOutlookToggle.releasePointerCapture(
+        event.pointerId
+      );
+    }
+
+    regionalOutlookDragStartY = null;
+    regionalOutlookDragLastY = null;
+    regionalOutlookDragged = false;
+  }
+);
+
 regionalOutlookToggle.addEventListener(
   "click",
   () => {
+    if (regionalOutlookDragged) {
+      regionalOutlookDragged = false;
+      return;
+    }
+
     setRegionalOutlookCollapsed(
       !regionalOutlookPanel.classList.contains(
         "is-collapsed"
