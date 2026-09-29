@@ -227,6 +227,14 @@
       box-shadow: 0 18px 50px rgba(0,0,0,0.28);
     }
 
+    .regional-outlook-toggle {
+      display: none;
+    }
+
+    .regional-outlook-content {
+      display: contents;
+    }
+
     .eyebrow {
       font-size: 11px;
       color: var(--accent);
@@ -2285,9 +2293,78 @@
         top: auto;
         left: 14px;
         right: 14px;
-        bottom: 14px;
+        bottom: 126px;
         width: auto;
         max-height: 70vh;
+        transition: max-height 180ms ease;
+      }
+
+      .regional-outlook-toggle {
+        display: block;
+        width: 100%;
+        padding: 0 0 10px;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .regional-outlook-grabber {
+        display: block;
+        width: 42px;
+        height: 4px;
+        margin: 0 auto 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.28);
+      }
+
+      .regional-outlook-toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .regional-outlook-toggle .eyebrow {
+        display: block;
+        margin-bottom: 3px;
+      }
+
+      .regional-outlook-summary {
+        display: block;
+        font-size: 16px;
+        font-weight: 800;
+        line-height: 1.15;
+      }
+
+      .regional-outlook-chevron {
+        flex: 0 0 auto;
+        font-size: 24px;
+        line-height: 1;
+        transition: transform 180ms ease;
+      }
+
+      .regional-outlook-content {
+        display: block;
+      }
+
+      .info-panel.is-collapsed {
+        max-height: 76px;
+        overflow: hidden;
+        padding-bottom: 10px;
+      }
+
+      .info-panel.is-collapsed .regional-outlook-toggle {
+        padding-bottom: 0;
+      }
+
+      .info-panel.is-collapsed .regional-outlook-content {
+        display: none;
+      }
+
+      .info-panel.is-collapsed .regional-outlook-chevron {
+        transform: rotate(180deg);
       }
 
       .legend {
@@ -2415,12 +2492,30 @@
     </div>
   </div>
 
-  <div class="info-panel">
-    <div class="eyebrow">Selected region</div>
+  <div class="info-panel" id="regional-outlook-panel">
+    <button
+      id="regional-outlook-toggle"
+      class="regional-outlook-toggle"
+      type="button"
+      aria-expanded="true"
+      aria-controls="regional-outlook-content"
+    >
+      <span class="regional-outlook-grabber" aria-hidden="true"></span>
+      <span class="regional-outlook-toggle-row">
+        <span>
+          <span class="eyebrow">Selected region</span>
+          <span id="regional-outlook-summary" class="regional-outlook-summary">
+            Rutherford County
+          </span>
+        </span>
+        <span class="regional-outlook-chevron" aria-hidden="true">⌄</span>
+      </span>
+    </button>
 
-    <div id="location-title" class="location-title">
-      Rutherford County
-    </div>
+    <div id="regional-outlook-content" class="regional-outlook-content">
+      <div id="location-title" class="location-title">
+        Rutherford County
+      </div>
 
     <div id="location-sub" class="location-sub">
       Tennessee, United States
@@ -2604,6 +2699,7 @@
       <button id="simulate-btn">
         Simulate automation impact
       </button>
+    </div>
     </div>
   </div>
 
@@ -3477,6 +3573,10 @@ function renderProfile(profile) {
 
   document.getElementById(
     "location-title"
+  ).textContent = profile.title;
+
+  document.getElementById(
+    "regional-outlook-summary"
   ).textContent = profile.title;
 
   document.getElementById(
@@ -10431,6 +10531,33 @@ document
       );
     }
   );
+
+const regionalOutlookPanel =
+  document.getElementById("regional-outlook-panel");
+const regionalOutlookToggle =
+  document.getElementById("regional-outlook-toggle");
+
+function setRegionalOutlookCollapsed(collapsed) {
+  regionalOutlookPanel.classList.toggle(
+    "is-collapsed",
+    collapsed
+  );
+  regionalOutlookToggle.setAttribute(
+    "aria-expanded",
+    String(!collapsed)
+  );
+}
+
+regionalOutlookToggle.addEventListener(
+  "click",
+  () => {
+    setRegionalOutlookCollapsed(
+      !regionalOutlookPanel.classList.contains(
+        "is-collapsed"
+      )
+    );
+  }
+);
 
 // Show the default regional panel without moving the camera.
 // The globe should open at the whole-Earth view.

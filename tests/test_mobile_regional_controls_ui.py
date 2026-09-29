@@ -10,9 +10,10 @@ def test_mobile_regional_controls_are_reserved_below_outlook_panel():
         top: auto;
         left: 14px;
         right: 14px;
-        bottom: 14px;
+        bottom: 126px;
         width: auto;
         max-height: 70vh;
+        transition: max-height 180ms ease;
       }
 """ in HTML
 
