@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <title>GV Change Impact Precheck</title>
+  <script src="/api_config.js"></script>
+  <script src="/fetch.js"></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 40px; max-width: 900px; }
     label { display:block; margin-top:14px; font-weight:bold; }
@@ -44,6 +46,7 @@
   <pre id="output">Waiting for score...</pre>
 
   <script>
+    const fetch = window.GVAI.fetchJSON;
     async function scoreChange() {
       const payload = {
         new_tasks: Number(document.getElementById("new_tasks").value),
@@ -55,7 +58,7 @@
         safe_change_limit: Number(document.getElementById("safe_change_limit").value)
       };
 
-      const apiBase = window.GVAI_API_BASE || "http://localhost:8000";
+      const apiBase = window.GVAI_API_BASE || "";
 
       try {
         const res = await fetch(`${apiBase}/api/change-impact`, {

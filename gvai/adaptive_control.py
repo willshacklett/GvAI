@@ -1,7 +1,18 @@
-import json, time
+import fcntl
+import json
+import logging
+import math
+import os
+import tempfile
+import threading
+import time
+from contextlib import contextmanager
+from copy import deepcopy
 from pathlib import Path
 
-STATE_PATH = Path("data/gv_adaptive_control.json")
+STATE_PATH = Path(os.getenv("GVAI_ADAPTIVE_CONTROL_PATH", "data/gv_adaptive_control.json"))
+_thread_lock = threading.RLock()
+logger = logging.getLogger(__name__)
 
 DEFAULT = {
     "last_drift": None,
@@ -20,22 +31,75 @@ def clamp(x, lo=0.0, hi=1.0):
 
 def load_state():
     if not STATE_PATH.exists():
-        return dict(DEFAULT)
+        return deepcopy(DEFAULT)
     try:
         data = json.loads(STATE_PATH.read_text())
-        merged = dict(DEFAULT)
+        if not isinstance(data, dict) or not isinstance(data.get("history", []), list):
+            raise ValueError("Invalid adaptive control state")
+        merged = deepcopy(DEFAULT)
         merged.update(data)
+        for field in ("core_ema", "fast_delta_ema", "alpha_core", "alpha_fast", "k", "alpha_effective"):
+            if not math.isfinite(float(merged[field])):
+                raise ValueError("Non-finite adaptive control state")
+        if merged["last_drift"] is not None and not math.isfinite(float(merged["last_drift"])):
+            raise ValueError("Invalid previous drift")
         return merged
     except Exception:
-        return dict(DEFAULT)
+        logger.exception("Adaptive control state could not be loaded")
+        return deepcopy(DEFAULT)
+
+
+@contextmanager
+def _state_lock():
+    with _thread_lock:
+        STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with STATE_PATH.with_suffix(".lock").open("a") as lock_file:
+            fcntl.flock(lock_file, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+
+def _save_state(state):
+    temporary_path = None
+    try:
+        bounded_state = {**state, "history": state.get("history", [])[-50:]}
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=STATE_PATH.parent,
+            prefix=f".{STATE_PATH.name}.", suffix=".tmp", delete=False,
+        ) as temporary:
+            temporary_path = Path(temporary.name)
+            json.dump(bounded_state, temporary, indent=2, allow_nan=False)
+            temporary.flush()
+            os.fsync(temporary.fileno())
+        os.replace(temporary_path, STATE_PATH)
+        return True
+    except (OSError, TypeError, ValueError):
+        logger.exception("Adaptive control state could not be persisted")
+        return False
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
 
 def save_state(state):
-    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    state["history"] = state.get("history", [])[-50:]
-    STATE_PATH.write_text(json.dumps(state, indent=2))
+    try:
+        with _state_lock():
+            return _save_state(state)
+    except OSError:
+        logger.exception("Adaptive control storage is unavailable")
+        return False
 
 def update_adaptive_control(gv):
-    state = load_state()
+    try:
+        with _state_lock():
+            return _update_state(load_state(), gv)
+    except OSError:
+        logger.exception("Adaptive control storage is unavailable; using transient state")
+        return _update_state(load_state(), gv, persist=False)
+
+
+def _update_state(state, gv, persist=True):
     drift = float(gv.get("drift_risk", 0.0) or 0.0)
     prev = state.get("last_drift")
     delta = 0.0 if prev is None else drift - float(prev)
@@ -70,13 +134,14 @@ def update_adaptive_control(gv):
         "snap_detected": snap
     })
     state.setdefault("history", []).append(event)
-    save_state(state)
+    persisted = _save_state(state) if persist else False
 
     return {
         "control_law": "alpha(t)=alpha_core+k*EMA_fast(delta_drift)",
         "alpha_core": alpha_core,
         "alpha_fast": alpha_fast,
         "k": k,
+        "persisted": persisted,
         **event
     }
 

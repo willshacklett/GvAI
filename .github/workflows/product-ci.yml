@@ -1,0 +1,112 @@
+name: Public Application CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  product-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GVAI_PRIVATE_CGROUP_ROOT: /sys/fs/cgroup/gvai-product-ci
+      GVAI_RUN_STAGING_SMOKE: "1"
+      GVAI_RUN_RESOURCE_CONTAINMENT_TEST: "1"
+      PYTHONOPTIMIZE: "0"
+      PYTEST_ADDOPTS: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install test dependencies
+        run: |
+          python -m pip install -r requirements.txt -r requirements-dev.txt -r gateway/requirements.txt
+          python -m pip check
+      - name: Prepare real sandbox prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes bubblewrap apparmor-utils
+          sudo tee /tmp/gvai-product-ci.apparmor >/dev/null <<'EOF'
+          abi <abi/4.0>,
+          include <tunables/global>
+
+          profile gvai-product-ci flags=(unconfined) {
+            userns,
+          }
+          EOF
+          sudo apparmor_parser --replace /tmp/gvai-product-ci.apparmor
+          resolved_python="$(python -c 'from pathlib import Path; import sys; print(Path(sys.executable).resolve(strict=True))')"
+          chmod go-w "$resolved_python"
+          aa-exec -p gvai-product-ci -- \
+            timeout --kill-after=5s 15s privacy/run_network_sandbox.sh \
+            python -c 'print("Product CI sandbox execution passed")'
+      - name: Delegate private worker resource boundary
+        run: |
+          set -euo pipefail
+          parent=/sys/fs/cgroup
+          root="$GVAI_PRIVATE_CGROUP_ROOT"
+          test "$(stat -fc %T "$parent")" = cgroup2fs
+          for controller in cpu memory pids; do
+            grep -qw "$controller" "$parent/cgroup.controllers"
+            if ! grep -qw "$controller" "$parent/cgroup.subtree_control"; then
+              printf '+%s\n' "$controller" | sudo tee "$parent/cgroup.subtree_control" >/dev/null
+            fi
+          done
+          sudo install -d -o "$(id -u)" -g "$(id -g)" -m 0700 "$root"
+          for controller in cpu memory pids; do
+            grep -qw "$controller" "$root/cgroup.controllers"
+            if ! grep -qw "$controller" "$root/cgroup.subtree_control"; then
+              printf '+%s\n' "$controller" | sudo tee "$root/cgroup.subtree_control" >/dev/null
+            fi
+            grep -qw "$controller" "$root/cgroup.subtree_control"
+          done
+          sudo chown "$(id -u):$(id -g)" "$root/cgroup.procs" "$root/cgroup.threads" "$root/cgroup.subtree_control"
+          mkdir -m 0700 "$root/gvai-ci-broker"
+          sudo chown "$(id -u):$(id -g)" "$root/gvai-ci-broker/cgroup.procs" "$root/gvai-ci-broker/cgroup.threads"
+      - name: Primary product suite
+        run: |
+          printf '%s\n' "$$" | sudo tee "$GVAI_PRIVATE_CGROUP_ROOT/gvai-ci-broker/cgroup.procs" >/dev/null
+          grep -qx "$$" "$GVAI_PRIVATE_CGROUP_ROOT/gvai-ci-broker/cgroup.procs"
+          aa-exec -p gvai-product-ci -- python -m pytest tests -q
+      - name: Frontend request regressions
+        run: node --test tests/frontend/*.test.cjs
+      - name: Pages publication sanity
+        run: python scripts/prepare_pages.py
+      - name: Railway import and startup configuration
+        run: |
+          bash -n privacy/start_railway.sh
+          python -m gunicorn --check-config gvai.api_service:app
+      - name: Remove scoped CI namespace profile
+        if: always()
+        run: |
+          if [ -f /tmp/gvai-product-ci.apparmor ]; then
+            sudo apparmor_parser --remove /tmp/gvai-product-ci.apparmor
+          fi
+      - name: Verify and remove delegated resource boundary
+        if: always()
+        run: |
+          set -euo pipefail
+          root="$GVAI_PRIVATE_CGROUP_ROOT"
+          if [ ! -d "$root" ]; then exit 0; fi
+          if [ -d "$root/gvai-ci-broker" ]; then
+            if grep -q . "$root/gvai-ci-broker/cgroup.procs"; then
+              echo "Product CI broker cgroup is still populated." >&2
+              exit 1
+            fi
+            sudo rmdir "$root/gvai-ci-broker"
+          fi
+          if find "$root" -mindepth 1 -maxdepth 1 -type d | grep -q .; then
+            echo "Leaked private-worker cgroups." >&2
+            exit 1
+          fi
+          sudo rmdir "$root"

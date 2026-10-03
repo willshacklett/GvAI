@@ -5,15 +5,16 @@ gvai-fpr/venv/
 .env
 
 # build artifacts
-gvai-build/
+gvai-build/venv/
+gvai-build/chart.png
 gvai-fpr/
 
 # data + outputs
-data/
+/data/
 dashboard/data/
 
 # Nashville STEX milestone inputs and audited profiles
-!data/
+!/data/
 data/*
 !data/onet/
 !data/onet/raw/
@@ -52,3 +53,18 @@ node_modules/
 
 # GVAI runtime privacy audit logs
 privacy/*.jsonl
+
+# Generated local runtime and publication state
+*.pyo
+*.bak
+*.pid
+*.log.*
+.pytest_cache/
+.gvai_run/
+logs/
+gvai/logs/
+_site/
+test-results/
+playwright-report/
+.env.*
+!.env.example

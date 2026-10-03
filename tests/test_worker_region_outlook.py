@@ -1336,7 +1336,7 @@ def test_main_globe_worker_outlook_precedes_detailed_stex_audit():
     assert html.index('id="worker-outlook-btn"') < html.index(
         'id="worker-outlook-card"'
     )
-    workspace = html[html.index('<main id="laborers-workspace"'):]
+    workspace = html[html.index('<section id="laborers-workspace"'):]
     assert workspace.index('id="worker-outlook-card"') < workspace.index(
         'id="related-occupations-card"'
     )

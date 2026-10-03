@@ -1,9 +1,14 @@
 import os
+import hmac
 import json
 import time
 import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from werkzeug.exceptions import HTTPException
+from werkzeug.middleware.proxy_fix import ProxyFix
 from openai import OpenAI
 from gvai.conscience_routes import register_conscience_routes
 from gvai.conscience import evaluate_action
@@ -80,7 +85,68 @@ app = Flask(__name__)
 # Railway deployment marker: live geographic search enabled.
 
 register_conscience_routes(app)
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+PUBLIC_ORIGINS = {
+    "https://gvai.io", "https://www.gvai.io",
+    *filter(None, (origin.strip() for origin in os.getenv("GVAI_CORS_ORIGINS", "").split(","))),
+}
+app.config.update(
+    MAX_CONTENT_LENGTH=int(os.getenv("GVAI_MAX_REQUEST_BYTES", "65536")),
+    CHAT_MAX_MESSAGE_BYTES=int(os.getenv("GVAI_CHAT_MAX_MESSAGE_BYTES", "8192")),
+    GEOCODE_MAX_QUERY_BYTES=int(os.getenv("GVAI_GEOCODE_MAX_QUERY_BYTES", "512")),
+    CHAT_RATE_LIMIT=os.getenv("GVAI_CHAT_RATE_LIMIT", "10 per minute"),
+    CHAT_GLOBAL_RATE_LIMIT=os.getenv("GVAI_CHAT_GLOBAL_RATE_LIMIT", "120 per minute"),
+    GEOCODE_RATE_LIMIT=os.getenv("GVAI_GEOCODE_RATE_LIMIT", "30 per minute"),
+    GEOCODE_GLOBAL_RATE_LIMIT=os.getenv("GVAI_GEOCODE_GLOBAL_RATE_LIMIT", "60 per minute"),
+)
+trusted_proxy_hops = int(os.getenv("GVAI_TRUSTED_PROXY_HOPS", "0"))
+if trusted_proxy_hops:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=trusted_proxy_hops)
+CORS(app, resources={r"/api/*": {"origins": sorted(PUBLIC_ORIGINS)}}, max_age=600)
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],
+    storage_uri=os.getenv("GVAI_RATE_LIMIT_STORAGE_URI", "memory://"),
+    headers_enabled=True,
+)
+
+
+@app.before_request
+def check_public_origin():
+    if request.path in {"/api/chat", "/api/geocode"}:
+        origin = request.headers.get("Origin")
+        if origin and origin not in PUBLIC_ORIGINS:
+            return jsonify({"ok": False, "reason": "Origin is not allowed."}), 403
+
+
+@app.errorhandler(Exception)
+def public_error(error):
+    if isinstance(error, HTTPException):
+        status = error.code or 500
+        reason = {
+            400: "Invalid request.",
+            404: "Resource not found.",
+            405: "Method not allowed.",
+            413: "Request is too large.",
+            429: "Too many requests. Please try again later.",
+        }.get(status, "Request could not be completed.")
+    else:
+        status = 500
+        reason = "Service temporarily unavailable. Please try again later."
+        app.logger.exception("Unhandled API failure on %s", request.path)
+    return jsonify({"ok": False, "reason": reason}), status
+
+
+@app.after_request
+def sanitize_server_failure(response):
+    if request.path.startswith("/api/") and response.status_code >= 500:
+        payload = response.get_json(silent=True)
+        if isinstance(payload, dict):
+            payload.pop("error", None)
+            payload.pop("error_type", None)
+            response.set_data(json.dumps(payload))
+            response.content_type = "application/json"
+    return response
 
 
 def _unsupported_worker_country_response(country_code):
@@ -127,8 +193,9 @@ def search_web(query: str):
             if isinstance(item, dict) and item.get("Text"):
                 out.append(f"{item.get('Text')} {item.get('FirstURL','')}")
         return out[:5]
-    except Exception as e:
-        return [f"Search unavailable: {e}"]
+    except Exception:
+        app.logger.exception("Live search unavailable")
+        return []
 
 @app.get("/api/health")
 def health():
@@ -136,8 +203,14 @@ def health():
 
 
 @app.get("/api/geocode")
+@limiter.limit(lambda: app.config["GEOCODE_RATE_LIMIT"])
+@limiter.limit(lambda: app.config["GEOCODE_GLOBAL_RATE_LIMIT"], key_func=lambda: "geocode")
 def api_geocode():
-    query = (request.args.get("q") or "").strip()
+    raw_query = request.args.get("q") or ""
+
+    if len(raw_query.encode("utf-8")) > app.config["GEOCODE_MAX_QUERY_BYTES"]:
+        return jsonify({"ok": False, "reason": "Location query is too large."}), 413
+    query = raw_query.strip()
 
     if not query:
         return jsonify({
@@ -202,6 +275,7 @@ def api_geocode():
         })
 
     except requests.RequestException as exc:
+        app.logger.exception("Geocode provider failed")
         return jsonify({
             "ok": False,
             "query": query,
@@ -278,6 +352,13 @@ def api_stex_review_approve():
             "ok": False,
             "reason": "Internal STEX review writes are disabled.",
         }), 403
+
+    token = os.getenv("GVAI_STEX_REVIEW_TOKEN", "")
+    authorization = request.headers.get("Authorization", "")
+    if not token or not hmac.compare_digest(
+        authorization.encode("utf-8"), f"Bearer {token}".encode("utf-8")
+    ):
+        return jsonify({"ok": False, "reason": "Authorized internal reviewer required."}), 403
 
     payload = request.get_json(silent=True) or {}
     try:
@@ -589,6 +670,7 @@ def api_region_stex_coverage():
         })
 
     except Exception as exc:
+        app.logger.exception("Statewide STEX coverage failed")
         return jsonify({
             "supported": False,
             "state_fips":
@@ -847,6 +929,7 @@ def api_region_housing_pressure():
         return jsonify(result)
 
     except Exception as exc:
+        app.logger.exception("Housing pressure lookup failed")
         return jsonify({
             "supported": False,
             "state_fips":
@@ -884,6 +967,7 @@ def api_region_workforce_mix():
         return jsonify(result)
 
     except Exception as exc:
+        app.logger.exception("Workforce mix lookup failed")
         return jsonify({
             "supported": False,
             "state_fips": state_fips,
@@ -920,6 +1004,7 @@ def api_region_labor_availability():
         return jsonify(result)
 
     except Exception as exc:
+        app.logger.exception("Labor availability lookup failed")
         return jsonify({
             "supported": False,
             "state_fips": state_fips,
@@ -995,13 +1080,13 @@ def api_region():
 
         return jsonify(result)
     except Exception as exc:
+        app.logger.exception("Regional data lookup failed")
         return jsonify({
             "supported": False,
             "latitude": latitude,
             "longitude": longitude,
             "reason": "Regional data lookup failed.",
             "error_type": type(exc).__name__,
-            "error": str(exc),
         }), 500
 
 
@@ -1025,6 +1110,7 @@ def api_region_labor_intelligence():
 
         return jsonify(result)
     except Exception as exc:
+        app.logger.exception("Regional labor intelligence synthesis failed")
         return jsonify({
             "supported": False,
             "latitude": latitude,
@@ -1032,7 +1118,6 @@ def api_region_labor_intelligence():
             "reason":
                 "Regional labor intelligence synthesis failed.",
             "error_type": type(exc).__name__,
-            "error": str(exc),
         }), 500
 
 
@@ -1086,6 +1171,7 @@ def api_worker_region_outlook():
         }), 400
 
     except Exception as exc:
+        app.logger.exception("Worker-region outlook synthesis failed")
         return jsonify({
             "ok": False,
             "latitude": latitude,
@@ -1094,7 +1180,6 @@ def api_worker_region_outlook():
             "reason":
                 "Worker-region outlook synthesis failed.",
             "error_type": type(exc).__name__,
-            "error": str(exc),
         }), 500
 
 
@@ -1563,12 +1648,19 @@ def api_providers():
     })
 
 @app.post("/api/chat")
+@limiter.limit(lambda: app.config["CHAT_RATE_LIMIT"])
+@limiter.limit(lambda: app.config["CHAT_GLOBAL_RATE_LIMIT"], key_func=lambda: "chat")
 def chat():
-    data = request.get_json(silent=True) or {}
-    message = (data.get("message") or "").strip()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not isinstance(data.get("message"), str):
+        return jsonify({"ok": False, "reason": "A text message is required."}), 400
+    message = data["message"].strip()
+
+    if len(data["message"].encode("utf-8")) > app.config["CHAT_MAX_MESSAGE_BYTES"]:
+        return jsonify({"ok": False, "reason": "Message is too large."}), 413
 
     if not message:
-        return jsonify({"ok": False, "error": "Missing message"}), 400
+        return jsonify({"ok": False, "reason": "A text message is required."}), 400
 
     gv_precheck, gv_runtime_policy = build_gv_runtime_policy(message)
 
@@ -1615,8 +1707,9 @@ BEHAVIOR
     try:
         model_result = call_model(system, user_content)
         reply = model_result.get("reply", "")
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+    except Exception:
+        app.logger.exception("Chat model provider failed")
+        return jsonify({"ok": False, "reason": "Chat is temporarily unavailable."}), 502
 
     payload = {
         "ok": True,
@@ -1643,6 +1736,7 @@ def attach_gv_conscience(payload, user_message="", reply_text=""):
     """Attach and enforce GV conscience judgment on chat responses."""
     if not isinstance(payload, dict):
         payload = {"reply": str(payload)}
+    payload.pop("gv_original_reply", None)
 
     original_reply = reply_text or payload.get("reply", "")
     action = "User asked: " + str(user_message) + "\nAI replied: " + str(original_reply)
@@ -1655,7 +1749,6 @@ def attach_gv_conscience(payload, user_message="", reply_text=""):
         payload["reply"] = safe_reply
         payload["response"] = safe_reply
         payload["gv_enforced"] = True
-        payload["gv_original_reply"] = original_reply
     elif mode == "QUALIFY":
         qualified_reply = (
             str(original_reply)

@@ -1,4 +1,5 @@
 const API = "/api/kernel/observatory";
+let telemetryLoading = false;
 
 function setText(id, value) {
   document.getElementById(id).textContent = value ?? "—";
@@ -10,10 +11,12 @@ function safeNum(value) {
 }
 
 async function loadTelemetry() {
+  if (telemetryLoading) return;
+  telemetryLoading = true;
   const feed = document.getElementById("feed");
 
   try {
-    const res = await fetch(API);
+    const res = await window.GVAI.fetchJSON(API);
     const data = await res.json();
 
     setText("rolling-gv", data.rolling_gv ?? "—");
@@ -27,7 +30,10 @@ async function loadTelemetry() {
     document.getElementById("latest-event").textContent = JSON.stringify(data.latest_event, null, 2);
     feed.textContent = JSON.stringify(data, null, 2);
   } catch (err) {
-    feed.textContent = "Telemetry unavailable: " + err.message;
+    for (const id of ["rolling-gv", "trajectory-mode", "intervention-level", "total-events"]) setText(id, "Unavailable");
+    feed.textContent = "Telemetry temporarily unavailable. Retry later.";
+  } finally {
+    telemetryLoading = false;
   }
 }
 
