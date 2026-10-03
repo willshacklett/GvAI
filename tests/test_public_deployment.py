@@ -66,7 +66,12 @@ def test_normal_pr_ci_runs_primary_product_suite():
     assert "--ignore" not in workflow
     assert "bubblewrap apparmor-utils" in workflow
     assert "chmod go-w" in workflow
-    assert "run: aa-exec -p gvai-product-ci -- python -m pytest tests -q" in workflow
+    assert "aa-exec -p gvai-product-ci -- python -m pytest tests -q" in workflow
+    assert "GVAI_PRIVATE_CGROUP_ROOT: /sys/fs/cgroup/gvai-product-ci" in workflow
+    assert 'GVAI_RUN_RESOURCE_CONTAINMENT_TEST: "1"' in workflow
+    assert 'GVAI_RUN_STAGING_SMOKE: "1"' in workflow
+    assert '"$GVAI_PRIVATE_CGROUP_ROOT/gvai-ci-broker/cgroup.procs"' in workflow
+    assert "Leaked private-worker cgroups." in workflow
     assert "apparmor_parser --remove" in workflow
 
 

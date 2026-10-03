@@ -13,6 +13,12 @@ jobs:
   product-tests:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      GVAI_PRIVATE_CGROUP_ROOT: /sys/fs/cgroup/gvai-product-ci
+      GVAI_RUN_STAGING_SMOKE: "1"
+      GVAI_RUN_RESOURCE_CONTAINMENT_TEST: "1"
+      PYTHONOPTIMIZE: "0"
+      PYTEST_ADDOPTS: ""
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -44,8 +50,34 @@ jobs:
           aa-exec -p gvai-product-ci -- \
             timeout --kill-after=5s 15s privacy/run_network_sandbox.sh \
             python -c 'print("Product CI sandbox execution passed")'
+      - name: Delegate private worker resource boundary
+        run: |
+          set -euo pipefail
+          parent=/sys/fs/cgroup
+          root="$GVAI_PRIVATE_CGROUP_ROOT"
+          test "$(stat -fc %T "$parent")" = cgroup2fs
+          for controller in cpu memory pids; do
+            grep -qw "$controller" "$parent/cgroup.controllers"
+            if ! grep -qw "$controller" "$parent/cgroup.subtree_control"; then
+              printf '+%s\n' "$controller" | sudo tee "$parent/cgroup.subtree_control" >/dev/null
+            fi
+          done
+          sudo install -d -o "$(id -u)" -g "$(id -g)" -m 0700 "$root"
+          for controller in cpu memory pids; do
+            grep -qw "$controller" "$root/cgroup.controllers"
+            if ! grep -qw "$controller" "$root/cgroup.subtree_control"; then
+              printf '+%s\n' "$controller" | sudo tee "$root/cgroup.subtree_control" >/dev/null
+            fi
+            grep -qw "$controller" "$root/cgroup.subtree_control"
+          done
+          sudo chown "$(id -u):$(id -g)" "$root/cgroup.procs" "$root/cgroup.threads" "$root/cgroup.subtree_control"
+          mkdir -m 0700 "$root/gvai-ci-broker"
+          sudo chown "$(id -u):$(id -g)" "$root/gvai-ci-broker/cgroup.procs" "$root/gvai-ci-broker/cgroup.threads"
       - name: Primary product suite
-        run: aa-exec -p gvai-product-ci -- python -m pytest tests -q
+        run: |
+          printf '%s\n' "$$" | sudo tee "$GVAI_PRIVATE_CGROUP_ROOT/gvai-ci-broker/cgroup.procs" >/dev/null
+          grep -qx "$$" "$GVAI_PRIVATE_CGROUP_ROOT/gvai-ci-broker/cgroup.procs"
+          aa-exec -p gvai-product-ci -- python -m pytest tests -q
       - name: Frontend request regressions
         run: node --test tests/frontend/*.test.cjs
       - name: Pages publication sanity
@@ -60,3 +92,21 @@ jobs:
           if [ -f /tmp/gvai-product-ci.apparmor ]; then
             sudo apparmor_parser --remove /tmp/gvai-product-ci.apparmor
           fi
+      - name: Verify and remove delegated resource boundary
+        if: always()
+        run: |
+          set -euo pipefail
+          root="$GVAI_PRIVATE_CGROUP_ROOT"
+          if [ ! -d "$root" ]; then exit 0; fi
+          if [ -d "$root/gvai-ci-broker" ]; then
+            if grep -q . "$root/gvai-ci-broker/cgroup.procs"; then
+              echo "Product CI broker cgroup is still populated." >&2
+              exit 1
+            fi
+            sudo rmdir "$root/gvai-ci-broker"
+          fi
+          if find "$root" -mindepth 1 -maxdepth 1 -type d | grep -q .; then
+            echo "Leaked private-worker cgroups." >&2
+            exit 1
+          fi
+          sudo rmdir "$root"

@@ -69,7 +69,10 @@ PR #87 was reviewed against current main on 2026-10-03. Its original remote chec
 exposed two CI setup defects: the GodScore workflow used Python 3.11 with the pinned
 Python 3.14 dependencies, and Product CI invoked real sandbox tests without Bubblewrap,
 the established scoped namespace profile, or a trusted Python executable. Both workflows
-are corrected without excluding tests or weakening isolation checks.
+are corrected without excluding tests or weakening isolation checks. Product CI also
+delegates a private worker cgroup and runs from its broker leaf, matching the existing
+resource harness. It opts into the real staging and cgroup tests and rejects leaked
+resource groups during cleanup.
 
 Four caught regional/STEX failures now log exception tracebacks before returning their
 existing safe domain messages. Regression tests verify logs retain diagnostics while
