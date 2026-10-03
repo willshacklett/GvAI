@@ -63,6 +63,34 @@ operator use. Railway has one startup path; no production credentials/account se
 - Research tests regenerate three tracked CSVs; that generated churn is restored after
    verification rather than included in the PR. Generated runtime files remain ignored.
 
+## Pre-Merge Review
+
+PR #87 was reviewed against current main on 2026-10-03. Its original remote checks
+exposed two CI setup defects: the GodScore workflow used Python 3.11 with the pinned
+Python 3.14 dependencies, and Product CI invoked real sandbox tests without Bubblewrap,
+the established scoped namespace profile, or a trusted Python executable. Both workflows
+are corrected without excluding tests or weakening isolation checks.
+
+Four caught regional/STEX failures now log exception tracebacks before returning their
+existing safe domain messages. Regression tests verify logs retain diagnostics while
+public JSON omits exception details. No unrelated product or layout changes were made.
+
+The strengthened browser check uses real entry/tab/close/retry clicks at 1440x900,
+1366x768, 1024x768, 768x1024, and 390x844. All 15 audience/viewport combinations passed,
+including regional failure/retry, search reachability, overflow, and rendered globe pixels.
+The refreshed Pages output contains exactly 37 intentional public assets. All 5,544
+removed files were verified as generated artifacts; no source or required fixture/asset
+was removed, and future nested source directories named data are not ignored.
+
+Final local review checks: 862 Python tests passed with the same 3 opt-in infrastructure
+skips; 53 focused hardening tests and 8 Node tests passed. Dependency, Pages reference,
+Gunicorn import/configuration, editor diagnostic, and whitespace checks passed.
+
+There were no general comments, reviews, or inline threads. Existing Actions Node 20
+deprecation warnings (the runner forces Node 24) and the future ubuntu-latest migration
+notice are valid follow-ups, not current application correctness failures. Check the
+latest GitHub run for the updated commit before merge; local results do not replace CI.
+
 ## Remaining Limitations
 
 - CORS does not authenticate public API clients. Rate limits are abuse budgets, not a WAF.

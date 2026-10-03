@@ -38,10 +38,18 @@ def check_site(url):
 
         output = Path("test-results")
         output.mkdir(exist_ok=True)
-        for width, height in [(1366, 768), (1024, 768), (390, 844)]:
+        for width, height in [(1440, 900), (1366, 768), (1024, 768), (768, 1024), (390, 844)]:
             page.set_viewport_size({"width": width, "height": height})
+            assert page.locator("#regional-outlook-panel").is_visible()
+            if not page.locator("#regional-retry").is_visible():
+                page.locator("#regional-outlook-toggle").click()
+            page.locator("#regional-retry").click()
+            page.wait_for_selector("#regional-error:not([hidden])", timeout=60000)
+            assert page.locator("#population").inner_text() == "Unavailable"
+            assert page.locator("#regional-outlook-panel").evaluate("element => element.scrollWidth <= element.clientWidth + 1")
+            page.locator("#audience-laborers-btn").click()
             for audience in ["laborers", "business", "government"]:
-                page.evaluate(f"document.getElementById('audience-{audience}-btn').click()")
+                page.locator(f"#switch-{audience}").click()
                 panel = page.locator(f"#{audience}-workspace")
                 assert panel.is_visible()
                 assert not page.locator("#regional-outlook-panel").is_visible()
@@ -52,6 +60,7 @@ def check_site(url):
                 })""")
                 assert measurements["scroll"] <= measurements["width"] + 1, measurements
                 assert measurements["right"] <= width, measurements
+                assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
                 shell = panel.locator(".laborers-workspace-shell, .business-workspace-shell")
                 assert shell.evaluate("element => element.scrollWidth <= element.clientWidth + 1")
                 close = panel.locator(".laborers-workspace-close")
@@ -63,7 +72,9 @@ def check_site(url):
                 assert search.evaluate("element => element.contains(document.elementFromPoint(element.getBoundingClientRect().x + 5, element.getBoundingClientRect().y + 5))")
                 page.screenshot(path=str(output / f"{audience}-{width}.png"))
                 print(width, audience, json.dumps(measurements))
-            page.evaluate("document.getElementById('close-government-workspace-btn').click()")
+            page.locator("#close-government-workspace-btn").click()
+            assert page.locator("#laborers-workspace:visible, #business-workspace:visible, #government-workspace:visible").count() == 0
+            assert page.locator("#regional-outlook-panel").is_visible()
             page.screenshot(path=str(output / f"globe-{width}.png"))
             pixels = page.evaluate("""() => new Promise(resolve => {
                 requestAnimationFrame(() => {

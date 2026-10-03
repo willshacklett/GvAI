@@ -64,3 +64,14 @@ def test_normal_pr_ci_runs_primary_product_suite():
     assert "python -m pytest tests -q" in workflow
     assert "node --test tests/frontend/*.test.cjs" in workflow
     assert "--ignore" not in workflow
+    assert "bubblewrap apparmor-utils" in workflow
+    assert "chmod go-w" in workflow
+    assert "run: aa-exec -p gvai-product-ci -- python -m pytest tests -q" in workflow
+    assert "apparmor_parser --remove" in workflow
+
+
+def test_product_and_demo_ci_use_declared_python_runtime():
+    runtime = (ROOT / ".python-version").read_text().strip()
+    for name in ("product-ci.yml", "godscore-ci-demo.yml"):
+        workflow = (ROOT / ".github/workflows" / name).read_text()
+        assert f"python-version: '{runtime}'" in workflow

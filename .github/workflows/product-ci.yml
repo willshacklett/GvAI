@@ -26,8 +26,26 @@ jobs:
         run: |
           python -m pip install -r requirements.txt -r requirements-dev.txt -r gateway/requirements.txt
           python -m pip check
+      - name: Prepare real sandbox prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes bubblewrap apparmor-utils
+          sudo tee /tmp/gvai-product-ci.apparmor >/dev/null <<'EOF'
+          abi <abi/4.0>,
+          include <tunables/global>
+
+          profile gvai-product-ci flags=(unconfined) {
+            userns,
+          }
+          EOF
+          sudo apparmor_parser --replace /tmp/gvai-product-ci.apparmor
+          resolved_python="$(python -c 'from pathlib import Path; import sys; print(Path(sys.executable).resolve(strict=True))')"
+          chmod go-w "$resolved_python"
+          aa-exec -p gvai-product-ci -- \
+            timeout --kill-after=5s 15s privacy/run_network_sandbox.sh \
+            python -c 'print("Product CI sandbox execution passed")'
       - name: Primary product suite
-        run: python -m pytest tests -q
+        run: aa-exec -p gvai-product-ci -- python -m pytest tests -q
       - name: Frontend request regressions
         run: node --test tests/frontend/*.test.cjs
       - name: Pages publication sanity
@@ -36,3 +54,9 @@ jobs:
         run: |
           bash -n privacy/start_railway.sh
           python -m gunicorn --check-config gvai.api_service:app
+      - name: Remove scoped CI namespace profile
+        if: always()
+        run: |
+          if [ -f /tmp/gvai-product-ci.apparmor ]; then
+            sudo apparmor_parser --remove /tmp/gvai-product-ci.apparmor
+          fi

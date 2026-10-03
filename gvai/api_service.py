@@ -670,6 +670,7 @@ def api_region_stex_coverage():
         })
 
     except Exception as exc:
+        app.logger.exception("Statewide STEX coverage failed")
         return jsonify({
             "supported": False,
             "state_fips":
@@ -928,6 +929,7 @@ def api_region_housing_pressure():
         return jsonify(result)
 
     except Exception as exc:
+        app.logger.exception("Housing pressure lookup failed")
         return jsonify({
             "supported": False,
             "state_fips":
@@ -965,6 +967,7 @@ def api_region_workforce_mix():
         return jsonify(result)
 
     except Exception as exc:
+        app.logger.exception("Workforce mix lookup failed")
         return jsonify({
             "supported": False,
             "state_fips": state_fips,
@@ -1001,6 +1004,7 @@ def api_region_labor_availability():
         return jsonify(result)
 
     except Exception as exc:
+        app.logger.exception("Labor availability lookup failed")
         return jsonify({
             "supported": False,
             "state_fips": state_fips,

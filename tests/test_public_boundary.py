@@ -149,6 +149,24 @@ def test_unhandled_exception_returns_json(client, monkeypatch, caplog):
     assert "private policy" in caplog.text
 
 
+@pytest.mark.parametrize("path,dependency,reason", [
+    ("housing-pressure", "resolve_state_county_housing_pressure", "Housing pressure lookup failed."),
+    ("workforce-mix", "resolve_state_county_workforce_mix", "Workforce mix lookup failed."),
+    ("labor-availability", "resolve_state_county_labor_availability", "Labor availability lookup failed."),
+])
+def test_regional_failures_preserve_safe_reason_and_log_details(client, monkeypatch, caplog, path, dependency, reason):
+    def fail(*args):
+        raise RuntimeError("private regional provider detail")
+    monkeypatch.setattr(api, dependency, fail)
+    response = client.get(f"/api/region/{path}?state=47")
+    assert response.status_code == 500
+    assert response.json["reason"] == reason
+    assert "error" not in response.json
+    assert "error_type" not in response.json
+    assert "private regional" not in response.get_data(as_text=True)
+    assert "private regional" in caplog.text
+
+
 @pytest.mark.parametrize("mode", ["BLOCK", "QUALIFY", "ALLOW"])
 def test_governance_never_returns_original_reply(client, monkeypatch, mode):
     monkeypatch.setattr(api, "evaluate_action", lambda *args: {"mode": mode})
