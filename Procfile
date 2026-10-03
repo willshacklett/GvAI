@@ -1,1 +1,1 @@
-web: python -m pip install -r requirements.txt && python gvai/api_service.py
+web: privacy/start_railway.sh

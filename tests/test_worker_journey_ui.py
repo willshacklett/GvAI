@@ -254,7 +254,7 @@ def test_mobile_worker_layout_has_single_column_and_no_fixed_worker_width():
 
 def test_no_prohibited_worker_recommendation_language_added():
     html = _html().lower()
-    workspace = html[html.index('<main id="laborers-workspace"'):html.index('<div class="layer-bar"')]
+    workspace = html[html.index('<section id="laborers-workspace"'):html.index('<div class="layer-bar"')]
     for prohibited in (
         "optimal",
         "best career",

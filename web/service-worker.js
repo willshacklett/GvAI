@@ -1,12 +1,12 @@
-const CACHE_NAME = "gvai-pwa-v5";
+const CACHE_NAME = "gvai-pwa-v6";
 const ASSETS = [
   "./",
   "./index.html",
+  "./fetch.js",
+  "./gv-carl-logo.svg",
   "./style.css",
   "./dashboard.js?v=voice2",
-  "./manifest.json",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png"
+  "./manifest.json"
 ];
 
 self.addEventListener("install", event => {
@@ -29,6 +29,8 @@ self.addEventListener("fetch", event => {
   const req = event.request;
 
   if (req.method !== "GET") return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
 
   event.respondWith(
     fetch(req).catch(() =>

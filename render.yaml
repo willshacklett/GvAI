@@ -1,3 +1,4 @@
+# Legacy Render alternative. Railway uses railway.json and privacy/start_railway.sh.
 services:
   - type: web
     name: gvai-api

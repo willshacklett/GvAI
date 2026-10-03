@@ -17,4 +17,11 @@ if [[ "${GVAI_PRIVATE_BUILD_MODE:-0}" =~ ^(1|true|yes|on)$ ]]; then
   export GVAI_LOCAL_MODEL_TIMEOUT="${GVAI_LOCAL_MODEL_TIMEOUT:-180}"
 fi
 
-exec python -m gunicorn -b 0.0.0.0:${PORT:-8080} gvai.api_service:app
+exec python -m gunicorn \
+  --bind "0.0.0.0:${PORT:-8080}" \
+  --workers "${GVAI_WEB_WORKERS:-1}" \
+  --timeout "${GVAI_WEB_TIMEOUT:-120}" \
+  --graceful-timeout 30 \
+  --access-logfile - \
+  --error-logfile - \
+  gvai.api_service:app

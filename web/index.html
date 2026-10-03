@@ -4,6 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GVAI — Post-Labor Capitalism Intelligence</title>
+  <meta name="description" content="Geographic labor intelligence for laborers, businesses, and government. Explore regional workforce evidence on GVAI's interactive globe." />
+  <meta property="og:title" content="GVAI | Geographic Labor Intelligence" />
+  <meta property="og:description" content="Explore regional labor and workforce evidence for laborers, businesses, and government." />
+  <meta property="og:image" content="https://gvai.io/gv-logo.png" />
+  <meta property="og:url" content="https://gvai.io/" />
+  <meta property="og:type" content="website" />
+  <link rel="canonical" href="https://gvai.io/" />
   <link rel="icon" type="image/svg+xml" href="/gv-carl-logo.svg?v=4" />
   <link rel="shortcut icon" type="image/svg+xml" href="/gv-carl-logo.svg?v=4" />
 
@@ -110,6 +117,7 @@
     }
 
     .brand-title {
+      margin: 0;
       font-size: 22px;
       font-weight: 850;
       line-height: 1;
@@ -450,8 +458,10 @@
     .laborers-workspace {
       position: absolute;
       top: 92px;
-      left: 430px;
-      right: 430px;
+      left: auto;
+      right: 20px;
+      width: min(64vw, 960px);
+      container-type: inline-size;
       bottom: 22px;
       min-width: 0;
       z-index: 9;
@@ -901,8 +911,10 @@
     .business-workspace {
       position: absolute;
       top: 92px;
-      left: 430px;
-      right: 430px;
+      left: auto;
+      right: 20px;
+      width: min(64vw, 960px);
+      container-type: inline-size;
       bottom: 22px;
       min-width: 0;
       z-index: 9;
@@ -1259,16 +1271,6 @@
     }
 
     @media (max-width: 1240px) {
-      .laborers-workspace {
-        left: 20px;
-        right: 430px;
-      }
-
-      .business-workspace {
-        left: 20px;
-        right: 430px;
-      }
-
       .laborers-stage-grid {
         grid-template-columns: 1fr;
       }
@@ -2168,6 +2170,7 @@
 
     @media (max-width: 900px) {
       .laborers-workspace {
+        width: auto;
         top: 112px;
         left: 14px;
         right: 14px;
@@ -2177,6 +2180,7 @@
       }
 
       .business-workspace {
+        width: auto;
         top: 112px;
         left: 14px;
         right: 14px;
@@ -2409,6 +2413,100 @@
       }
     }
 
+    .laborers-workspace-shell,
+    .business-workspace-shell {
+      overflow-x: hidden;
+      min-width: 0;
+    }
+
+    #app.workspace-open .info-panel,
+    #app.workspace-open .hint,
+    #app.workspace-open .legend {
+      display: none;
+    }
+
+    #app.workspace-open .layer-bar {
+      max-width: calc(34vw - 40px);
+      flex-wrap: wrap;
+    }
+
+    .workspace-switcher {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .workspace-switcher[hidden] { display: none; }
+    .workspace-switcher button { min-height: 36px; }
+    .workspace-switcher [aria-selected="true"] { border-color: var(--accent); }
+    .laborers-stage-nav { grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); }
+    .laborers-journey-map { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); }
+
+    .laborers-workspace-header > .laborers-workspace-close {
+      grid-column: 2;
+      grid-row: 2;
+      align-self: start;
+    }
+
+    .laborers-workspace *,
+    .business-workspace * {
+      min-width: 0;
+      overflow-wrap: break-word;
+    }
+
+    .regional-error[hidden] { display: none; }
+
+    .globe-controls {
+      position: absolute;
+      left: 20px;
+      top: 116px;
+      z-index: 11;
+      display: flex;
+      gap: 6px;
+    }
+
+    .globe-controls button { min-width: 44px; min-height: 44px; }
+
+    .score-number.metric-unavailable { font-size: 24px; }
+    .score-top { flex-wrap: wrap; }
+
+    @media (max-width: 900px) {
+      .laborers-workspace,
+      .business-workspace {
+        top: 208px;
+        max-height: calc(100dvh - 222px);
+        min-height: 0;
+      }
+      .globe-controls { top: 156px; left: 14px; }
+      .info-panel { max-height: min(58dvh, calc(100dvh - 340px)); }
+      #app.workspace-open .layer-bar { display: none; }
+    }
+
+    @container (max-width: 760px) {
+      .laborers-workspace-header {
+        max-height: 42dvh;
+        overflow-y: auto;
+      }
+      .laborers-workspace-header > .laborers-workspace-close {
+        grid-column: 1;
+        grid-row: 2;
+      }
+      .laborers-context-grid,
+      .laborers-stage-grid,
+      .business-workflow,
+      .business-control-grid,
+      .business-evidence-grid,
+      .business-plan-facts,
+      .compare-occupations-grid,
+      .live-jobs-filters {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .laborers-workspace-header,
+      .active-investigation-bar { grid-template-columns: minmax(0, 1fr); }
+      .worker-outlook-button { white-space: normal; }
+    }
+
     @media print {
       body * {
         visibility: hidden;
@@ -2441,16 +2539,17 @@
     href="https://cdn.jsdelivr.net/npm/cesium@1.133.0/Build/Cesium/Widgets/widgets.css"
   />
   <script src="/api_config.js?v=railway1"></script>
+  <script src="/fetch.js"></script>
 </head>
 
 <body>
-<div id="app">
+<main id="app" aria-label="GVAI geographic labor intelligence">
 
   <div id="globe-shell">
     <canvas id="globe"></canvas>
   </div>
 
-  <div class="topbar">
+  <header class="topbar">
     <div class="brand">
       <img
         class="brand-logo"
@@ -2458,7 +2557,7 @@
         alt="GVAI"
       />
       <div class="brand-copy">
-        <div class="brand-title">GVAI</div>
+        <h1 class="brand-title">GVAI</h1>
         <div class="brand-sub">Post-Labor Capitalism Intelligence</div>
         <div class="brand-status">GLOBAL OUTLOOK</div>
       </div>
@@ -2472,7 +2571,19 @@
       />
       <button id="search-btn" class="primary">Explore</button>
     </div>
-  </div>
+  </header>
+
+  <nav class="globe-controls" aria-label="Globe controls">
+    <button id="globe-zoom-in" type="button" aria-label="Zoom in" title="Zoom in">+</button>
+    <button id="globe-zoom-out" type="button" aria-label="Zoom out" title="Zoom out">-</button>
+    <button id="globe-reset" type="button" title="Reset globe view">Reset view</button>
+  </nav>
+
+  <nav id="workspace-switcher" class="workspace-switcher" role="tablist" aria-label="Audience workspace" hidden>
+    <button id="switch-laborers" type="button" role="tab" aria-controls="laborers-workspace" aria-selected="false">Laborers</button>
+    <button id="switch-business" type="button" role="tab" aria-controls="business-workspace" aria-selected="false">Business</button>
+    <button id="switch-government" type="button" role="tab" aria-controls="government-workspace" aria-selected="false">Government</button>
+  </nav>
 
   <div class="legend">
     <div class="legend-row">
@@ -2520,6 +2631,10 @@
 
     <div id="location-sub" class="location-sub">
       Tennessee, United States
+    </div>
+    <div id="regional-error" class="regional-error" role="status" aria-live="polite" hidden>
+      <p>Regional data temporarily unavailable. Retry or select another region.</p>
+      <button id="regional-retry" type="button">Retry</button>
     </div>
 
     <div class="score-card">
@@ -2704,7 +2819,7 @@
     </div>
   </div>
 
-  <main id="laborers-workspace" class="laborers-workspace" aria-labelledby="laborers-workspace-title" hidden>
+  <section id="laborers-workspace" class="laborers-workspace" aria-labelledby="laborers-workspace-title" hidden>
     <div class="laborers-workspace-header">
       <div>
         <div class="laborers-workspace-kicker">Laborers Workspace</div>
@@ -3079,9 +3194,9 @@
         </div>
       </section>
     </div>
-  </main>
+  </section>
 
-  <main id="business-workspace" class="business-workspace" aria-labelledby="business-workspace-title" hidden>
+  <section id="business-workspace" class="business-workspace" aria-labelledby="business-workspace-title" hidden>
     <div class="laborers-workspace-header">
       <div>
         <div class="laborers-workspace-kicker">Business Workspace</div>
@@ -3159,9 +3274,9 @@
         <div id="business-safety-status" class="worker-outlook-summary">GVAI Safety Systems status is shown only when returned by the workforce evidence response. If no external decider is configured, GVAI reports unavailable rather than active governance.</div>
       </section>
     </div>
-  </main>
+  </section>
 
-  <main id="government-workspace" class="business-workspace government-workspace" aria-labelledby="government-workspace-title" hidden>
+  <section id="government-workspace" class="business-workspace government-workspace" aria-labelledby="government-workspace-title" hidden>
     <div class="laborers-workspace-header">
       <div>
         <div class="laborers-workspace-kicker">Government Workspace</div>
@@ -3272,7 +3387,7 @@
         </div>
       </section>
     </div>
-  </main>
+  </section>
 
   <div class="layer-bar">
     <button class="layer-btn active" data-layer="stability">
@@ -3342,10 +3457,11 @@
   <div class="hint">
     Drag to rotate • Scroll to zoom • Click the globe to inspect a region
   </div>
-</div>
+</main>
 
 <script type="module">
 import * as Cesium from "https://cdn.jsdelivr.net/npm/cesium@1.133.0/+esm";
+const fetch = window.GVAI.fetchJSON;
 
 window.CESIUM_BASE_URL =
   "https://cdn.jsdelivr.net/npm/cesium@1.133.0/Build/Cesium/";
@@ -3762,6 +3878,15 @@ const GEOGRAPHY_VISIBILITY = {
 };
 
 let activeRegionRequestId = 0;
+let lastRegionalSelection = null;
+
+document.getElementById("globe-zoom-in").addEventListener("click", () => {
+  viewer.camera.zoomIn(viewer.camera.positionCartographic.height * 0.25);
+});
+document.getElementById("globe-zoom-out").addEventListener("click", () => {
+  viewer.camera.zoomOut(viewer.camera.positionCartographic.height * 0.25);
+});
+document.getElementById("globe-reset").addEventListener("click", () => viewer.camera.flyHome());
 let currentRegionLatitude = null;
 let currentRegionLongitude = null;
 let currentRegionLabel = null;
@@ -3987,12 +4112,14 @@ function openLaborersWorkspace(stage = "my-work") {
   closeBusinessWorkspace();
   closeGovernmentWorkspace();
   workspace.hidden = false;
+  updateWorkspaceLayout();
   setWorkerWorkspaceStage(stage, true);
 }
 
 function closeLaborersWorkspace() {
   const workspace = document.getElementById("laborers-workspace");
   if (workspace) workspace.hidden = true;
+  updateWorkspaceLayout();
 }
 
 function businessSelectedOccupation() {
@@ -4049,12 +4176,14 @@ function openBusinessWorkspace() {
   closeGovernmentWorkspace();
   syncBusinessRegionContext();
   workspace.hidden = false;
+  updateWorkspaceLayout();
   renderBusinessPlan();
 }
 
 function closeBusinessWorkspace() {
   const workspace = document.getElementById("business-workspace");
   if (workspace) workspace.hidden = true;
+  updateWorkspaceLayout();
 }
 
 function governmentRegionLabel() {
@@ -4076,11 +4205,24 @@ function openGovernmentWorkspace() {
   closeBusinessWorkspace();
   syncGovernmentRegionContext();
   workspace.hidden = false;
+  updateWorkspaceLayout();
 }
 
 function closeGovernmentWorkspace() {
   const workspace = document.getElementById("government-workspace");
   if (workspace) workspace.hidden = true;
+  updateWorkspaceLayout();
+}
+
+function updateWorkspaceLayout() {
+  const active = document.querySelector("#laborers-workspace:not([hidden]), #business-workspace:not([hidden]), #government-workspace:not([hidden])");
+  const switcher = document.getElementById("workspace-switcher");
+  document.getElementById("app").classList.toggle("workspace-open", Boolean(active));
+  switcher.hidden = !active;
+  if (active) active.querySelector(".laborers-workspace-header").prepend(switcher);
+  for (const button of switcher.querySelectorAll("button")) {
+    button.setAttribute("aria-selected", String(button.getAttribute("aria-controls") === active?.id));
+  }
 }
 
 function businessValue(value, formatter = value => value) {
@@ -6601,6 +6743,7 @@ function clearRegionalMetrics() {
 
     if (element) {
       element.textContent = "—";
+      element.classList.remove("metric-unavailable");
     }
   }
 
@@ -6665,6 +6808,25 @@ function renderRegionalSTEXUnavailable(message) {
   content.innerHTML = "";
 }
 
+
+function showRegionalFailure(requestId) {
+  if (requestId !== activeRegionRequestId) return;
+  document.getElementById("regional-error").hidden = false;
+  document.getElementById("regional-outlook-content").setAttribute("aria-busy", "false");
+  for (const id of ["stability-score", "population", "labor-force", "automation", "transition", "job-risk-label", "housing-label", "industry-label", "resilience-label"]) {
+    const element = document.getElementById(id);
+    if (element) element.textContent = "Unavailable";
+  }
+  document.getElementById("stability-score").classList.add("metric-unavailable");
+  document.getElementById("risk-badge").textContent = "DATA UNAVAILABLE";
+}
+
+document.getElementById("regional-retry").addEventListener("click", () => {
+  if (lastRegionalSelection) {
+    const { latitude, longitude, options } = lastRegionalSelection;
+    void loadRegionalData(latitude, longitude, options);
+  }
+});
 
 async function loadRegionalSTEX(areaCode, requestId) {
   if (!areaCode) {
@@ -7063,6 +7225,9 @@ async function loadRegionalData(
 ) {
   const requestId =
     ++activeRegionRequestId;
+  lastRegionalSelection = { latitude, longitude, options: { ...options } };
+  document.getElementById("regional-error").hidden = true;
+  document.getElementById("regional-outlook-content").setAttribute("aria-busy", "true");
 
   const scope =
     options.scope || "county";
@@ -7143,6 +7308,10 @@ async function loadRegionalData(
 
       return;
     }
+    if (!data || data.ok === false || typeof data !== "object" || Array.isArray(data) || typeof data.supported !== "boolean") {
+      throw new Error("Regional data unavailable");
+    }
+    document.getElementById("regional-outlook-content").setAttribute("aria-busy", "false");
 
     if (!data.supported) {
       clearRegionalMetrics();
@@ -7542,9 +7711,10 @@ async function loadRegionalData(
       "Regional intelligence lookup failed",
       error
     );
-
+    if (requestId !== activeRegionRequestId) return;
+    showRegionalFailure(requestId);
     sub.textContent =
-      "Regional intelligence lookup unavailable.";
+      "Regional data temporarily unavailable.";
   }
 }
 
@@ -8372,6 +8542,9 @@ document.getElementById("close-government-workspace-btn").addEventListener("clic
 document.getElementById("audience-laborers-btn").addEventListener("click", () => openLaborersWorkspace());
 document.getElementById("audience-business-btn").addEventListener("click", openBusinessWorkspace);
 document.getElementById("audience-government-btn").addEventListener("click", openGovernmentWorkspace);
+document.getElementById("switch-laborers").addEventListener("click", () => openLaborersWorkspace());
+document.getElementById("switch-business").addEventListener("click", openBusinessWorkspace);
+document.getElementById("switch-government").addEventListener("click", openGovernmentWorkspace);
 document.getElementById("business-workforce-form").addEventListener("submit", event => {
   event.preventDefault();
   void loadBusinessWorkforceEvidence();

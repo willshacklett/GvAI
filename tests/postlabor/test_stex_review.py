@@ -346,7 +346,8 @@ def test_api_write_gate_and_enabled_transition(monkeypatch, tmp_path):
     assert calls == []
 
     monkeypatch.setenv("GVAI_STEX_REVIEW_WRITES_ENABLED", "1")
-    enabled = client.post("/api/stex/review/approve", json=payload)
+    monkeypatch.setenv("GVAI_STEX_REVIEW_TOKEN", "synthetic-review-test-token")
+    enabled = client.post("/api/stex/review/approve", json=payload, headers={"Authorization": "Bearer synthetic-review-test-token"})
     assert enabled.status_code == 200
     assert enabled.get_json()["profile"]["review_status"] == "approved"
     assert calls == [(CODE, "Will Shacklett", None, payload["approval_revision"])]
@@ -354,11 +355,13 @@ def test_api_write_gate_and_enabled_transition(monkeypatch, tmp_path):
 
 def test_api_enabled_missing_revision_returns_controlled_error(monkeypatch):
     monkeypatch.setenv("GVAI_STEX_REVIEW_WRITES_ENABLED", "1")
+    monkeypatch.setenv("GVAI_STEX_REVIEW_TOKEN", "synthetic-review-test-token")
     client = api_service.app.test_client()
 
     response = client.post(
         "/api/stex/review/approve",
         json={"occupation_code": CODE, "reviewed_by": "Will Shacklett"},
+        headers={"Authorization": "Bearer synthetic-review-test-token"},
     )
 
     assert response.status_code == 409

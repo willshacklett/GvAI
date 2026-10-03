@@ -1,3 +1,5 @@
+import pytest
+
 from gvai.postlabor.variables.registry import (
     get_variable,
     list_variables,
@@ -20,6 +22,19 @@ from gvai.postlabor.workers.occupation_data import (
     OccupationSkill,
     skill_similarity,
 )
+
+
+def test_world_bank_adapter_builds_shared_snapshot(monkeypatch):
+    from gvai.postlabor.sources import world_bank
+
+    monkeypatch.setattr(world_bank, "_fetch_indicator", lambda *args: [{"value": 1.8, "date": "2025"}])
+    snapshot = world_bank.fetch_country_snapshot("us", "United States", variable_ids=["demographics.fertility_rate"])
+    observation = snapshot.get("demographics.fertility_rate")
+    assert snapshot.geography.geo_id == "US"
+    assert observation.value == 1.8
+    assert observation.source.source_id == "world_bank"
+    assert observation.observed_at == "2025-01-01"
+    assert snapshot.to_dict()["observations"]["demographics.fertility_rate"]["value"] == 1.8
 
 
 def test_registry_counts():
@@ -848,24 +863,44 @@ def test_onet_code_from_soc():
     assert onet_code_from_soc("15-1252.00") == "15-1252.00"
 
 
-def test_worker_occupation_resolution_alias():
+@pytest.fixture
+def projections_workbook(tmp_path):
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Table 1.2"
+    sheet.append(["National employment matrix title", "National employment matrix code"])
+    for title, code in (
+        ("Pest control workers", "37-2021"),
+        ("Stockers and order fillers", "53-7065"),
+        ("Laborers and freight, stock, and material movers, hand", "53-7062"),
+    ):
+        sheet.append([title, code])
+    path = tmp_path / "projections.xlsx"
+    workbook.save(path)
+    workbook.close()
+    return path
+
+
+def test_worker_occupation_resolution_alias(projections_workbook):
     from gvai.postlabor.workers.worker_assessment import (
         resolve_worker_occupation,
     )
 
-    result = resolve_worker_occupation("pest tech")
+    result = resolve_worker_occupation("pest tech", projections_path=projections_workbook)
 
     assert result.candidates
     assert result.candidates[0].soc_code == "37-2021"
     assert result.candidates[0].confidence >= 0.90
 
 
-def test_worker_occupation_resolution_keeps_ambiguity():
+def test_worker_occupation_resolution_keeps_ambiguity(projections_workbook):
     from gvai.postlabor.workers.worker_assessment import (
         resolve_worker_occupation,
     )
 
-    result = resolve_worker_occupation("warehouse worker")
+    result = resolve_worker_occupation("warehouse worker", projections_path=projections_workbook)
 
     assert len(result.candidates) >= 2
     assert result.resolved is False
