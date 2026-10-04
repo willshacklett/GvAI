@@ -63,6 +63,14 @@ The shared JSON helper times out after 25 seconds and sanitizes network, HTTP, a
 Selection tokens prevent older successes or failures from replacing the latest region.
 The internal STEX editor is source-only and is not published to Pages.
 
+The Regional Intelligence Experience uses `/api/region/intelligence` as one shared,
+source-labelled baseline for Laborers, Business, and Government. Important values
+distinguish source statistics, GVAI-derived metrics, scenario outputs, and interpretation.
+Missing scores stay unavailable; named-place shortcuts contain no demo statistics.
+Ask receives bounded structured regional context through the existing protected chat
+route. Task-hours scenarios are explicit assumption-led arithmetic, not predictions.
+See [the regional experience and credibility review](docs/REGIONAL_INTELLIGENCE_EXPERIENCE.md).
+
 ## Railway Production
 
 `railway.json` is authoritative: install requirements during build, then execute
