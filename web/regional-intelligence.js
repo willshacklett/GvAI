@@ -72,7 +72,7 @@
   function sourceDetails(metric, model) {
     const sources = (metric.source_ids || []).map(id => model.sources?.[id]).filter(Boolean);
     const category = metric.classification === "source_statistic" ? "Source data" : "GVAI-derived";
-    const labels = sources.map(source => `${source.name}${source.vintage ? ` · ${source.vintage}` : ""}`).join(" + ");
+    const labels = sources.map(source => `${source.name}${source.vintage ? ` · ${source.vintage}` : ""}${source.geography?.type === "oews_labor_market_area" ? ` · ${source.geography.label}` : ""}`).join(" + ");
     const links = sources.map(source => {
       const link = source.url && /^https:\/\//.test(source.url)
         ? `<a href="${escape(source.url)}" target="_blank" rel="noopener noreferrer">${escape(source.name)}</a>`
@@ -101,7 +101,9 @@
     const retryable = Object.entries(model.availability.sections || {}).some(([key, section]) => ["acs", "workforce"].includes(key) && section.status === "unavailable" && section.retryable);
     const retry = retryable ? '<button type="button" class="regional-summary-retry" data-regional-refresh>Retry ACS evidence</button>' : "";
     const jobs = model.jobs;
-    const jobsMarkup = jobs && jobs.status !== "not_requested" ? `<p class="regional-jobs-signal">Source data · Latest occupation jobs search: ${jobs.result_count === null ? "unavailable" : `${escape(jobs.result_count)} listings returned`} · ${escape((jobs.source_names || []).join(", ") || "source unavailable")}. Not total regional vacancies. ${jobs.retrieved_at ? `Retrieved ${escape(jobs.retrieved_at)}.` : ""}</p>` : "";
+    const search = jobs?.search_context || {};
+    const searchLabel = search.location || (Number.isFinite(search.latitude) && Number.isFinite(search.longitude) ? `${search.latitude}, ${search.longitude}` : search.country_code || "search geography not supplied");
+    const jobsMarkup = jobs && jobs.status !== "not_requested" ? `<p class="regional-jobs-signal">Source data · Latest occupation jobs search: ${jobs.result_count == null ? "unavailable" : `${escape(jobs.result_count)} listings returned`} · ${escape((jobs.source_names || []).join(", ") || "source unavailable")}. Search geography: ${escape(searchLabel)}. Not total regional vacancies or necessarily confined to the selected county. ${jobs.retrieved_at ? `Retrieved ${escape(jobs.retrieved_at)}.` : ""}</p>` : "";
     return [
       `<h2 class="regional-region-title">${escape(model.region.label)}</h2>`,
       `<p class="regional-outlook-line">${escape(outlook)}</p>`,
@@ -125,7 +127,9 @@
   function scenario(inputs) {
     const limits = { workers: [1, 1000000], weeklyHours: [1, 168], taskShare: [0, 100], timeSaving: [0, 100] };
     for (const [key, [minimum, maximum]] of Object.entries(limits)) {
-      if (inputs[key] === null || inputs[key] === undefined || String(inputs[key]).trim() === "" || !Number.isFinite(Number(inputs[key])) || Number(inputs[key]) < minimum || Number(inputs[key]) > maximum || (key === "workers" && !Number.isInteger(Number(inputs[key])))) {
+      const value = inputs[key];
+      const decimal = typeof value === "number" || (typeof value === "string" && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value.trim()));
+      if (!decimal || !Number.isFinite(Number(value)) || Number(value) < minimum || Number(value) > maximum || (key === "workers" && !Number.isInteger(Number(value)))) {
         throw new Error("Enter all four assumptions within the stated ranges.");
       }
     }
@@ -145,7 +149,8 @@
   }
 
   function taskPatterns(contributors) {
-    const rated = contributors.filter(task => task.importance_status === "rated" && Number.isFinite(task.structural_exposure));
+    const rated = contributors.filter(task => task.importance_status === "rated" && Number.isFinite(task.structural_exposure) && task.structural_exposure >= 0 && task.structural_exposure <= 100
+      && Number.isFinite(task.source_importance) && task.source_importance > 0);
     return {
       lowerExposure: [...rated].sort((first, second) => first.structural_exposure - second.structural_exposure).slice(0, 3),
       augmentation: [...rated].filter(task => Number.isFinite(task.augmentation_likelihood) && task.augmentation_likelihood > 0)

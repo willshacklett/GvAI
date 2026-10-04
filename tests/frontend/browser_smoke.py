@@ -2,6 +2,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 from playwright.sync_api import sync_playwright
 
@@ -15,7 +16,8 @@ def check_site(url):
         page = browser.new_page(viewport={"width": 1366, "height": 768}, ignore_https_errors=True)
         page.set_default_timeout(90000)
         errors = []
-        api_mode = {"failed": True}
+        api_mode = {"failed": True, "hold_chat": False, "hold_business": False}
+        pending = {"chat": [], "business": []}
         chat_contexts = []
         regional_requests = []
         fixture = build_regional_intelligence({
@@ -30,6 +32,20 @@ def check_site(url):
                            {"group_id": "sales_office", "label": "Sales and office", "employed": 48000, "share_percent": 25}]},
         })
         page.on("pageerror", lambda error: errors.append(str(error)))
+        page.add_init_script("""localStorage.setItem('gvai.workerProfile.v1', JSON.stringify({
+            profile_version: 'v1', current_occupation: {occupation_code: '37-2021.00', occupation_title: 'Pest Control Workers'},
+            experience: {}, education: {}, credentials: [], skills: [], wage: {}, mobility: {},
+            preferences: {notes: 'PRIVATE_PROFILE_SENTINEL'}
+        }));""")
+        def occupation(code):
+            return {"occupation_code": code, "occupation_title": "Pest Control Workers" if code == "37-2021.00" else "Software Developers",
+                    "structural_exposure": 25 if code == "37-2021.00" else 55, "rated_task_count": 1,
+                    "rubric_version": "Synthetic STEX fixture", "source": {"name": "O*NET fixture", "tasks_year": 2026}}
+
+        business_fixture = {"ok": True, "supported": True, "occupation": occupation("37-2021.00"),
+            "region": {"county": "Rutherford County", "oews_area_code": "0034980"},
+            "occupation_evidence": {"employment": {"employment": 1000, "source_year": 2025, "source": "BLS OEWS fixture"},
+                "wage": {"median_hourly_wage": 25, "median_annual_wage": 52000, "source_year": 2025, "source": "BLS OEWS fixture"}}}
 
         def api_route(route):
             if "/api/region/intelligence" in route.request.url:
@@ -40,14 +56,42 @@ def check_site(url):
                     route.fulfill(json={"ok": True, "intelligence": fixture})
             elif "/api/chat" in route.request.url:
                 chat_contexts.append(route.request.post_data_json["region_context"])
+                if api_mode["hold_chat"]:
+                    pending["chat"].append(route)
+                    return
                 route.fulfill(json={"ok": True, "reply": "Synthetic model interpretation: observed ACS evidence is distinct from derived signals. STEX is unavailable in this fixture."})
             elif "/api/geocode" in route.request.url:
+                if parse_qs(urlsplit(route.request.url).query).get("q") == ["France"]:
+                    route.fulfill(json={"ok": True, "label": "France", "latitude": 46.2, "longitude": 2.2, "country": "France", "country_code": "fr"})
+                    return
                 route.fulfill(json={
                     "ok": True, "label": "Rutherford County, Tennessee",
                     "latitude": 35.85, "longitude": -86.4,
                     "country": "United States", "country_code": "us",
                     "state": "Tennessee", "county": "Rutherford County",
                 })
+            elif "/api/stex/occupations" in route.request.url:
+                route.fulfill(json={"ok": True, "profiles": [occupation("15-1252.00"), occupation("37-2021.00")]})
+            elif "/api/stex/occupation?" in route.request.url:
+                code = parse_qs(urlsplit(route.request.url).query)["code"][0]
+                route.fulfill(json={"ok": True, "profile": occupation(code)})
+            elif "/api/stex/tasks?" in route.request.url:
+                route.fulfill(json={"ok": True, "contributors": [{"task_id": "fixture", "task_title": "Inspect worksite", "source_importance": 100,
+                    "structural_exposure": 25, "augmentation_likelihood": 30, "stex_contribution_points": 25,
+                    "importance_status": "rated", "rationale": "Synthetic audit rationale; not a guarantee."}]})
+            elif "/api/business/workforce-intelligence" in route.request.url:
+                if api_mode["hold_business"]:
+                    pending["business"].append(route)
+                    return
+                route.fulfill(json=business_fixture)
+            elif "/api/worker/live-jobs/capabilities" in route.request.url:
+                country = parse_qs(urlsplit(route.request.url).query).get("country", ["US"])[0]
+                route.fulfill(json={"ok": True, "state": "available" if country == "US" else "unsupported",
+                    "providers": [{"state": "configured", "supported_search_filters": ["location"], "search_filter_options": {}}]})
+            elif "/api/worker/live-jobs?" in route.request.url:
+                route.fulfill(json={"ok": True, "status": "available_with_results", "provider": "Synthetic provider",
+                    "search_context": {"location": "Austin, Texas", "country_code": "US"}, "openings": [{"title": "Synthetic opening",
+                    "source_attribution": "Synthetic provider", "provider": "Synthetic provider", "apply_url": "https://example.org/job"}]})
             else:
                 route.fulfill(status=503, json={"ok": False, "reason": "Synthetic unavailable fixture"})
 
@@ -107,12 +151,26 @@ def check_site(url):
                 interpretation = brief.locator(f'[data-audience-section="{audience}"]')
                 interpretation.scroll_into_view_if_needed()
                 assert interpretation.is_visible()
+                if audience == "laborers":
+                    page.locator("#stex-occupation-select").select_option("37-2021.00")
+                    page.wait_for_function("document.getElementById('stex-score').textContent === '25.0'")
+                    page.locator("#stex-task-audit summary").first.click()
+                    assert "Lower-rated structural exposure" in page.locator("#regional-task-patterns").inner_text()
+                    assert "not probabilities or guarantees" in page.locator("#regional-task-patterns").inner_text()
+                    page.locator("#stex-task-audit summary").first.click()
+                    page.locator('.laborers-stage-nav [data-worker-stage-target="live-jobs"]').click()
+                    page.locator("#live-jobs-btn").click()
+                    page.wait_for_function("document.getElementById('live-jobs-content').textContent.includes('Synthetic opening')")
+                    assert "Synthetic provider" in page.locator("#live-jobs-content").inner_text()
+                    assert "Austin, Texas" in panel.locator(".regional-jobs-signal").inner_text()
+                    page.locator('.laborers-stage-nav [data-worker-stage-target="my-work"]').click()
                 page.locator("#ask-btn").click()
                 page.locator("#regional-ask-form button").click()
                 page.wait_for_function("document.getElementById('regional-ask-reply').textContent.includes('Synthetic model interpretation')")
                 assert chat_contexts[-1]["audience"] == audience
                 assert chat_contexts[-1]["region"]["id"] == "US:county:47149"
                 assert chat_contexts[-1]["sources"]["acs"]["vintage"] == 2024
+                assert "PRIVATE_PROFILE_SENTINEL" not in json.dumps(chat_contexts[-1])
                 page.locator("#simulate-btn").click()
                 for name, value in (("workers", "10"), ("hours", "40"), ("share", "20"), ("saving", "50")):
                     page.locator(f"#scenario-{name}").fill(value)
@@ -152,6 +210,31 @@ def check_site(url):
             page.locator("#globe-zoom-in").click()
             page.locator("#globe-zoom-out").click()
             print(width, "globe colored pixels", pixels)
+        page.set_viewport_size({"width": 1440, "height": 900})
+        page.locator("#audience-laborers-btn").click()
+        page.locator("#ask-btn").click()
+        api_mode["hold_chat"] = True
+        with page.expect_request("**/api/chat"):
+            page.locator("#regional-ask-form button").click()
+        page.locator("#switch-business").click()
+        assert pending["chat"]
+        with page.expect_response("**/api/chat"):
+            pending["chat"].pop().fulfill(json={"ok": True, "reply": "STALE_REPLY_MUST_NOT_RENDER"})
+        assert "STALE_REPLY_MUST_NOT_RENDER" not in page.locator("#regional-ask-reply").text_content()
+        api_mode["hold_chat"] = False
+        api_mode["hold_business"] = True
+        with page.expect_request("**/api/business/workforce-intelligence?*"):
+            page.locator("#business-workforce-form button").click()
+        page.locator("#location-search").fill("France")
+        page.locator("#search-btn").click()
+        page.wait_for_function("document.querySelector('#business-workspace [data-region-label]').textContent === 'France'")
+        assert pending["business"]
+        with page.expect_response("**/api/business/workforce-intelligence?*"):
+            pending["business"].pop().fulfill(json=business_fixture)
+        assert page.locator("#business-workforce-evidence").text_content() == ""
+        assert "No current jobs search" in page.locator("#live-jobs-context").text_content()
+        assert "363,000" not in page.locator("#business-workspace [data-regional-brief]").inner_text()
+        print("Delayed Ask, foreign-region invalidation, real occupation/task/jobs interactions, and private-profile exclusion verified")
         assert not any("/api/region/labor-intelligence" in url or "/api/stex/regional" in url for url in regional_requests)
         print("Structured Ask and labelled scenarios verified for all 15 audience/viewport combinations")
         assert not errors, errors

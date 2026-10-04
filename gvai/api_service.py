@@ -1,6 +1,7 @@
 import os
 import hmac
 import json
+import math
 import time
 import requests
 from flask import Flask, request, jsonify
@@ -17,6 +18,7 @@ from gvai.arbitrator import arbitrate_responses
 from gvai.gv_mode import gv_mode_prompt
 from gvai.adaptive_control import update_adaptive_control, get_adaptive_control_state
 from gvai.postlabor.region_intel import (
+    US_STATE_FIPS,
     resolve_packaged_oews_area_code,
     resolve_state_county_housing_pressure,
     resolve_state_county_labor_availability,
@@ -27,7 +29,7 @@ from gvai.postlabor.region_intel import (
 from gvai.postlabor.region_labor_intelligence import (
     synthesize_region_labor_intelligence,
 )
-from gvai.postlabor.regional_intelligence import synthesize_regional_intelligence
+from gvai.postlabor.regional_intelligence import sanitize_regional_context, synthesize_regional_intelligence
 from gvai.postlabor.worker_region_outlook import (
     synthesize_worker_related_occupations,
     synthesize_worker_region_outlook,
@@ -707,18 +709,23 @@ def api_stex_tasks():
 
         contributors = []
 
+        def rating(value, maximum=None):
+            if isinstance(value, bool):
+                return None
+            try:
+                number = float(value)
+                return number if math.isfinite(number) and number >= 0 and (maximum is None or number <= maximum) else None
+            except (TypeError, ValueError):
+                return None
+
         rated_tasks = [
             task
             for task in tasks
             if (
                 task.get("importance_status")
                 == "rated"
-                and float(
-                    task.get(
-                        "source_importance"
-                    )
-                    or 0
-                ) > 0
+                and (rating(task.get("source_importance")) or 0) > 0
+                and rating(task.get("structural_exposure"), 100) is not None
             )
         ]
 
@@ -733,24 +740,14 @@ def api_stex_tasks():
         )
 
         for task in tasks:
-            importance = float(
-                task.get(
-                    "source_importance"
-                )
-                or 0
-            )
-
-            exposure = float(
-                task.get(
-                    "structural_exposure"
-                )
-                or 0
-            )
+            importance = rating(task.get("source_importance"))
+            exposure = rating(task.get("structural_exposure"), 100)
 
             is_rated = (
                 task.get("importance_status")
                 == "rated"
-                and importance > 0
+                and importance is not None and importance > 0
+                and exposure is not None
             )
 
             weighted_contribution = (
@@ -758,7 +755,7 @@ def api_stex_tasks():
                 * exposure
                 / 100.0
                 if is_rated
-                else 0.0
+                else None
             )
 
             stex_contribution_points = (
@@ -769,7 +766,7 @@ def api_stex_tasks():
                     is_rated
                     and total_importance > 0
                 )
-                else 0.0
+                else None
             )
 
             contributors.append({
@@ -784,9 +781,7 @@ def api_stex_tasks():
                 "structural_exposure":
                     exposure,
                 "augmentation_likelihood":
-                    task.get(
-                        "augmentation_likelihood"
-                    ),
+                    rating(task.get("augmentation_likelihood"), 100),
                 "importance_status":
                     task.get(
                         "importance_status"
@@ -797,19 +792,19 @@ def api_stex_tasks():
                     round(
                         weighted_contribution,
                         4,
-                    ),
+                    ) if weighted_contribution is not None else None,
                 "stex_contribution_points":
                     round(
                         stex_contribution_points,
                         4,
-                    ),
+                    ) if stex_contribution_points is not None else None,
             })
 
         contributors.sort(
             key=lambda item:
                 item[
                     "weighted_contribution"
-                ],
+                ] if item["weighted_contribution"] is not None else -1,
             reverse=True,
         )
 
@@ -1033,7 +1028,7 @@ def api_regional_intelligence():
                 raise ValueError("Coordinates out of range")
         except (TypeError, ValueError):
             return jsonify({"ok": False, "reason": "Valid latitude and longitude are required."}), 400
-    if scope == "state" and (not state_fips or not state_fips.isascii() or not state_fips.isdigit() or len(state_fips) != 2):
+    if scope == "state" and state_fips not in US_STATE_FIPS:
         return jsonify({"ok": False, "reason": "A two-digit state FIPS identifier is required."}), 400
     result = synthesize_regional_intelligence(scope=scope, latitude=latitude, longitude=longitude, state_fips=state_fips)
     return jsonify({"ok": True, "intelligence": result})
@@ -1700,6 +1695,10 @@ def chat():
         }
         if not isinstance(region_context.get("region"), dict) or not isinstance(region_context.get("metrics"), dict):
             return jsonify({"ok": False, "reason": "Region identity and metrics are required."}), 400
+        try:
+            region_context = sanitize_regional_context(region_context)
+        except (ValueError, TypeError):
+            return jsonify({"ok": False, "reason": "Invalid structured regional evidence."}), 400
 
     gv_precheck, gv_runtime_policy = build_gv_runtime_policy(message)
 

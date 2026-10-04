@@ -1,7 +1,8 @@
-const CACHE_NAME = "gvai-pwa-v7";
+const CACHE_NAME = "gvai-pwa-v8";
 const ASSETS = [
   "./",
   "./index.html",
+  "./api_config.js?v=railway1",
   "./fetch.js",
   "./regional-intelligence.js",
   "./gv-carl-logo.svg",
@@ -35,7 +36,7 @@ self.addEventListener("fetch", event => {
 
   event.respondWith(
     fetch(req).catch(() =>
-      caches.match(req).then(cached => cached || caches.match("./index.html"))
+      caches.match(req).then(cached => cached || (req.mode === "navigate" ? caches.match("./index.html") : Response.error()))
     )
   );
 });

@@ -129,3 +129,42 @@ unavailable where no packaged aggregate exists. Source freshness is not known be
 reported vintage. Model interpretations and scenario assumptions still require judgment.
 
 No secrets, account settings, or separate Safety Systems repository are changed.
+
+## Strict Pre-Merge Review
+
+The 2026-10-04 review of PR #88 confirmed the original 14-file scope and no human
+reviews or unresolved threads. Must-fix findings addressed on the same branch:
+
+- Malformed, non-JSON, timed-out, or wrong-geography ACS tables now preserve known
+	selection identity with unavailable source values. County rows cannot be labelled
+	state/national data, and state rows cannot be labelled national data.
+- FIPS identifiers are canonical and validated. Invalid state codes are rejected;
+	missing county identity is not silently replaced by a state identity. Aggregate
+	selections cannot inherit county STEX or a mismatched OEWS denominator.
+- Ratios/shares are validated against their source baselines. Missing ACS/task ratings
+	remain unavailable, never fabricated zero; audit coverage must agree with its OEWS
+	denominator. OEWS area scope is visible beside regional and occupation evidence.
+- Nested regional Ask fields are allowlisted to exclude private/profile/system and
+	governance data. Size/nonfinite validation and blocked/qualified enforcement remain.
+- Foreign-country selection now invalidates Business/jobs results consistently.
+	Jobs searches capture the region request token and retain their actual search geography;
+	an outside-location search is not presented as county vacancies.
+- Scenario inputs reject coercible booleans/arrays, malformed numeric strings, negative,
+	nonfinite, oversized, fractional-worker, and out-of-range percentage assumptions.
+	Legitimate zero task-share/time-saving produces a labelled zero scenario, not missing data.
+- The cache version is updated, exact API config and regional runtime assets are cached,
+	and only navigation requests may receive an offline HTML-shell fallback. Missing
+	JavaScript/API data is never replaced with HTML.
+
+The expanded Chromium smoke uses real occupation selection, task-audit, jobs-search,
+audience/region switching, Ask, and scenario controls at all five target viewports. It
+also deliberately delays Ask/Business replies to verify invalidation and uses a private
+profile sentinel to verify generic regional Ask exclusion. Synthetic fixtures do not
+replace manual checks of real provider scope, source freshness, or model attribution.
+
+Automated feedback classification: Actions Node 20 migration and upcoming ubuntu-latest
+image migration are valid follow-ups, not current application failures. The GodScore
+demo's exit annotation is the existing intentional collapse scenario, not a failing
+product assertion; full product CI remains a separate mandatory gate. No tests are disabled
+or weakened by this review. ACS margins of error are not included, STEX audits remain
+partial, provider listings are search-limited, and source update dates remain unknown.

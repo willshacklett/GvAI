@@ -91,8 +91,8 @@ test("unavailable country never inherits US statistics or offers meaningless ret
 
 test("task patterns use rated audit evidence only and do not invent durability", () => {
   const patterns = regional.taskPatterns([
-    { task_title: "Low-rated task", importance_status: "rated", structural_exposure: 10, augmentation_likelihood: 20 },
-    { task_title: "High-rated task", importance_status: "rated", structural_exposure: 80, augmentation_likelihood: 60 },
+    { task_title: "Low-rated task", importance_status: "rated", source_importance: 100, structural_exposure: 10, augmentation_likelihood: 20 },
+    { task_title: "High-rated task", importance_status: "rated", source_importance: 100, structural_exposure: 80, augmentation_likelihood: 60 },
     { task_title: "Unknown", importance_status: "unrated", structural_exposure: 0, augmentation_likelihood: 100 }
   ]);
   assert.equal(patterns.lowerExposure[0].task_title, "Low-rated task");
@@ -109,4 +109,29 @@ test("job listing counts remain scoped source results, not regional totals", () 
   assert.equal(regional.contextForChat(store.get().model, "laborers").jobs.result_count, 3);
   store.updateJobs({ status: "available_with_results", result_count: 999 }, "another region");
   assert.equal(store.get().model.jobs.result_count, 3);
+});
+
+test("scenario rejects blank, coercible, nonfinite and out-of-bound assumptions", () => {
+  const valid = { workers: 10, weeklyHours: 40, taskShare: 20, timeSaving: 50 };
+  for (const key of Object.keys(valid)) {
+    for (const value of ["", " ", null, undefined, -1, 1e30, NaN, Infinity, "Infinity", "NaN", "abc", "0x10", true, [], {}]) {
+      assert.throws(() => regional.scenario({ ...valid, [key]: value }), `${key}: ${String(value)}`);
+    }
+  }
+  assert.throws(() => regional.scenario({ ...valid, workers: 0 }));
+  assert.throws(() => regional.scenario({ ...valid, workers: 1.5 }));
+  assert.throws(() => regional.scenario({ ...valid, weeklyHours: 0 }));
+  for (const key of ["taskShare", "timeSaving"]) assert.throws(() => regional.scenario({ ...valid, [key]: 101 }));
+  assert.equal(regional.scenario({ ...valid, taskShare: 0 }).potentialHours, 0);
+  assert.equal(regional.scenario({ ...valid, timeSaving: 0 }).potentialHours, 0);
+  assert.equal(regional.scenario({ ...valid, taskShare: 100, timeSaving: 100 }).potentialHours, 400);
+});
+
+test("job search geography remains explicit when it differs from the selected county", () => {
+  const fixture = model();
+  fixture.jobs = { status: "available_with_results", result_count: 3, source_names: ["Provider"], search_context: { location: "Austin, Texas" } };
+  const markup = regional.briefMarkup(fixture, "government");
+  assert.match(markup, /Search geography: Austin, Texas/);
+  assert.match(markup, /not necessarily confined|necessarily confined/);
+  assert.match(markup, /Rutherford County/);
 });

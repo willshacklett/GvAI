@@ -4327,12 +4327,14 @@ function renderBusinessEvidence(data) {
   const jobZone = preparation.job_zone || {};
   const education = preparation.education || {};
   const educationLevels = Array.isArray(education.levels) ? education.levels.slice(0, 3) : [];
+  const areaCode = data.region?.oews_area_code || regionalStore.get().model?.region.oews_area_code;
+  const employmentGeography = `OEWS labor-market area ${areaCode || "(identifier unavailable)"}; not county-only employment`;
   const constraints = Array.isArray(data.constraints) ? data.constraints : [];
 
   status.textContent = `${data.occupation?.occupation_title || data.occupation?.occupation_code || "Occupation"} · ${data.region?.county || businessRegionLabel()} · GVAI evidence only`;
   content.innerHTML = `
-    <article class="business-question-card"><strong>How many workers are employed in this occupation locally?</strong><span>${businessValue(employment.employment, formatCompact)} employed · ${businessValue(employment.source_year)} · ${escapeHtml(employment.source || "Source unavailable")}</span></article>
-    <article class="business-question-card"><strong>What does the published wage evidence show?</strong><span>Hourly median: ${businessValue(wage.median_hourly_wage, value => formatMoney(value))} · Annual median: ${businessValue(wage.median_annual_wage, value => formatMoney(value))}</span><small>Source data · ${escapeHtml(wage.source || "BLS OEWS source unavailable")} · ${businessValue(wage.source_year)}</small></article>
+    <article class="business-question-card"><strong>How many workers are employed in this occupation locally?</strong><span>${businessValue(employment.employment, formatCompact)} employed · ${businessValue(employment.source_year)} · ${escapeHtml(employment.source || "Source unavailable")}</span><small>Source data · ${escapeHtml(employmentGeography)}</small></article>
+    <article class="business-question-card"><strong>What does the published wage evidence show?</strong><span>Hourly median: ${businessValue(wage.median_hourly_wage, value => formatMoney(value))} · Annual median: ${businessValue(wage.median_annual_wage, value => formatMoney(value))}</span><small>Source data · ${escapeHtml(wage.source || "BLS OEWS source unavailable")} · ${businessValue(wage.source_year)} · ${escapeHtml(employmentGeography)}</small></article>
     <article class="business-question-card"><strong>How specific is the available occupation evidence?</strong><span>${escapeHtml(specificity.disclosure || "Specificity unavailable.")}</span></article>
     <article class="business-question-card"><strong>What preparation does the occupation typically require?</strong><span>${escapeHtml(jobZone.title || "Job Zone unavailable")} · ${escapeHtml(jobZone.education || "Education/training evidence unavailable")}</span></article>
     <article class="business-question-card"><strong>What does structural exposure indicate?</strong><span>${businessValue(stex.structural_exposure)} STEX · ${escapeHtml(stex.semantics || "STEX semantics unavailable.")}</span><small>GVAI-derived · approved STEX task audit · ${escapeHtml(stex.rubric_version || "rubric unavailable")} · not percent automatable</small></article>
@@ -7331,14 +7333,7 @@ async function loadRegionalData(
   // Never allow statistics from the previously selected
   // geography to survive into a new selection.
   clearRegionalMetrics();
-  clearWorkerOutlook();
-  activeBusinessWorkforceRequestId += 1;
-  activeLiveJobsRequestId += 1;
-  currentBusinessEvidence = null;
-  document.getElementById("business-workforce-evidence").innerHTML = "";
-  document.getElementById("business-workforce-status").textContent = "Choose an occupation to load evidence for the selected region.";
-  document.getElementById("live-jobs-content").innerHTML = "";
-  document.getElementById("live-jobs-status").textContent = "Run a jobs search for the selected region and occupation.";
+  invalidateRegionDependentEvidence();
   currentRegionLatitude = null;
   currentRegionLongitude = null;
   currentRegionLabel = null;
@@ -7409,7 +7404,7 @@ async function loadRegionalData(
       throw new Error("Regional data unavailable");
     }
     const model = payload.intelligence;
-    if (model.region.label === "Selected region" && regionalStore.get().selection?.label) model.region.label = regionalStore.get().selection.label;
+    if ((model.region.label === "Selected region" || (model.region.type === "state" && !model.region.state)) && regionalStore.get().selection?.label) model.region.label = regionalStore.get().selection.label;
     const data = window.GVAIRegional.baselineFromModel(model);
     document.getElementById("regional-outlook-content").setAttribute("aria-busy", "false");
 
@@ -7610,6 +7605,18 @@ async function loadRegionalData(
     sub.textContent =
       "Regional data temporarily unavailable.";
   }
+}
+
+function invalidateRegionDependentEvidence() {
+  clearWorkerOutlook();
+  activeBusinessWorkforceRequestId += 1;
+  activeLiveJobsRequestId += 1;
+  currentBusinessEvidence = null;
+  document.getElementById("business-workforce-evidence").innerHTML = "";
+  document.getElementById("business-workforce-status").textContent = "Choose an occupation to load evidence for the selected region.";
+  document.getElementById("live-jobs-content").innerHTML = "";
+  document.getElementById("live-jobs-status").textContent = "Run a jobs search for the selected region and occupation.";
+  document.getElementById("live-jobs-context").textContent = "No current jobs search for this selection.";
 }
 
 function flyToProfile(profile) {
@@ -7819,9 +7826,11 @@ document
           regionalStore.set(window.GVAIRegional.unavailableModel({ id: `${data.country_code.toUpperCase()}:country`,
             label: data.country || rawQuery, type: "country", country: data.country, country_code: data.country_code.toUpperCase(), latitude, longitude },
             "No regional evidence provider is connected for this country."));
-          clearWorkerOutlook();
+          invalidateRegionDependentEvidence();
           currentRegionLatitude = null;
           currentRegionLongitude = null;
+          currentRegionLabel = data.country || rawQuery;
+          syncActiveInvestigationRegion();
           renderWorkerOutlookAvailability();
 
           title.textContent =
@@ -8079,7 +8088,7 @@ document.getElementById("regional-scenario-form").addEventListener("submit", eve
       weeklyHours: document.getElementById("scenario-hours").value, taskShare: document.getElementById("scenario-share").value,
       timeSaving: document.getElementById("scenario-saving").value });
     const format = number => new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(number);
-    result.innerHTML = `<h3>Scenario change</h3><p>Assumed cohort baseline: ${format(estimate.baselineHours)} task hours/week. Assumed affected tasks: ${format(estimate.affectedHours)} hours/week.</p><h3>Potential effect</h3><p>If these assumptions held, ${format(estimate.potentialHours)} task hours/week could be released for other work.</p><p>Scenario output for ${escapeHtml(model.region.label)} · ${escapeHtml(audience)}. Not observed regional hours or predicted jobs removed.</p><p>${escapeHtml(estimate.method)}</p>`;
+    result.innerHTML = `<h3>Scenario change</h3><p>Assumed cohort baseline: ${format(estimate.baselineHours)} task hours/week. Assumed affected tasks: ${format(estimate.affectedHours)} hours/week.</p><h3>Potential effect (directional scenario)</h3><p>If these assumptions held, ${format(estimate.potentialHours)} task hours/week could be released for other work.</p><p>Scenario output for ${escapeHtml(model.region.label)} · ${escapeHtml(audience)}. Not observed regional hours or predicted jobs removed.</p><p>${escapeHtml(estimate.method)}</p>`;
   } catch (error) { result.textContent = error.message; }
 });
 
@@ -8528,7 +8537,7 @@ async function loadOccupationSTEXTasks(code, requestId = activeOccupationSTEXReq
     const patternList = (tasks, field) => tasks.length ? `<ul>${tasks.map(task => `<li>${escapeHtml(task.task_title)} · ${Number(task[field]).toFixed(1)} rubric points<details><summary>Inspect rationale</summary>${escapeHtml(task.rationale)}</details></li>`).join("")}</ul>` : "<p>No rated evidence available for this pattern.</p>";
     document.getElementById("regional-task-patterns").innerHTML = `<h3>Lower-rated structural exposure within this audit</h3>${patternList(patterns.lowerExposure, "structural_exposure")}<h3>Higher-rated augmentation within this audit</h3>${patternList(patterns.augmentation, "augmentation_likelihood")}<p>GVAI-derived STEX rubric ratings of O*NET tasks, not probabilities or guarantees of durable employment. Inspect each rationale and source vintage in the occupation profile.</p>`;
     const top =
-      data.contributors.filter(task => task.importance_status === "rated" && Number.isFinite(task.structural_exposure)).slice(0, 5);
+      data.contributors.filter(task => task.importance_status === "rated" && Number.isFinite(task.structural_exposure) && Number.isFinite(task.stex_contribution_points)).slice(0, 5);
 
     if (!top.length) {
       container.innerHTML =
@@ -8633,21 +8642,21 @@ async function loadOccupationSTEX(
     ).textContent =
       Number.isFinite(profile.structural_exposure)
         ? profile.structural_exposure.toFixed(1)
-        : "—";
+        : "Unavailable";
 
     document.getElementById(
       "stex-rated"
     ).textContent =
       Number.isFinite(profile.rated_task_count)
         ? `${profile.rated_task_count} rated`
-        : "—";
+        : "Unavailable";
 
     document.getElementById(
       "stex-source-year"
     ).textContent =
       profile.source?.tasks_year
         ? `O*NET ${profile.source.tasks_year}`
-        : "—";
+        : "Unavailable";
 
     document.getElementById(
       "stex-note"
@@ -9429,6 +9438,12 @@ async function loadLiveJobs() {
   const status = document.getElementById("live-jobs-status");
   const content = document.getElementById("live-jobs-content");
   if (!status || !content) return;
+  const selectedRegion = regionalStore.get();
+  if (!selectedRegion.model?.region.country_code || ["loading", "refreshing"].includes(selectedRegion.status)) {
+    status.textContent = "Wait for the selected region before running a jobs search.";
+    content.innerHTML = "";
+    return;
+  }
 
   const occupationCode = activeInvestigationContext?.investigated_occupation?.occupation_code || currentDrilldownCode || currentOccupationCode;
   if (!occupationCode) {
@@ -9439,8 +9454,9 @@ async function loadLiveJobs() {
 
   const requestId = ++activeLiveJobsRequestId;
   const regionId = regionalStore.get().model?.region.id;
+  const regionRequestId = activeRegionRequestId;
   const occupationTitle = activeInvestigationContext?.investigated_occupation?.occupation_title || currentDrilldownTitle || currentOccupationTitle || "";
-  const countryCode = window.GVAI_WORKER_COUNTRY_CODE || "US";
+  const countryCode = selectedRegion.model.region.country_code || window.GVAI_WORKER_COUNTRY_CODE || "US";
   const params = new URLSearchParams({
     occupation: occupationCode,
     occupation_title: occupationTitle,
@@ -9448,6 +9464,7 @@ async function loadLiveJobs() {
   if (window.GVAI_WORKER_COUNTRY_CODE) {
     params.set("country", window.GVAI_WORKER_COUNTRY_CODE);
   }
+  params.set("country", countryCode);
   if (currentRegionLatitude !== null) params.set("lat", currentRegionLatitude);
   if (currentRegionLongitude !== null) params.set("lon", currentRegionLongitude);
   const selectedFilters = {
@@ -9470,7 +9487,7 @@ async function loadLiveJobs() {
     `Occupation: ${occupationTitle || occupationCode} · Region: ${activeRegion?.label || countryCode}`;
 
   const capability = await fetchLiveJobsCapability(countryCode);
-  if (requestId !== activeLiveJobsRequestId) return;
+  if (requestId !== activeLiveJobsRequestId || regionRequestId !== activeRegionRequestId) return;
   if (capability && capability.state !== "available") {
     regionalStore.updateJobs({ status: capability.state, result_count: null, source_names: [], retrieved_at: null }, regionId);
     status.textContent = LIVE_JOBS_CAPABILITY_MESSAGES[capability.state] || "Live job openings are unavailable for this selection.";
@@ -9482,7 +9499,7 @@ async function loadLiveJobs() {
   try {
     const response = await fetch(`${window.GVAI_API_BASE || ""}/api/worker/live-jobs?${params.toString()}`);
     const data = await response.json();
-    if (requestId !== activeLiveJobsRequestId) return;
+    if (requestId !== activeLiveJobsRequestId || regionRequestId !== activeRegionRequestId) return;
 
     if (!response.ok || !data.ok) {
       status.textContent = data.reason || "Live job openings are temporarily unavailable.";
@@ -9491,7 +9508,7 @@ async function loadLiveJobs() {
     const openings = Array.isArray(data.openings) ? data.openings : [];
     regionalStore.updateJobs({ status: data.status, result_count: ["available_with_results", "available_zero_results"].includes(data.status) ? openings.length : null,
       source_names: Array.isArray(data.providers) ? data.providers : data.provider ? [data.provider] : [], retrieved_at: new Date().toISOString(),
-      occupation_code: occupationCode, occupation_title: occupationTitle }, regionId);
+      occupation_code: occupationCode, occupation_title: occupationTitle, search_context: data.search_context || {} }, regionId);
     const context = data.search_context || {};
     const region = context.location || (
       context.latitude !== null && context.latitude !== undefined && context.longitude !== null && context.longitude !== undefined
@@ -9522,7 +9539,7 @@ async function loadLiveJobs() {
       content.innerHTML = "";
     }
   } catch (error) {
-    if (requestId !== activeLiveJobsRequestId) return;
+    if (requestId !== activeLiveJobsRequestId || regionRequestId !== activeRegionRequestId) return;
     console.error("Live jobs load failed:", error);
     regionalStore.updateJobs({ status: "temporarily_unavailable", result_count: null, source_names: [], retrieved_at: null }, regionId);
     status.textContent = "Live job openings are temporarily unavailable.";
