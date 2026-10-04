@@ -152,6 +152,7 @@ def _regional_stex_signal(
     oews_area_code: str | None,
     *,
     stex_year: int,
+    include_details: bool = False,
 ) -> Dict[str, Any]:
     if not oews_area_code:
         return {
@@ -189,7 +190,7 @@ def _regional_stex_signal(
             employment_rows=rows,
             profiles=profiles,
             occupation_titles=occupation_titles,
-            recommendation_limit=0,
+            recommendation_limit=10 if include_details else 0,
         )
 
         return {
@@ -204,6 +205,8 @@ def _regional_stex_signal(
                 "stex_covered_employment": plan.covered_employment,
                 "coverage_percentage": plan.coverage_rate,
                 "covered_occupation_stex": plan.covered_stex,
+                **({"contributing_audited_occupations": list(plan.contributing_audited_occupations),
+                    "recommended_unaudited_occupations": list(plan.recommended_unaudited_occupations)} if include_details else {}),
             },
             "explanation": (
                 "STEX is aggregated only over audited occupations, "

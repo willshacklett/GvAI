@@ -15,7 +15,8 @@ def test_regional_failure_and_retry_preserve_selection_guard():
     assert "if (requestId !== activeRegionRequestId) return;" in catch
     assert "showRegionalFailure(requestId)" in catch
     assert 'element.textContent = "Unavailable"' in HTML
-    assert 'typeof data.supported !== "boolean"' in HTML
+    assert "!payload.intelligence" in HTML
+    assert "window.GVAIRegional.baselineFromModel(model)" in HTML
 
 
 def test_workspace_width_is_bounded_and_content_responsive():

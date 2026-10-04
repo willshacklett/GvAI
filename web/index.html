@@ -2507,6 +2507,35 @@
       .worker-outlook-button { white-space: normal; }
     }
 
+    .regional-brief { padding: 14px 0; border-bottom: 1px solid var(--border); }
+    .regional-region-title { margin: 0; font-size: 18px; line-height: 1.35; }
+    .regional-outlook-line { font-size: 12px; line-height: 1.6; }
+    .regional-availability, .regional-source-note, .regional-methods, .regional-workforce { color: var(--muted); font-size: 11px; line-height: 1.55; }
+    .regional-key-signals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 14px 0; }
+    .regional-stat { min-width: 0; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+    .regional-stat dt { color: var(--muted); font-size: 11px; }
+    .regional-stat dd { margin: 3px 0 6px; font-size: 18px; font-weight: 700; overflow-wrap: anywhere; }
+    .regional-source-note summary, .regional-methods summary, .regional-workforce summary { cursor: pointer; }
+    .regional-source-note a { color: var(--accent); }
+    .regional-source-note ul { padding-left: 16px; }
+    .regional-interpretation h3 { font-size: 14px; margin: 14px 0 6px; }
+    .regional-interpretation p, .regional-tools p { font-size: 12px; line-height: 1.6; }
+    .regional-journey, .regional-interpretation small, .regional-tools-context { color: var(--muted); font-size: 11px; }
+    .regional-identity-strip { margin: 8px 0; color: var(--accent); font-size: 14px; font-weight: 700; }
+    .regional-tools { padding: 14px 0; min-width: 0; }
+    .regional-tools details { margin-top: 14px; }
+    .regional-tools summary { cursor: pointer; font-size: 13px; font-weight: 700; }
+    .regional-tools form { display: grid; gap: 10px; margin-top: 12px; }
+    .regional-tools label { display: grid; gap: 5px; font-size: 12px; }
+    .regional-tools input, .regional-tools textarea, .regional-tools select { width: 100%; min-width: 0; padding: 8px; color: var(--text); background: var(--panel-soft); border: 1px solid var(--border); border-radius: 4px; font: inherit; }
+    .regional-tools textarea { resize: vertical; min-height: 90px; }
+    .regional-ask-reply { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.6; }
+    .regional-tools .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .regional-tools .actions button { flex: 1 1 160px; }
+    .regional-extra-metrics { display: grid; gap: 12px; }
+    .regional-summary-retry { margin: 10px 0; }
+    @container (min-width: 760px) { .regional-key-signals { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
     @media print {
       body * {
         visibility: hidden;
@@ -2540,6 +2569,7 @@
   />
   <script src="/api_config.js?v=railway1"></script>
   <script src="/fetch.js"></script>
+  <script src="/regional-intelligence.js"></script>
 </head>
 
 <body>
@@ -2637,6 +2667,12 @@
       <button id="regional-retry" type="button">Retry</button>
     </div>
 
+    <section id="regional-shared-brief" class="regional-brief" data-regional-brief aria-label="Selected-region intelligence" aria-live="polite"></section>
+
+    <details class="regional-methods">
+      <summary>Index availability and original indicators</summary>
+      <p>No validated regional stability, displacement, concentration, or resilience calculation is connected. These indicators are not inferred from missing data.</p>
+
     <div class="score-card">
       <div class="score-top">
         <div>
@@ -2716,6 +2752,8 @@
       </div>
     </div>
 
+    </details>
+
     <section class="audience-hub" aria-labelledby="audience-hub-title">
       <div class="audience-hub-kicker">Choose your path</div>
       <h2 id="audience-hub-title">One regional intelligence platform. Three ways in.</h2>
@@ -2792,6 +2830,7 @@
 
     <details id="stex-task-audit" class="stex-audit-disclosure">
       <summary>View detailed STEX task audit</summary>
+      <div id="regional-task-patterns"></div>
 
       <div class="stex-contributors">
         <div class="stex-contributors-title">
@@ -2807,6 +2846,8 @@
     </details>
 
 
+    <section id="regional-tools" class="regional-tools" aria-label="Regional questions and scenarios">
+    <p id="regional-tools-context" class="regional-tools-context">Select a region before asking or building a scenario.</p>
     <div class="actions">
       <button id="ask-btn" class="primary">
         Ask GVAI about this area
@@ -2816,6 +2857,32 @@
         Simulate automation impact
       </button>
     </div>
+    <details id="regional-ask-pane">
+      <summary>Ask about regional evidence</summary>
+      <form id="regional-ask-form">
+        <label>Audience<select id="regional-ask-audience"><option value="laborers">Laborers</option><option value="business">Business</option><option value="government">Government</option></select></label>
+        <label>Question<textarea id="regional-question" maxlength="8192" required>Explain the observed conditions, derived signals, and data gaps in this region.</textarea></label>
+        <button type="submit" class="primary">Ask GVAI</button>
+      </form>
+      <p>Model interpretation, not source data. Verify claims against the cited evidence.</p>
+      <p id="regional-ask-status" role="status"></p>
+      <div id="regional-ask-reply" class="regional-ask-reply"></div>
+    </details>
+    <details id="regional-scenario-pane">
+      <summary>Task augmentation scenario</summary>
+      <p>Assumption-led task-hours arithmetic, not a forecast of job loss, staffing needs, or ROI.</p>
+      <div id="regional-scenario-baseline"></div>
+      <form id="regional-scenario-form">
+        <h3>Input assumptions</h3>
+        <label>Workers in the assumed cohort<input id="scenario-workers" type="number" min="1" max="1000000" step="1" required /></label>
+        <label>Weekly hours per worker<input id="scenario-hours" type="number" min="1" max="168" step="1" required /></label>
+        <label>Assumed task share affected (%)<input id="scenario-share" type="number" min="0" max="100" step="1" required /></label>
+        <label>Assumed time saving within those tasks (%)<input id="scenario-saving" type="number" min="0" max="100" step="1" required /></label>
+        <button type="submit" class="primary">Calculate scenario</button>
+      </form>
+      <div id="regional-scenario-result" role="status"><p>No scenario calculated.</p></div>
+    </details>
+    </section>
     </div>
   </div>
 
@@ -2823,6 +2890,7 @@
     <div class="laborers-workspace-header">
       <div>
         <div class="laborers-workspace-kicker">Laborers Workspace</div>
+        <div class="regional-identity-strip" data-region-label>Choose a region on the globe</div>
         <div id="laborers-workspace-title" class="laborers-workspace-title">Your work options</div>
         <div class="laborers-workspace-copy">Move from your current work to local evidence, jobs to explore, one occupation investigation, and things to investigate next.</div>
         <div class="laborers-context-grid" aria-label="Worker workspace context">
@@ -2870,6 +2938,7 @@
     </div>
 
     <div class="laborers-workspace-shell">
+      <section class="regional-brief" data-regional-brief data-audience="laborers" aria-label="Laborer regional interpretation"></section>
       <aside id="active-investigation-bar" class="active-investigation-bar" aria-label="Active investigation" hidden>
         <div>
           <div id="active-investigation-title" class="active-investigation-title"></div>
@@ -2971,6 +3040,7 @@
             </div>
           </div>
         </div>
+        <div id="worker-task-audit-slot"></div>
         <div class="worker-stage-actions" aria-label="Current work next actions">
           <button type="button" class="worker-outlook-button" data-worker-stage-action="local-outlook" data-worker-stage-load="worker-outlook">View local outlook</button>
           <button type="button" class="worker-outlook-button" data-worker-stage-action="explore-occupations" data-worker-stage-load="related-occupations">Explore occupations</button>
@@ -3200,6 +3270,7 @@
     <div class="laborers-workspace-header">
       <div>
         <div class="laborers-workspace-kicker">Business Workspace</div>
+        <div class="regional-identity-strip" data-region-label>Choose a region on the globe</div>
         <div id="business-workspace-title" class="laborers-workspace-title">Workforce evidence</div>
         <div class="laborers-workspace-copy">Review published regional workforce evidence for selected occupations and keep an employer-selected local plan.</div>
         <div class="business-workflow" aria-label="Business workforce workflow">
@@ -3212,6 +3283,7 @@
       <button id="close-business-workspace-btn" type="button" class="laborers-workspace-close">Back to globe</button>
     </div>
     <div class="business-workspace-shell">
+      <section class="regional-brief" data-regional-brief data-audience="business" aria-label="Business regional interpretation"></section>
       <section class="laborers-stage" aria-labelledby="business-selection-title">
         <div class="laborers-stage-head">
           <div>
@@ -3280,6 +3352,7 @@
     <div class="laborers-workspace-header">
       <div>
         <div class="laborers-workspace-kicker">Government Workspace</div>
+        <div class="regional-identity-strip" data-region-label>Choose a region on the globe</div>
         <div id="government-workspace-title" class="laborers-workspace-title">Regional evidence</div>
         <div class="laborers-workspace-copy">Review public regional evidence as separate signals. GVAI does not combine these signals into a government score, policy ranking, or policy recommendation.</div>
 
@@ -3307,6 +3380,7 @@
     </div>
 
     <div class="business-workspace-shell">
+      <section class="regional-brief" data-regional-brief data-audience="government" aria-label="Government regional interpretation"></section>
       <section class="laborers-stage" aria-labelledby="government-region-title">
         <div class="laborers-stage-head">
           <div>
@@ -3582,64 +3656,28 @@ const profiles = [
     sub: "Tennessee, United States",
     lat: 35.8456,
     lon: -86.3903,
-    height: 160000,
-    score: 72,
-    population: "380K",
-    labor: "205K",
-    automation: "41%",
-    transition: "Moderate",
-    job: 44,
-    housing: 63,
-    industry: 51,
-    resilience: 68
+    height: 160000
   },
   {
     title: "Detroit Metro",
     sub: "Michigan, United States",
     lat: 42.3314,
     lon: -83.0458,
-    height: 260000,
-    score: 61,
-    population: "4.3M",
-    labor: "2.1M",
-    automation: "58%",
-    transition: "Elevated",
-    job: 66,
-    housing: 49,
-    industry: 72,
-    resilience: 55
+    height: 260000
   },
   {
     title: "Tokyo",
     sub: "Japan",
     lat: 35.6762,
     lon: 139.6503,
-    height: 310000,
-    score: 78,
-    population: "14M",
-    labor: "7.5M",
-    automation: "52%",
-    transition: "Managed",
-    job: 48,
-    housing: 58,
-    industry: 47,
-    resilience: 79
+    height: 310000
   },
   {
     title: "Shenzhen",
     sub: "Guangdong, China",
     lat: 22.5431,
     lon: 114.0579,
-    height: 270000,
-    score: 69,
-    population: "17.7M",
-    labor: "9.2M",
-    automation: "67%",
-    transition: "Rapid",
-    job: 71,
-    housing: 73,
-    industry: 81,
-    resilience: 70
+    height: 270000
   }
 ];
 
@@ -3686,7 +3724,8 @@ function updateBar(id, value) {
 }
 
 function renderProfile(profile) {
-  selectedProfile = profile;
+  selectedProfile = { ...globalProfile, ...profile };
+  profile = selectedProfile;
 
   document.getElementById(
     "location-title"
@@ -3705,7 +3744,7 @@ function renderProfile(profile) {
   ).textContent =
     profile.score === null ||
     profile.score === undefined
-      ? "—"
+      ? "Unavailable"
       : profile.score;
 
   document.getElementById(
@@ -3753,18 +3792,10 @@ function renderProfile(profile) {
     badge.textContent = "GLOBAL";
     badge.style.color =
       "var(--accent)";
-  } else if (profile.score >= 75) {
-    badge.textContent = "STABLE";
-    badge.style.color =
-      "var(--good)";
-  } else if (profile.score >= 65) {
-    badge.textContent = "WATCH";
-    badge.style.color =
-      "var(--watch)";
   } else {
-    badge.textContent = "ELEVATED";
+    badge.textContent = "NOT CALCULATED";
     badge.style.color =
-      "var(--risk)";
+      "var(--muted)";
   }
 
   syncBusinessRegionContext();
@@ -3879,6 +3910,41 @@ const GEOGRAPHY_VISIBILITY = {
 
 let activeRegionRequestId = 0;
 let lastRegionalSelection = null;
+const regionalStore = window.GVAIRegional.createStore();
+window.GVAIRegional.mount(regionalStore);
+let regionalAskRequestId = 0;
+let renderedRegionalModel = null;
+let renderedRegionalAudience = "laborers";
+
+regionalStore.subscribe(state => {
+  if (state.model !== renderedRegionalModel || state.audience !== renderedRegionalAudience) {
+    regionalAskRequestId += 1;
+    document.getElementById("regional-ask-status").textContent = "";
+    document.getElementById("regional-ask-reply").textContent = "";
+    document.querySelector("#regional-ask-form button").disabled = false;
+    document.getElementById("regional-scenario-result").innerHTML = "<p>No scenario calculated for this selection.</p>";
+  }
+  renderedRegionalModel = state.model;
+  renderedRegionalAudience = state.audience;
+  if (state.model) renderSharedRegionalMetrics(state.model);
+});
+
+function renderSharedRegionalMetrics(model) {
+  const ids = { population: "population", "labor-force": "labor_force", automation: "automation_exposure", transition: "labor_availability",
+    "stability-score": "stability_index", "job-risk-label": "job_displacement", "housing-label": "home_value_to_income_ratio",
+    "industry-label": "industry_concentration", "resilience-label": "economic_resilience" };
+  for (const [id, key] of Object.entries(ids)) {
+    const element = document.getElementById(id);
+    element.textContent = window.GVAIRegional.formatMetric(model.metrics[key]);
+    const parent = element.closest(".metric, .score-top, .bar-row");
+    let source = parent.querySelector(`[data-source-for="${id}"]`);
+    if (!source) { source = document.createElement("div"); source.dataset.sourceFor = id; parent.append(source); }
+    source.innerHTML = window.GVAIRegional.sourceDetails(model.metrics[key], model);
+  }
+  document.getElementById("stability-score").classList.add("metric-unavailable");
+  document.getElementById("risk-badge").textContent = "NOT CALCULATED";
+  document.getElementById("regional-scenario-baseline").innerHTML = `<h3>Current published baseline</h3><p>${escapeHtml(model.region.label)} · civilian labor force: ${escapeHtml(window.GVAIRegional.formatMetric(model.metrics.labor_force))}</p>${window.GVAIRegional.sourceDetails(model.metrics.labor_force, model)}`;
+}
 
 document.getElementById("globe-zoom-in").addEventListener("click", () => {
   viewer.camera.zoomIn(viewer.camera.positionCartographic.height * 0.25);
@@ -3902,6 +3968,7 @@ let activeTransitionPreparationRequestId = 0;
 let activeTransitionActionPlanRequestId = 0;
 let activeLiveJobsRequestId = 0;
 let activeBusinessWorkforceRequestId = 0;
+let activeOccupationSTEXRequestId = 0;
 const RELATED_OCCUPATIONS_DEFAULT_COUNT = 5;
 let relatedOccupationsExpanded = false;
 let relatedOccupationItems = [];
@@ -4219,7 +4286,15 @@ function updateWorkspaceLayout() {
   const switcher = document.getElementById("workspace-switcher");
   document.getElementById("app").classList.toggle("workspace-open", Boolean(active));
   switcher.hidden = !active;
-  if (active) active.querySelector(".laborers-workspace-header").prepend(switcher);
+  if (active) {
+    active.querySelector(".laborers-workspace-header").prepend(switcher);
+    active.querySelector("[data-regional-brief]").insertAdjacentElement("afterend", document.getElementById("regional-tools"));
+    regionalStore.selectAudience(active.id.replace("-workspace", ""));
+    if (active.id === "laborers-workspace") document.getElementById("worker-task-audit-slot").append(document.getElementById("stex-task-audit"));
+  } else {
+    document.getElementById("regional-outlook-content").append(document.getElementById("regional-tools"));
+    document.getElementById("regional-outlook-content").append(document.getElementById("stex-task-audit"));
+  }
   for (const button of switcher.querySelectorAll("button")) {
     button.setAttribute("aria-selected", String(button.getAttribute("aria-controls") === active?.id));
   }
@@ -4257,11 +4332,11 @@ function renderBusinessEvidence(data) {
   status.textContent = `${data.occupation?.occupation_title || data.occupation?.occupation_code || "Occupation"} · ${data.region?.county || businessRegionLabel()} · GVAI evidence only`;
   content.innerHTML = `
     <article class="business-question-card"><strong>How many workers are employed in this occupation locally?</strong><span>${businessValue(employment.employment, formatCompact)} employed · ${businessValue(employment.source_year)} · ${escapeHtml(employment.source || "Source unavailable")}</span></article>
-    <article class="business-question-card"><strong>What does the published wage evidence show?</strong><span>Hourly median: ${businessValue(wage.median_hourly_wage, value => formatMoney(value))} · Annual median: ${businessValue(wage.median_annual_wage, value => formatMoney(value))}</span></article>
+    <article class="business-question-card"><strong>What does the published wage evidence show?</strong><span>Hourly median: ${businessValue(wage.median_hourly_wage, value => formatMoney(value))} · Annual median: ${businessValue(wage.median_annual_wage, value => formatMoney(value))}</span><small>Source data · ${escapeHtml(wage.source || "BLS OEWS source unavailable")} · ${businessValue(wage.source_year)}</small></article>
     <article class="business-question-card"><strong>How specific is the available occupation evidence?</strong><span>${escapeHtml(specificity.disclosure || "Specificity unavailable.")}</span></article>
     <article class="business-question-card"><strong>What preparation does the occupation typically require?</strong><span>${escapeHtml(jobZone.title || "Job Zone unavailable")} · ${escapeHtml(jobZone.education || "Education/training evidence unavailable")}</span></article>
-    <article class="business-question-card"><strong>What does structural exposure indicate?</strong><span>${businessValue(stex.structural_exposure)} STEX · ${escapeHtml(stex.semantics || "STEX semantics unavailable.")}</span></article>
-    <article class="business-question-card"><strong>What education/training evidence is published?</strong><span>${educationLevels.length ? educationLevels.map(level => `${escapeHtml(level.title)}: ${businessValue(level.percentage_of_respondents, value => `${value}%`)}`).join(" · ") : "Unavailable"}</span></article>
+    <article class="business-question-card"><strong>What does structural exposure indicate?</strong><span>${businessValue(stex.structural_exposure)} STEX · ${escapeHtml(stex.semantics || "STEX semantics unavailable.")}</span><small>GVAI-derived · approved STEX task audit · ${escapeHtml(stex.rubric_version || "rubric unavailable")} · not percent automatable</small></article>
+    <article class="business-question-card"><strong>What education/training evidence is published?</strong><span>${educationLevels.length ? educationLevels.map(level => `${escapeHtml(level.title)}: ${businessValue(level.percentage_of_respondents, value => `${value}%`)}`).join(" · ") : "Unavailable"}</span><small>Source data · O*NET education survey · vintage unavailable unless supplied in the source response</small></article>
     <article class="business-question-card full-width"><strong>Missing evidence</strong><span>${constraints.length ? constraints.map(item => escapeHtml(item)).join(" · ") : "No missing evidence constraints were returned for this selection."}</span></article>
   `;
   if (safety) {
@@ -6828,6 +6903,20 @@ document.getElementById("regional-retry").addEventListener("click", () => {
   }
 });
 
+function renderRegionalSourceViews(model) {
+  const stexStatus = document.getElementById("regional-stex-status");
+  const stexContent = document.getElementById("regional-stex-content");
+  document.getElementById("regional-stex-card").classList.add("visible");
+  const coverage = model.metrics.stex_coverage;
+  stexStatus.textContent = coverage.value === null ? "Regional STEX is unavailable for this geography." : "Audited employment subset · not a displacement forecast";
+  stexContent.innerHTML = `<div class="regional-extra-metrics">${["stex_coverage", "automation_exposure", "stex_covered_employment", "total_employment"].map(key => `<div class="regional-stat"><dt>${escapeHtml(model.metrics[key].label)}</dt><dd>${escapeHtml(window.GVAIRegional.formatMetric(model.metrics[key]))}</dd>${window.GVAIRegional.sourceDetails(model.metrics[key], model)}</div>`).join("")}</div><p class="regional-stex-message">STEX across audited covered occupations. Unrated employment is unknown, not zero.</p>`;
+  const next = model.stex?.recommended_unaudited_occupations || [];
+  if (next.length) stexContent.innerHTML += `<details><summary>Next occupations to audit</summary><ul>${next.map(item => `<li>${escapeHtml(item.occupation_title)} · ${escapeHtml(item.employment)} employment · ${escapeHtml(item.potential_incremental_coverage)} potential audit coverage points</li>`).join("")}</ul><p>Audit prioritization, not a forecast or employment recommendation.</p></details>`;
+  document.getElementById("regional-labor-intel-card").classList.add("visible");
+  document.getElementById("regional-labor-intel-status").textContent = "Deterministic signal synthesis · no composite score";
+  document.getElementById("regional-labor-intel-content").innerHTML = `<p>${escapeHtml(model.summary)}</p><ul>${model.constraints.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+}
+
 async function loadRegionalSTEX(areaCode, requestId) {
   if (!areaCode) {
     renderRegionalSTEXUnavailable(
@@ -7231,6 +7320,7 @@ async function loadRegionalData(
 
   const scope =
     options.scope || "county";
+  regionalStore.begin({ scope, latitude, longitude, label: options.label || options.stateName || (scope === "country" ? "United States" : scope === "state" ? `US state ${options.stateFips}` : `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`) });
 
   const title =
     document.getElementById("location-title");
@@ -7242,6 +7332,13 @@ async function loadRegionalData(
   // geography to survive into a new selection.
   clearRegionalMetrics();
   clearWorkerOutlook();
+  activeBusinessWorkforceRequestId += 1;
+  activeLiveJobsRequestId += 1;
+  currentBusinessEvidence = null;
+  document.getElementById("business-workforce-evidence").innerHTML = "";
+  document.getElementById("business-workforce-status").textContent = "Choose an occupation to load evidence for the selected region.";
+  document.getElementById("live-jobs-content").innerHTML = "";
+  document.getElementById("live-jobs-status").textContent = "Run a jobs search for the selected region and occupation.";
   currentRegionLatitude = null;
   currentRegionLongitude = null;
   currentRegionLabel = null;
@@ -7275,15 +7372,15 @@ async function loadRegionalData(
     if (scope === "country") {
       endpoint =
         (window.GVAI_API_BASE || "") +
-        "/api/region?scope=country";
+        "/api/region/intelligence?scope=country";
     } else if (scope === "state") {
       endpoint =
         (window.GVAI_API_BASE || "") +
-        `/api/region?scope=state&state=${encodeURIComponent(options.stateFips)}`;
+        `/api/region/intelligence?scope=state&state=${encodeURIComponent(options.stateFips)}`;
     } else {
       endpoint =
         (window.GVAI_API_BASE || "") +
-        `/api/region?lat=${encodeURIComponent(latitude)}` +
+        `/api/region/intelligence?lat=${encodeURIComponent(latitude)}` +
         `&lon=${encodeURIComponent(longitude)}`;
     }
 
@@ -7296,7 +7393,7 @@ async function loadRegionalData(
       );
     }
 
-    const data =
+    const payload =
       await response.json();
 
     if (
@@ -7308,13 +7405,17 @@ async function loadRegionalData(
 
       return;
     }
-    if (!data || data.ok === false || typeof data !== "object" || Array.isArray(data) || typeof data.supported !== "boolean") {
+    if (!payload || payload.ok === false || !payload.intelligence) {
       throw new Error("Regional data unavailable");
     }
+    const model = payload.intelligence;
+    if (model.region.label === "Selected region" && regionalStore.get().selection?.label) model.region.label = regionalStore.get().selection.label;
+    const data = window.GVAIRegional.baselineFromModel(model);
     document.getElementById("regional-outlook-content").setAttribute("aria-busy", "false");
 
     if (!data.supported) {
       clearRegionalMetrics();
+      regionalStore.set(model);
 
       currentRegionLatitude = null;
       currentRegionLongitude = null;
@@ -7326,13 +7427,15 @@ async function loadRegionalData(
       return;
     }
 
+    regionalStore.set(model);
     title.textContent =
       data.county ||
       data.state ||
       data.country ||
       data.name ||
       "Selected region";
-    currentRegionLabel = title.textContent;
+    currentRegionLabel = model.region.label;
+    document.getElementById("regional-outlook-summary").textContent = model.region.label;
 
     const geographyLabel =
       data.county
@@ -7346,17 +7449,15 @@ async function loadRegionalData(
         ? `${geographyLabel} · ${data.source || "Public data"}`
         : data.source || "Public data";
 
-      void loadRegionalSTEX(data.oews_area_code, requestId);
+    renderRegionalSourceViews(model);
 
     if (scope !== "country" && scope !== "state") {
       currentRegionLatitude = latitude;
       currentRegionLongitude = longitude;
       syncActiveInvestigationRegion();
-      void loadRegionalLaborIntelligence(latitude, longitude, requestId);
     } else {
       currentRegionLatitude = null;
       currentRegionLongitude = null;
-      currentRegionLabel = null;
       syncActiveInvestigationRegion();
     }
 
@@ -7457,6 +7558,7 @@ async function loadRegionalData(
       }
     }
 
+    if (requestId !== activeRegionRequestId) return;
     document.getElementById(
       "population"
     ).textContent =
@@ -7471,7 +7573,7 @@ async function loadRegionalData(
       data.unemployment_rate;
 
     const laborAvailability =
-      classifyLaborAvailability(data);
+      { label: window.GVAIRegional.formatMetric(model.metrics.labor_availability), detail: model.metrics.labor_availability.method };
 
     document.getElementById(
       "transition"
@@ -7495,216 +7597,7 @@ async function loadRegionalData(
         formatCompact(data.labor_force)
     };
 
-    const infoPanel =
-      document.querySelector(".info-panel");
-
-    let censusBox =
-      document.getElementById(
-        "census-details"
-      );
-
-    if (!censusBox) {
-      censusBox =
-        document.createElement("div");
-
-      censusBox.id =
-        "census-details";
-
-      censusBox.className =
-        "score-card";
-
-      infoPanel.insertBefore(
-        censusBox,
-        document.querySelector(".actions")
-      );
-    }
-
-    censusBox.innerHTML = `
-      <div class="section-title" style="margin-top:0">
-        Census Regional Data
-      </div>
-
-      <div class="metric-grid" style="margin-bottom:0">
-        <div class="metric">
-          <div class="metric-label">
-            Unemployment
-          </div>
-          <div class="metric-value">
-            ${
-              unemployment === null ||
-              unemployment === undefined
-                ? "—"
-                : unemployment + "%"
-            }
-          </div>
-        </div>
-
-        <div class="metric">
-          <div class="metric-label">
-            Median age
-          </div>
-          <div class="metric-value">
-            ${
-              data.median_age === null ||
-              data.median_age === undefined
-                ? "—"
-                : data.median_age
-            }
-          </div>
-        </div>
-
-        <div class="metric">
-          <div class="metric-label">
-            Median household income
-          </div>
-          <div class="metric-value">
-            ${formatMoney(
-              data.median_household_income
-            )}
-          </div>
-        </div>
-
-        <div class="metric">
-          <div class="metric-label">
-            Median home value
-          </div>
-          <div class="metric-value">
-            ${formatMoney(
-              data.median_home_value
-            )}
-          </div>
-        </div>
-
-        <div class="metric">
-          <div class="metric-label">
-            Home value / income
-          </div>
-          <div class="metric-value">
-            ${
-              data.home_value_to_income_ratio === null ||
-              data.home_value_to_income_ratio === undefined
-                ? "—"
-                : data.home_value_to_income_ratio + "×"
-            }
-          </div>
-        </div>
-      </div>
-
-      ${
-        data.occupation_profile &&
-        data.occupation_profile.data_available
-          ? `
-      <div
-        style="
-          margin-top:14px;
-          padding:14px;
-          border:1px solid var(--border);
-          border-radius:12px;
-          background:rgba(255,255,255,0.03);
-        "
-      >
-        <div
-          style="
-            font-size:11px;
-            text-transform:uppercase;
-            letter-spacing:.08em;
-            color:var(--muted);
-            margin-bottom:10px;
-          "
-        >
-          Local Workforce Mix
-        </div>
-
-        ${data.occupation_profile.groups
-          .map(group => `
-            <div
-              style="
-                display:flex;
-                justify-content:space-between;
-                gap:12px;
-                margin:7px 0;
-                font-size:12px;
-              "
-            >
-              <span>${group.label}</span>
-              <strong>
-                ${
-                  group.share_percent === null ||
-                  group.share_percent === undefined
-                    ? "—"
-                    : group.share_percent + "%"
-                }
-              </strong>
-            </div>
-          `)
-          .join("")}
-
-        <div
-          style="
-            margin-top:10px;
-            font-size:10px;
-            color:var(--muted);
-          "
-        >
-          ${data.occupation_profile.source}
-        </div>
-      </div>
-      `
-          : ""
-      }
-
-      <div
-        style="
-          margin-top:14px;
-          padding:14px;
-          border:1px solid var(--border);
-          border-radius:12px;
-          background:rgba(255,255,255,0.03);
-        "
-      >
-        <div
-          style="
-            font-size:11px;
-            text-transform:uppercase;
-            letter-spacing:.08em;
-            color:var(--muted);
-            margin-bottom:5px;
-          "
-        >
-          Human Labor Availability
-        </div>
-
-        <div
-          style="
-            font-size:22px;
-            font-weight:700;
-            margin-bottom:4px;
-          "
-        >
-          ${laborAvailability.label}
-        </div>
-
-        <div
-          style="
-            font-size:12px;
-            color:var(--muted);
-            line-height:1.45;
-          "
-        >
-          ${laborAvailability.detail}
-        </div>
-      </div>
-
-      <div
-        style="
-          margin-top:10px;
-          font-size:11px;
-          color:var(--muted);
-        "
-      >
-        ${data.source} · ACS ${data.acs_year}
-      </div>
-    `;
+    renderSharedRegionalMetrics(model);
 
   } catch (error) {
     console.error(
@@ -7713,6 +7606,7 @@ async function loadRegionalData(
     );
     if (requestId !== activeRegionRequestId) return;
     showRegionalFailure(requestId);
+    regionalStore.fail();
     sub.textContent =
       "Regional data temporarily unavailable.";
   }
@@ -7831,7 +7725,8 @@ document
 
         loadRegionalData(
           match.lat,
-          match.lon
+          match.lon,
+          { label: match.title }
         );
 
         return;
@@ -7919,6 +7814,11 @@ document
             ++activeRegionRequestId;
 
           clearRegionalMetrics();
+          lastRegionalSelection = null;
+          document.getElementById("regional-error").hidden = true;
+          regionalStore.set(window.GVAIRegional.unavailableModel({ id: `${data.country_code.toUpperCase()}:country`,
+            label: data.country || rawQuery, type: "country", country: data.country, country_code: data.country_code.toUpperCase(), latitude, longitude },
+            "No regional evidence provider is connected for this country."));
           clearWorkerOutlook();
           currentRegionLatitude = null;
           currentRegionLongitude = null;
@@ -7984,7 +7884,8 @@ document
             null,
             {
               scope: "state",
-              stateFips
+              stateFips,
+              stateName: data.state
             }
           );
 
@@ -8019,7 +7920,8 @@ document
 
         await loadRegionalData(
           latitude,
-          longitude
+          longitude,
+          { label: data.label || data.county || data.city || rawQuery }
         );
 
       } catch (error) {
@@ -8132,49 +8034,54 @@ document
   .getElementById("ask-btn")
   .addEventListener(
     "click",
-    async () => {
-      const region =
-        document.getElementById(
-          "location-title"
-        ).textContent;
-
-      const prompt =
-        `Give me a Post-Labor Capitalism analysis for ${region}. ` +
-        `Focus on automation exposure, employment, resilience, ` +
-        `local economic impact, and transition risks.`;
-
-      try {
-        const response =
-          await fetch(
-            (window.GVAI_API_BASE || "") +
-            "/api/chat",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type":
-                  "application/json"
-              },
-              body: JSON.stringify({
-                message: prompt
-              })
-            }
-          );
-
-        const data =
-          await response.json();
-
-        alert(
-          data.response ||
-          data.reply ||
-          "GVAI returned no response."
-        );
-      } catch (error) {
-        alert(
-          "GVAI analysis is unavailable right now."
-        );
-      }
+    () => {
+      document.getElementById("regional-ask-pane").open = true;
+      document.getElementById("regional-question").focus();
     }
   );
+
+document.getElementById("regional-ask-audience").addEventListener("change", event => regionalStore.selectAudience(event.target.value));
+document.getElementById("regional-ask-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const { model, audience } = regionalStore.get();
+  const status = document.getElementById("regional-ask-status");
+  const button = event.currentTarget.querySelector("button");
+  const message = document.getElementById("regional-question").value.trim();
+  if (!model) { status.textContent = "Select a region before asking about its evidence."; return; }
+  if (!message || new TextEncoder().encode(message).length > 8192) { status.textContent = "Enter a shorter question."; return; }
+  const requestId = ++regionalAskRequestId;
+  button.disabled = true;
+  status.textContent = "Reviewing the selected regional evidence...";
+  try {
+    const response = await fetch((window.GVAI_API_BASE || "") + "/api/chat", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, region_context: window.GVAIRegional.contextForChat(model, audience) })
+    });
+    const data = await response.json();
+    if (requestId !== regionalAskRequestId || regionalStore.get().model !== model || regionalStore.get().audience !== audience) return;
+    if (!data.ok) throw new Error("Regional interpretation unavailable");
+    document.getElementById("regional-ask-reply").textContent = data.reply || data.response || "No interpretation returned.";
+    status.textContent = "Model interpretation based on the supplied regional evidence; verify against sources.";
+  } catch (error) {
+    if (requestId === regionalAskRequestId) status.textContent = "GVAI regional interpretation is temporarily unavailable. Your evidence remains visible.";
+  } finally {
+    if (requestId === regionalAskRequestId) button.disabled = false;
+  }
+});
+
+document.getElementById("regional-scenario-form").addEventListener("submit", event => {
+  event.preventDefault();
+  const result = document.getElementById("regional-scenario-result");
+  const { model, audience } = regionalStore.get();
+  if (!model) { result.textContent = "Select a region before building a scenario."; return; }
+  try {
+    const estimate = window.GVAIRegional.scenario({ workers: document.getElementById("scenario-workers").value,
+      weeklyHours: document.getElementById("scenario-hours").value, taskShare: document.getElementById("scenario-share").value,
+      timeSaving: document.getElementById("scenario-saving").value });
+    const format = number => new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(number);
+    result.innerHTML = `<h3>Scenario change</h3><p>Assumed cohort baseline: ${format(estimate.baselineHours)} task hours/week. Assumed affected tasks: ${format(estimate.affectedHours)} hours/week.</p><h3>Potential effect</h3><p>If these assumptions held, ${format(estimate.potentialHours)} task hours/week could be released for other work.</p><p>Scenario output for ${escapeHtml(model.region.label)} · ${escapeHtml(audience)}. Not observed regional hours or predicted jobs removed.</p><p>${escapeHtml(estimate.method)}</p>`;
+  } catch (error) { result.textContent = error.message; }
+});
 
 
 function escapeHtml(value) {
@@ -8585,7 +8492,7 @@ if (initialWorkerProfile) {
 }
 renderWorkerJourneyState(initialWorkerProfile);
 
-async function loadOccupationSTEXTasks(code) {
+async function loadOccupationSTEXTasks(code, requestId = activeOccupationSTEXRequestId) {
   const container =
     document.getElementById(
       "stex-contributors-list"
@@ -8604,6 +8511,7 @@ async function loadOccupationSTEXTasks(code) {
     );
 
     const data = await response.json();
+    if (requestId !== activeOccupationSTEXRequestId) return;
 
     if (
       !response.ok ||
@@ -8616,8 +8524,11 @@ async function loadOccupationSTEXTasks(code) {
       );
     }
 
+    const patterns = window.GVAIRegional.taskPatterns(data.contributors);
+    const patternList = (tasks, field) => tasks.length ? `<ul>${tasks.map(task => `<li>${escapeHtml(task.task_title)} · ${Number(task[field]).toFixed(1)} rubric points<details><summary>Inspect rationale</summary>${escapeHtml(task.rationale)}</details></li>`).join("")}</ul>` : "<p>No rated evidence available for this pattern.</p>";
+    document.getElementById("regional-task-patterns").innerHTML = `<h3>Lower-rated structural exposure within this audit</h3>${patternList(patterns.lowerExposure, "structural_exposure")}<h3>Higher-rated augmentation within this audit</h3>${patternList(patterns.augmentation, "augmentation_likelihood")}<p>GVAI-derived STEX rubric ratings of O*NET tasks, not probabilities or guarantees of durable employment. Inspect each rationale and source vintage in the occupation profile.</p>`;
     const top =
-      data.contributors.slice(0, 5);
+      data.contributors.filter(task => task.importance_status === "rated" && Number.isFinite(task.structural_exposure)).slice(0, 5);
 
     if (!top.length) {
       container.innerHTML =
@@ -8668,6 +8579,7 @@ async function loadOccupationSTEXTasks(code) {
     ).join("");
 
   } catch (error) {
+    if (requestId !== activeOccupationSTEXRequestId) return;
     container.innerHTML =
       '<div class="stex-status">Task contributor detail is temporarily unavailable.</div>';
   }
@@ -8676,6 +8588,8 @@ async function loadOccupationSTEXTasks(code) {
 async function loadOccupationSTEX(
   code = "37-2021.00"
 ) {
+  const requestId = ++activeOccupationSTEXRequestId;
+  document.getElementById("regional-task-patterns").innerHTML = "";
   const statusEl =
     document.getElementById("stex-status");
 
@@ -8696,6 +8610,7 @@ async function loadOccupationSTEX(
     }
 
     const data = await response.json();
+    if (requestId !== activeOccupationSTEXRequestId) return;
     const profile = data.profile || {};
 
     currentOccupationTitle = profile.occupation_title || null;
@@ -8747,13 +8662,15 @@ async function loadOccupationSTEX(
       `${profile.rubric_version || "STEX"} • audited profile`;
 
 
-    await loadOccupationSTEXTasks(code);
+    await loadOccupationSTEXTasks(code, requestId);
 
   } catch (error) {
+    if (requestId !== activeOccupationSTEXRequestId) return;
     const contributors =
       document.getElementById(
         "stex-contributors-list"
       );
+    for (const id of ["stex-score", "stex-rated", "stex-source-year"]) document.getElementById(id).textContent = "Unavailable";
 
     if (contributors) {
       contributors.innerHTML =
@@ -9521,6 +9438,7 @@ async function loadLiveJobs() {
   }
 
   const requestId = ++activeLiveJobsRequestId;
+  const regionId = regionalStore.get().model?.region.id;
   const occupationTitle = activeInvestigationContext?.investigated_occupation?.occupation_title || currentDrilldownTitle || currentOccupationTitle || "";
   const countryCode = window.GVAI_WORKER_COUNTRY_CODE || "US";
   const params = new URLSearchParams({
@@ -9554,6 +9472,7 @@ async function loadLiveJobs() {
   const capability = await fetchLiveJobsCapability(countryCode);
   if (requestId !== activeLiveJobsRequestId) return;
   if (capability && capability.state !== "available") {
+    regionalStore.updateJobs({ status: capability.state, result_count: null, source_names: [], retrieved_at: null }, regionId);
     status.textContent = LIVE_JOBS_CAPABILITY_MESSAGES[capability.state] || "Live job openings are unavailable for this selection.";
     content.innerHTML = "";
     return;
@@ -9570,6 +9489,9 @@ async function loadLiveJobs() {
       return;
     }
     const openings = Array.isArray(data.openings) ? data.openings : [];
+    regionalStore.updateJobs({ status: data.status, result_count: ["available_with_results", "available_zero_results"].includes(data.status) ? openings.length : null,
+      source_names: Array.isArray(data.providers) ? data.providers : data.provider ? [data.provider] : [], retrieved_at: new Date().toISOString(),
+      occupation_code: occupationCode, occupation_title: occupationTitle }, regionId);
     const context = data.search_context || {};
     const region = context.location || (
       context.latitude !== null && context.latitude !== undefined && context.longitude !== null && context.longitude !== undefined
@@ -9602,6 +9524,7 @@ async function loadLiveJobs() {
   } catch (error) {
     if (requestId !== activeLiveJobsRequestId) return;
     console.error("Live jobs load failed:", error);
+    regionalStore.updateJobs({ status: "temporarily_unavailable", result_count: null, source_names: [], retrieved_at: null }, regionId);
     status.textContent = "Live job openings are temporarily unavailable.";
     content.innerHTML = "";
   }
@@ -10700,9 +10623,9 @@ document
   .addEventListener(
     "click",
     () => {
-      alert(
-        `Automation simulator for ${selectedProfile.title} is the next module.`
-      );
+      const pane = document.getElementById("regional-scenario-pane");
+      pane.open = true;
+      pane.scrollIntoView({ block: "nearest" });
     }
   );
 

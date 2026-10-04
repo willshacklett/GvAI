@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 import os
+import logging
 import requests
 
 from gvai.postlabor.sources.oews_geography import (
@@ -39,6 +40,7 @@ def resolve_us_region(
     longitude: float,
     *,
     acs_year: int = 2024,
+    request_timeout: float = 30,
 ) -> Dict[str, Any]:
     """
     Resolve a U.S. coordinate to state/county and retrieve
@@ -57,7 +59,7 @@ def resolve_us_region(
             "vintage": "Current_Current",
             "format": "json",
         },
-        timeout=30,
+        timeout=request_timeout,
     )
     geo_response.raise_for_status()
 
@@ -130,17 +132,19 @@ def resolve_us_region(
         "key": census_api_key,
     }
 
-    acs_response = requests.get(
-        f"{ACS_BASE}/{acs_year}/acs/acs5",
-        params=params,
-        timeout=30,
-        headers={
-            "User-Agent": "GVAI/1.0",
-            "Accept": "application/json",
-        },
-    )
-
-    acs_response.raise_for_status()
+    try:
+        acs_response = requests.get(
+            f"{ACS_BASE}/{acs_year}/acs/acs5",
+            params=params,
+            timeout=request_timeout,
+            headers={"User-Agent": "GVAI/1.0", "Accept": "application/json"},
+        )
+        acs_response.raise_for_status()
+    except requests.RequestException:
+        logging.getLogger(__name__).exception("County ACS source unavailable; retaining geography")
+        return {"supported": True, "data_available": False, "latitude": latitude, "longitude": longitude,
+                "state": state_name, "county": county_name, "state_fips": state_fips, "county_fips": county_fips,
+                "acs_year": acs_year, "reason": "ACS evidence is temporarily unavailable.", "source": "U.S. Census Bureau ACS 5-year"}
 
     content_type = (
         acs_response.headers.get(
@@ -210,12 +214,17 @@ def resolve_us_region(
             1,
         )
 
-    occupation_profile = build_county_occupation_profile(
-        state_fips=state_fips,
-        county_fips=county_fips,
-        acs_year=acs_year,
-        census_api_key=census_api_key,
-    )
+    try:
+        occupation_profile = build_county_occupation_profile(
+            state_fips=state_fips,
+            county_fips=county_fips,
+            acs_year=acs_year,
+            census_api_key=census_api_key,
+            request_timeout=request_timeout,
+        )
+    except Exception:
+        logging.getLogger(__name__).exception("County workforce source unavailable; retaining ACS baseline")
+        occupation_profile = {"data_available": False, "source": "U.S. Census Bureau ACS S2401", "reason": "Workforce evidence is temporarily unavailable."}
 
     return {
         "supported": True,
@@ -780,6 +789,7 @@ def build_county_occupation_profile(
     county_fips: str,
     acs_year: int = 2024,
     census_api_key: str | None = None,
+    request_timeout: float = 30,
 ) -> Dict[str, Any]:
     """
     Retrieve broad county occupation groups from ACS subject table S2401.
@@ -820,7 +830,7 @@ def build_county_occupation_profile(
             "in": f"state:{state_fips}",
             "key": key,
         },
-        timeout=30,
+        timeout=request_timeout,
         headers={
             "User-Agent": "GVAI/1.0",
             "Accept": "application/json",
@@ -894,6 +904,7 @@ def build_aggregate_occupation_profile(
     state_fips: str | None = None,
     acs_year: int = 2024,
     census_api_key: str | None = None,
+    request_timeout: float = 30,
 ) -> Dict[str, Any]:
     """
     Retrieve ACS S2401 occupation composition for either
@@ -951,7 +962,7 @@ def build_aggregate_occupation_profile(
     response = requests.get(
         f"{ACS_BASE}/{acs_year}/acs/acs5/subject",
         params=params,
-        timeout=30,
+        timeout=request_timeout,
         headers={
             "User-Agent": "GVAI/1.0",
             "Accept": "application/json",
@@ -1024,6 +1035,7 @@ def resolve_us_aggregate_region(
     scope: str,
     state_fips: str | None = None,
     acs_year: int = 2024,
+    request_timeout: float = 30,
 ) -> Dict[str, Any]:
     """
     Retrieve U.S. national or state-level ACS indicators.
@@ -1089,7 +1101,7 @@ def resolve_us_aggregate_region(
     response = requests.get(
         f"{ACS_BASE}/{acs_year}/acs/acs5",
         params=params,
-        timeout=30,
+        timeout=request_timeout,
         headers={
             "User-Agent": "GVAI/1.0",
             "Accept": "application/json",
@@ -1157,14 +1169,17 @@ def resolve_us_aggregate_region(
             2,
         )
 
-    occupation_profile = (
-        build_aggregate_occupation_profile(
+    try:
+        occupation_profile = build_aggregate_occupation_profile(
             scope=scope,
             state_fips=state_fips,
             acs_year=acs_year,
             census_api_key=census_api_key,
+            request_timeout=request_timeout,
         )
-    )
+    except Exception:
+        logging.getLogger(__name__).exception("Aggregate workforce source unavailable; retaining ACS baseline")
+        occupation_profile = {"data_available": False, "source": "U.S. Census Bureau ACS S2401", "reason": "Workforce evidence is temporarily unavailable."}
 
     result = {
         "supported": True,
