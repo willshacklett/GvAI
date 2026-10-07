@@ -71,7 +71,8 @@
 
   function sourceDetails(metric, model) {
     const sources = (metric.source_ids || []).map(id => model.sources?.[id]).filter(Boolean);
-    const category = metric.classification === "source_statistic" ? "Source data" : "GVAI-derived";
+    const category = { source_statistic: "Source data", derived_metric: "GVAI-derived",
+      scenario_output: "Scenario output", model_interpretation: "AI interpretation" }[metric.classification] || "Classification unavailable";
     const labels = sources.map(source => `${source.name}${source.vintage ? ` · ${source.vintage}` : ""}${source.geography?.type === "oews_labor_market_area" ? ` · ${source.geography.label}` : ""}`).join(" + ");
     const links = sources.map(source => {
       const link = source.url && /^https:\/\//.test(source.url)

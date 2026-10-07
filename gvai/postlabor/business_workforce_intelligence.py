@@ -280,6 +280,23 @@ def _preparation_evidence(
     }
 
 
+def public_occupation_evidence(*, occupation_code, area_code, source_year=DEFAULT_BUSINESS_STEX_YEAR, client=None):
+    """Use the same packaged evidence and specificity rules for any audience."""
+    normalized_code = normalize_occupation_code(occupation_code)
+    client = client or OEWSClient()
+    employment, specificity = _employment_evidence(
+        client, area_code=area_code, occupation_code=normalized_code, source_year=source_year,
+    )
+    wage = _wage_evidence(
+        client, area_code=area_code, occupation_code=normalized_code, source_year=source_year,
+        specificity=specificity,
+    )
+    return {"employment": {**employment, "classification": "source_statistic"},
+            "wage": {**wage, "classification": "source_statistic"},
+            "oews_specificity": specificity,
+            "stex": {**_stex_evidence(normalized_code), "classification": "derived_metric"}}
+
+
 def synthesize_business_workforce_intelligence(
     *,
     latitude: float,
@@ -308,20 +325,9 @@ def synthesize_business_workforce_intelligence(
     )
 
     area_code = region.get("oews_area_code") if region.get("supported") else None
-    employment, specificity = _employment_evidence(
-        client,
-        area_code=area_code,
-        occupation_code=normalized_code,
-        source_year=oews_year,
-    )
-    wage = _wage_evidence(
-        client,
-        area_code=area_code,
-        occupation_code=normalized_code,
-        source_year=oews_year,
-        specificity=specificity,
-    )
-    stex = _stex_evidence(normalized_code)
+    public = public_occupation_evidence(occupation_code=normalized_code, area_code=area_code,
+                                        source_year=oews_year, client=client)
+    employment, wage, specificity, stex = (public[key] for key in ("employment", "wage", "oews_specificity", "stex"))
     preparation = _preparation_evidence(
         normalized_code,
         occupation_title=occupation_title or employment.get("occupation_title"),

@@ -1,10 +1,13 @@
-const CACHE_NAME = "gvai-pwa-v8";
+const CACHE_NAME = "gvai-pwa-v9";
 const ASSETS = [
   "./",
   "./index.html",
   "./api_config.js?v=railway1",
   "./fetch.js",
   "./regional-intelligence.js",
+  "./intelligence-session.js",
+  "./intelligence-guide.js",
+  "./intelligence-session.css",
   "./gv-carl-logo.svg",
   "./style.css",
   "./dashboard.js?v=voice2",
