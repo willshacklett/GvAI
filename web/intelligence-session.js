@@ -1,4 +1,5 @@
 (function (root) {
+  const decision = typeof module === "object" && module.exports ? require("./investigation.js") : root.GVAIInvestigation;
   const MAX_REGIONS = 5;
   const audiences = ["laborers", "business", "government"];
   const simple = ["open_region_evidence", "open_jobs", "open_scenario", "show_sources"];
@@ -10,7 +11,7 @@
     if (!action || typeof action !== "object" || Array.isArray(action)) return false;
     const exact = keys => Object.keys(action).sort().join() === keys.sort().join();
     if (action.type === "set_audience") return exact(["type", "audience"]) && audiences.includes(action.audience);
-    if (["focus_region", "select_region"].includes(action.type)) {
+    if (["focus_region", "select_region", "add_candidate"].includes(action.type)) {
       return (exact(["type", "region_id"]) && knownIds.includes(action.region_id)) ||
         (exact(["type", "query"]) && typeof action.query === "string" && /^[\p{L}\p{N}_ .,'()-]{1,160}$/u.test(action.query));
     }
@@ -24,18 +25,27 @@
     }
     if (action.type === "open_occupation") return exact(["type", "occupation_code"]) &&
       typeof action.occupation_code === "string" && /^\d{2}-\d{4}(?:\.\d{2})?$/.test(action.occupation_code);
-    return simple.includes(action.type) && exact(["type"]);
+    return (simple.includes(action.type) && exact(["type"])) || decision.validAction(action, new Set(knownIds));
   }
 
   function createStore(regional) {
     let messages = [], comparisons = [], occupation = null, scenario = null, intent = "", epoch = 0;
     let requestedActions = [], outcomes = [];
     let occupationEvidence = {};
+    let investigation = null, decisionRead = null, placeChoice = null, choiceResolver = null;
+    const invalidate = () => {
+      epoch += 1; decisionRead = null;
+      if (choiceResolver) {
+        const resolve = choiceResolver;
+        choiceResolver = null; placeChoice = null; resolve(null);
+      }
+    };
     const evidence = new Map();
     const listeners = new Set();
     const prune = () => {
       const selected = regional.get().model?.region.id;
-      for (const key of evidence.keys()) if (!comparisons.includes(key) && key !== selected) evidence.delete(key);
+      for (const key of evidence.keys()) if (!comparisons.includes(key) && key !== selected &&
+          !investigation?.candidates.some(item => item.region_id === key)) evidence.delete(key);
     };
     let lastSelection, lastAudience, lastRegionId;
     const get = () => ({
@@ -45,24 +55,23 @@
       comparisons: comparisons.map(id => evidence.get(id)).filter(Boolean), comparisonIds: [...comparisons],
       knownRegions: [...evidence.values()].map(model => model.region),
       occupation, scenario, messages: [...messages], recentIntent: intent,
-      requestedActions, outcomes, occupationEvidence, epoch
+      requestedActions, outcomes, occupationEvidence, epoch, investigation, decisionRead, placeChoice
     });
     const notify = () => listeners.forEach(listener => listener(get()));
     regional.subscribe(state => {
       const id = state.model?.region.id;
       if (state.selection !== lastSelection || state.audience !== lastAudience || id !== lastRegionId) {
-        epoch += 1;
+        invalidate();
         scenario = null;
       }
       lastSelection = state.selection; lastAudience = state.audience; lastRegionId = id;
       if (id) evidence.set(id, state.model);
-      // Retain only shortlist evidence plus the current selection.
-      for (const key of evidence.keys()) if (!comparisons.includes(key) && key !== id) evidence.delete(key);
+      prune();
       notify();
     });
     return {
       get,
-      invalidateNavigation() { epoch += 1; notify(); },
+      invalidateNavigation() { invalidate(); notify(); },
       subscribe(listener) { listeners.add(listener); listener(get()); return () => listeners.delete(listener); },
       addMessage(role, content) {
         if (!["user", "assistant"].includes(role) || typeof content !== "string") throw new Error("Invalid conversation message");
@@ -75,11 +84,17 @@
         if (!model?.region.id) throw new Error("Select a resolved region first.");
         if (comparisons.includes(model.region.id)) return;
         if (comparisons.length >= MAX_REGIONS) throw new Error("The shortlist holds up to five regions. Remove one first.");
-        comparisons = [...comparisons, model.region.id]; evidence.set(model.region.id, model); epoch += 1; notify();
+        if (investigation) investigation = decision.mutateCandidate(investigation, model.region.id, "shortlisted");
+        comparisons = [...comparisons, model.region.id]; evidence.set(model.region.id, model); invalidate(); notify();
       },
       compare(ids) {
         if (!validateAction({ type: "compare_regions", region_ids: ids }, [...evidence.keys()])) throw new Error("Comparison requires two to five known regions.");
-        comparisons = [...ids]; prune(); epoch += 1; notify();
+        if (investigation) {
+          let next = { ...investigation, candidates: investigation.candidates.map(item => item.status === "shortlisted" && !ids.includes(item.region_id) ? { ...item, status: "candidate" } : item) };
+          for (const id of ids) next = decision.mutateCandidate(next, id, "shortlisted");
+          investigation = next;
+        }
+        comparisons = [...ids]; prune(); invalidate(); notify();
       },
       setComparisons(models) {
         if (!Array.isArray(models) || models.length < 2 || models.length > MAX_REGIONS ||
@@ -87,35 +102,96 @@
             new Set(models.map(model => model.region.id)).size !== models.length) {
           throw new Error("Comparisons need two to five distinct resolved regions with regional evidence contracts.");
         }
+        const ids = models.map(model => model.region.id);
+        if (investigation) {
+          let next = { ...investigation, candidates: investigation.candidates.map(item => item.status === "shortlisted" && !ids.includes(item.region_id) ? { ...item, status: "candidate" } : item) };
+          for (const model of models) next = decision.mutateCandidate(next, model.region.id, "shortlisted");
+          investigation = next;
+        }
         models.forEach(model => evidence.set(model.region.id, model));
-        comparisons = models.map(model => model.region.id); prune(); epoch += 1; notify();
+        comparisons = ids; prune(); invalidate(); notify();
       },
-      removeComparison(id) { comparisons = comparisons.filter(item => item !== id); if (id !== regional.get().model?.region.id) evidence.delete(id); epoch += 1; notify(); },
+      removeComparison(id) {
+        comparisons = comparisons.filter(item => item !== id);
+        if (investigation?.candidates.some(item => item.region_id === id && item.status === "shortlisted")) {
+          investigation = decision.mutateCandidate(investigation, id, "candidate");
+        }
+        prune(); invalidate(); notify();
+      },
       selectOccupation(code) {
         if (typeof code !== "string" || !/^\d{2}-\d{4}(?:\.\d{2})?$/.test(code)) throw new Error("Invalid occupation code.");
-        occupation = code; occupationEvidence = {}; epoch += 1; notify();
+        occupation = code; occupationEvidence = {}; invalidate(); notify();
       },
       setOccupationEvidence(value) { occupationEvidence = value || {}; notify(); },
+      startInvestigation(type, question) {
+        if (investigation) throw new Error("An investigation is already active. Continue it or start a new conversation.");
+        let next = decision.create(type, question);
+        for (const id of comparisons) next = decision.mutateCandidate(next, id, "shortlisted");
+        const selected = regional.get().model?.region.id;
+        if (selected && !comparisons.includes(selected)) next = decision.mutateCandidate(next, selected, "candidate");
+        investigation = next; invalidate(); notify();
+      },
+      setCriteria(criteria) { investigation = decision.mergeCriteria(investigation, criteria); invalidate(); notify(); },
+      removeCriterion(key) {
+        if (!investigation) throw new Error("No active investigation.");
+        investigation = { ...investigation, criteria: investigation.criteria.filter(item => item.key !== key) };
+        invalidate(); notify();
+      },
+      setCandidate(model, status = null, reason = null) {
+        if (model?.schema_version !== "gvai.regional-intelligence.v1" || !model.region?.id || !model.metrics || !model.availability) throw new Error("Verified regional evidence is required.");
+        const existing = investigation?.candidates.find(item => item.region_id === model.region.id);
+        if (status === null) { status = existing?.status || "candidate"; reason = existing?.reason || null; }
+        const next = decision.mutateCandidate(investigation, model.region.id, status, reason);
+        const ids = comparisons.filter(id => id !== model.region.id);
+        if (status === "shortlisted") {
+          if (ids.length >= MAX_REGIONS) throw new Error("Shortlist limit: five regions.");
+          if (comparisons.includes(model.region.id)) ids.splice(comparisons.indexOf(model.region.id), 0, model.region.id);
+          else ids.push(model.region.id);
+        }
+        investigation = next;
+        evidence.set(model.region.id, model); comparisons = ids;
+        invalidate(); prune(); notify();
+      },
+      candidateDecision(id, status, reason = null) {
+        if (["removed", "rejected"].includes(status) && !investigation?.candidates.some(item => item.region_id === id)) throw new Error("This place is not a candidate.");
+        const model = evidence.get(id);
+        if (!model) throw new Error("Candidate evidence is unavailable. Retrieve this place again.");
+        this.setCandidate(model, status, reason);
+      },
+      setDecisionRead(read) { decisionRead = read || null; notify(); },
+      choosePlace(query, candidates) {
+        if (!Array.isArray(candidates) || candidates.length < 2 || candidates.length > 5) throw new Error("Invalid place choices.");
+        if (choiceResolver) throw new Error("Resolve the current place choice first.");
+        return new Promise(resolve => { choiceResolver = resolve; placeChoice = { query, candidates }; notify(); });
+      },
+      resolvePlaceChoice(index) {
+        if (!choiceResolver) return;
+        const place = index === null ? null : placeChoice?.candidates[index];
+        if (index !== null && !place) throw new Error("Invalid place choice.");
+        const resolve = choiceResolver;
+        choiceResolver = null; placeChoice = null; notify(); resolve(place);
+      },
       setScenario(assumptions, result) {
         scenario = { region_id: regional.get().model?.region.id, assumptions, result };
-        epoch += 1; notify();
+        invalidate(); notify();
       },
       beginActions(actions) { requestedActions = actions; outcomes = []; notify(); },
       actionResult(type, status, detail = null) {
         outcomes = [...outcomes, { type, status, ...(detail ? { detail: String(detail).slice(0, 240) } : {}) }].slice(-8); notify();
       },
-      context() {
+      context({ includeLatest = false } = {}) {
         const state = get();
         return { schema_version: "gvai.intelligence-session.v1", audience: state.audience,
           selected_region_id: state.selectedRegion?.id || null,
           regions: state.knownRegions.map(({ id, latitude, longitude }) => ({ id, latitude, longitude })),
           comparison_ids: [...comparisons], occupation_code: occupation,
           scenario: scenario ? { region_id: scenario.region_id, assumptions: scenario.assumptions } : null,
-          messages: messages.slice(0, -1).map(message => ({
+          messages: (includeLatest ? messages.slice(-24) : messages.slice(0, -1)).map(message => ({
             ...message, content: new TextDecoder().decode(new TextEncoder().encode(message.content).slice(0, 8192), { stream: true })
-          })), action_outcomes: outcomes.map(({ type, status }) => ({ type, status })) };
+          })), action_outcomes: outcomes.map(({ type, status }) => ({ type, status })),
+          investigation };
       },
-      clearConversation() { messages = []; intent = ""; requestedActions = []; outcomes = []; notify(); }
+      clearConversation() { messages = []; intent = ""; requestedActions = []; outcomes = []; investigation = null; prune(); invalidate(); notify(); }
     };
   }
 

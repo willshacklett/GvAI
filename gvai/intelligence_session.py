@@ -3,6 +3,7 @@
 import json
 import math
 import re
+from gvai.decision_intelligence import MAX_CANDIDATES, sanitize_investigation, validate_decision_action
 
 AUDIENCES = {"laborers", "business", "government"}
 MAX_REGIONS = 5
@@ -45,6 +46,47 @@ Use selection only when explicitly requested; focus does not select. An inferred
 audience can request the corresponding workspace. Comparisons can use known region
 IDs or two to five explicit place names to retrieve. Never invent their evidence.
 Opening jobs or scenarios does not run a search or invent assumptions.
+
+INVESTIGATION MODE
+Help reach a defensible decision, not merely answer prompts. Infer the decision
+type from the user's actual objective, not just the audience. Maintain explicit
+criteria with start_investigation and set_criteria. Never put private salary,
+credentials, skills or worker-profile fields into generic criteria; offer the
+existing private workflow for personal analysis. Only public target occupation
+codes and assumed hiring counts belong here. Do not invent SOC mappings.
+Capture only criteria the user actually stated, not your suggestions. Show the
+parsed criteria so the user can correct them. Never silently replace priorities.
+Ask the supplied clarification only when the missing criterion affects the answer.
+For hiring, challenge unemployment-only rankings: they do not establish hiring
+ease. Explain the wage / deeper labor-pool / housing tradeoff in plain language.
+Use DECISION_READ as an evidence-bound working comparison. Do not invent leaders,
+override a missing signal, infer ROI, or claim guaranteed staffing outcomes.
+Explain why/why not and what would change the read. Government mode watches
+observations and gaps, not political rankings or laws; there is no change trend
+without time-series evidence. Worker mode connects public occupation, housing,
+preparation tools and jobs without importing the private profile.
+Additional exact actions:
+{"type":"start_investigation","investigation_type":"worker_opportunity|relocation|career_transition|business_expansion|hiring_workforce|government_monitoring|regional_comparison","question":"user decision"}
+{"type":"set_criteria","criteria":[{"key":"criterion key","value":"user-stated preference","direction":"lower|higher|inspect","priority":"primary|secondary|constraint"}]}
+Criterion keys: occupations, workforce_availability, wage_level, housing_pressure,
+labor_force, distance_radius, geography, current_jobs, occupational_composition,
+stex, user_priority. occupations value: [{"code":"37-2021.00","workers":30}]
+(workers can be null). distance_radius value: {"miles":100,"center":"Nashville"}.
+Other values are bounded text. Direction/priority must reflect the user, not
+an assumed universal score. set_criteria merges keys; include all changed keys
+when a user changes which criterion is primary.
+{"type":"add_candidate","query":"place name"} or {"type":"add_candidate","region_id":"known ID"}
+{"type":"remove_candidate","region_id":"known ID"}
+{"type":"shortlist_candidate","region_id":"known ID"}
+{"type":"reject_candidate","region_id":"known ID","reason":"criteria-based interpretation"}
+{"type":"focus_candidate","region_id":"known ID"}
+{"type":"compare_candidates"}
+At most eight candidates and five shortlist regions. Candidate search retrieves
+only named places; no hidden nationwide search or radius filter is connected.
+An ambiguous place triggers user choice, never a model-authored guess.
+After approved retrieval/criteria changes the client asks one automatic
+continuation using fresh evidence. On that continuation, return advice and no
+actions. Describe material gaps, accepted tradeoffs and what could change the read.
 """
 
 
@@ -62,7 +104,7 @@ def validate_actions(actions, known_ids):
             keys = set(action)
             if kind == "set_audience":
                 valid = keys == {"type", "audience"} and isinstance(action["audience"], str) and action["audience"] in AUDIENCES
-            elif kind in {"focus_region", "select_region"}:
+            elif kind in {"focus_region", "select_region", "add_candidate"}:
                 valid = (keys == {"type", "region_id"} and isinstance(action["region_id"], str)
                          and action["region_id"] in known_ids)
                 if keys == {"type", "query"}:
@@ -82,6 +124,8 @@ def validate_actions(actions, known_ids):
                          and bool(OCCUPATION.fullmatch(action["occupation_code"])))
             elif kind in {"open_region_evidence", "open_jobs", "open_scenario", "show_sources"}:
                 valid = keys == {"type"}
+            else:
+                valid = validate_decision_action(action, known_ids)
         if valid:
             accepted.append(action)
         else:
@@ -125,7 +169,7 @@ def sanitize_session(value):
         history.append({"role": item["role"], "content": item["content"]})
     references = []
     regions = value.get("regions", [])
-    if not isinstance(regions, list) or len(regions) > MAX_REGIONS + 1:
+    if not isinstance(regions, list) or len(regions) > MAX_CANDIDATES + MAX_REGIONS + 1:
         raise ValueError("Too many investigation regions")
     for region in regions:
         if not isinstance(region, dict) or not isinstance(region.get("id"), str) or not REGION_ID.fullmatch(region["id"]):
@@ -176,14 +220,17 @@ def sanitize_session(value):
     for outcome in outcomes:
         if (not isinstance(outcome, dict) or not isinstance(outcome.get("type"), str)
                 or outcome["type"] not in {"set_audience", "focus_region", "select_region", "compare_regions",
-                    "open_occupation", "open_region_evidence", "open_jobs", "open_scenario", "show_sources", "invalid"}
+                    "open_occupation", "open_region_evidence", "open_jobs", "open_scenario", "show_sources", "invalid",
+                    "start_investigation", "set_criteria", "add_candidate", "remove_candidate", "shortlist_candidate",
+                    "reject_candidate", "focus_candidate", "compare_candidates"}
                 or not isinstance(outcome.get("status"), str)
                 or outcome["status"] not in {"completed", "failed", "stale", "rejected", "unavailable"}):
             raise ValueError("Invalid interface outcome")
         checked_outcomes.append({"type": outcome["type"], "status": outcome["status"]})
     return {"schema_version": VERSION, "audience": audience, "messages": history,
             "regions": references, "selected_region_id": selected, "comparison_ids": comparison,
-            "occupation_code": code, "scenario": scenario, "action_outcomes": checked_outcomes}
+            "occupation_code": code, "scenario": scenario, "action_outcomes": checked_outcomes,
+            "investigation": sanitize_investigation(value.get("investigation"), ids)}
 
 
 def retrieve_evidence(session, resolver):

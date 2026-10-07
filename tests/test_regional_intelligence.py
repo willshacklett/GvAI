@@ -213,7 +213,8 @@ def test_regional_ui_uses_shared_model_not_demo_statistics():
         assert f'data-regional-brief data-audience="{audience}"' in html
     assert 'id="regional-ask-form"' in html
     guide = (Path(__file__).resolve().parents[1] / "web/intelligence-guide.js").read_text()
-    assert "region_context: root.GVAIRegional.contextForChat(model, regional.get().audience)" in guide
+    assert "requestBody(message, context, model ? root.GVAIRegional.contextForChat(model, regional.get().audience) : null)" in guide
+    assert "region_context: regionalContext" in guide
     assert "intelligence_session: context" in guide
     assert "Input assumptions" in html
     assert "Current published baseline" in html

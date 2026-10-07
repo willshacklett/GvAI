@@ -2570,6 +2570,7 @@
   <script src="/api_config.js?v=railway1"></script>
   <script src="/fetch.js"></script>
   <script src="/regional-intelligence.js"></script>
+  <script src="/investigation.js"></script>
   <script src="/intelligence-session.js"></script>
   <script src="/intelligence-guide.js"></script>
   <link rel="stylesheet" href="/intelligence-session.css" />
@@ -2596,6 +2597,11 @@
         <summary>Why GVAI is showing this place</summary>
         <div id="intelligence-why-content"></div>
         <button type="button" id="intelligence-why-ask">Ask GVAI why</button>
+      </details>
+      <section id="intelligence-place-choice" hidden aria-live="polite"></section>
+      <details id="intelligence-investigation">
+        <summary>Investigation · question, criteria and candidates</summary>
+        <div id="intelligence-investigation-content"></div>
       </details>
       <details id="intelligence-comparison">
         <summary>Compare places · evidence shortlist</summary>
@@ -8089,10 +8095,25 @@ async function resolveIntelligenceRegion(action, token, isCurrent) {
     : null;
   if (!region || !Number.isFinite(region.latitude) || !Number.isFinite(region.longitude)) {
     const known = region;
-    const response = await fetch((window.GVAI_API_BASE || "") + `/api/geocode?q=${encodeURIComponent(action.query || region.label)}`);
-    const location = await response.json();
+    const query = action.query || region.label;
+    const response = await fetch((window.GVAI_API_BASE || "") + `/api/geocode?candidates=1&q=${encodeURIComponent(query)}`);
+    const data = await response.json();
     if (token !== activeRegionRequestId || !isCurrent()) return null;
-    if (!response.ok || !location.ok) throw new Error(location.reason || "Place could not be resolved.");
+    if (!response.ok || !data.ok) throw new Error(data.reason || "Place could not be resolved.");
+    let location = data;
+    if (data.candidates) {
+      if (!Array.isArray(data.candidates) || !data.candidates.length || data.candidates.length > 5 ||
+          data.candidates.some(place => typeof place.label !== "string" || place.label.length > 1000 ||
+            !Number.isFinite(place.latitude) || Math.abs(place.latitude) > 90 ||
+            !Number.isFinite(place.longitude) || Math.abs(place.longitude) > 180 ||
+            typeof place.country_code !== "string")) throw new Error("Place search returned invalid candidates.");
+      location = data.candidates.length === 1 ? data.candidates[0] : await intelligenceSession.choosePlace(query, data.candidates);
+      if (!location) {
+        if (!isCurrent() || token !== activeRegionRequestId) return null;
+        throw new Error("Place choice cancelled. Name a more specific place to continue.");
+      }
+      if (token !== activeRegionRequestId || !isCurrent()) return null;
+    }
     const stateFips = usStateFipsByName[location.state];
     const country = location.country_code?.toUpperCase();
     const aggregate = !location.county && !location.city && !location.postcode;
@@ -8133,12 +8154,63 @@ async function navigateIntelligenceRegion(action, isCurrent, updateSession) {
   await loading;
   if (selectionToken !== activeRegionRequestId || regionalStore.get().audience !== audience || !isCurrent()) return false;
   if (!regionalStore.get().model) throw new Error("Selected place has no retrievable regional evidence.");
+  const model = regionalStore.get().model;
+  if (action.region_id && model.region.id !== action.region_id) throw new Error("Selected evidence did not match the requested identity.");
+  if (intelligenceSession.get().investigation) updateSession(() => intelligenceSession.setCandidate(model));
+}
+
+async function retrieveIntelligenceCandidate(action, token, isCurrent) {
+  const region = await resolveIntelligenceRegion(action, token, isCurrent);
+  if (!region) return null;
+  if (region.country_code !== "US") throw new Error("Candidate retrieval currently supports US regional evidence only.");
+  const params = new URLSearchParams();
+  if (region.type === "state") {
+    if (!region.state_fips) throw new Error("State identity could not be resolved.");
+    params.set("scope", "state"); params.set("state", region.state_fips);
+  } else if (region.type === "country") params.set("scope", "country");
+  else {
+    if (!Number.isFinite(region.latitude) || !Number.isFinite(region.longitude)) throw new Error("Place coordinates are unavailable.");
+    params.set("lat", region.latitude); params.set("lon", region.longitude);
+  }
+  const response = await fetch((window.GVAI_API_BASE || "") + `/api/region/intelligence?${params}`);
+  const data = await response.json();
+  if (token !== activeRegionRequestId || !isCurrent()) return null;
+  if (!response.ok || !data.ok || !data.intelligence) throw new Error(data.reason || "Candidate evidence is temporarily unavailable.");
+  if (action.region_id && data.intelligence.region?.id !== action.region_id) throw new Error("Candidate evidence did not match the requested identity.");
+  return data.intelligence;
 }
 
 const intelligenceGuide = window.GVAIIntelligenceGuide.mount(intelligenceSession, regionalStore, {
   set_audience: (action, isCurrent, updateSession = mutation => mutation()) => updateSession(() => selectIntelligenceAudience(action)),
   focus_region: navigateIntelligenceRegion,
   select_region: navigateIntelligenceRegion,
+  start_investigation: (action, isCurrent, updateSession) => updateSession(() => {
+    intelligenceSession.startInvestigation(action.investigation_type, action.question);
+    document.getElementById("intelligence-investigation").open = true;
+  }),
+  set_criteria: (action, isCurrent, updateSession) => updateSession(() => intelligenceSession.setCriteria(action.criteria)),
+  add_candidate: async (action, isCurrent, updateSession) => {
+    if (!intelligenceSession.get().investigation) throw new Error("Start an investigation before adding candidates.");
+    const token = activeRegionRequestId;
+    const model = await retrieveIntelligenceCandidate(action, token, isCurrent);
+    if (!model || !isCurrent() || token !== activeRegionRequestId) return false;
+    updateSession(() => intelligenceSession.setCandidate(model));
+    const { latitude, longitude } = model.region;
+    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+      viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(longitude, latitude, 180000), duration: 2 });
+    }
+  },
+  remove_candidate: (action, isCurrent, updateSession) => updateSession(() => intelligenceSession.candidateDecision(action.region_id, "removed")),
+  shortlist_candidate: (action, isCurrent, updateSession) => updateSession(() => intelligenceSession.candidateDecision(action.region_id, "shortlisted")),
+  reject_candidate: (action, isCurrent, updateSession) => updateSession(() => intelligenceSession.candidateDecision(action.region_id, "rejected", action.reason)),
+  focus_candidate: (action, isCurrent, updateSession) => navigateIntelligenceRegion({ type: "focus_region", region_id: action.region_id }, isCurrent, updateSession),
+  compare_candidates: (action, isCurrent, updateSession) => updateSession(() => {
+    const state = intelligenceSession.get();
+    const ids = state.investigation?.candidates.filter(item => item.status !== "rejected").map(item => item.region_id) || [];
+    const shortlist = state.investigation?.candidates.filter(item => item.status === "shortlisted").map(item => item.region_id) || [];
+    intelligenceSession.compare(shortlist.length >= 2 ? shortlist : ids);
+    document.getElementById("intelligence-comparison").open = true;
+  }),
   open_region_evidence: () => { document.getElementById("intelligence-why").open = true; },
   show_sources: () => {
     document.getElementById("intelligence-why").open = true;
@@ -8148,24 +8220,12 @@ const intelligenceGuide = window.GVAIIntelligenceGuide.mount(intelligenceSession
     if (action.region_ids) updateSession(() => intelligenceSession.compare(action.region_ids));
     else {
       const token = activeRegionRequestId;
-      const models = await Promise.all(action.queries.map(async query => {
-        const region = await resolveIntelligenceRegion({ query }, token, isCurrent);
-        if (!region) return null;
-        if (region.country_code !== "US") throw new Error("Comparison retrieval currently supports US regional evidence only.");
-        const params = new URLSearchParams();
-        if (region.type === "state") {
-          if (!region.state_fips) throw new Error("State identity could not be resolved.");
-          params.set("scope", "state"); params.set("state", region.state_fips);
-        } else if (region.type === "country") params.set("scope", "country");
-        else {
-          if (!Number.isFinite(region.latitude) || !Number.isFinite(region.longitude)) throw new Error("Place coordinates are unavailable.");
-          params.set("lat", region.latitude); params.set("lon", region.longitude);
-        }
-        const response = await fetch((window.GVAI_API_BASE || "") + `/api/region/intelligence?${params}`);
-        const data = await response.json();
-        if (!response.ok || !data.ok || !data.intelligence) throw new Error("Comparison evidence is temporarily unavailable.");
-        return data.intelligence;
-      }));
+      const models = [];
+      for (const query of action.queries) {
+        const model = await retrieveIntelligenceCandidate({ query }, token, isCurrent);
+        if (!model) return false;
+        models.push(model);
+      }
       if (token !== activeRegionRequestId || !isCurrent()) return false;
       if (models.some(model => !model)) return false;
       updateSession(() => intelligenceSession.setComparisons(models));

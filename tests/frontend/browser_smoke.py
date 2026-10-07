@@ -9,6 +9,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from gvai.postlabor.regional_intelligence import build_regional_intelligence
+from gvai.decision_intelligence import assess
 
 
 def check_site(url):
@@ -22,6 +23,15 @@ def check_site(url):
         chat_contexts = []
         investigations = []
         regional_requests = []
+        def selected_fixture(identity):
+            selected = copy.deepcopy(fixture)
+            if identity == "US:county:47065":
+                selected["region"].update(id=identity, label="Hamilton County, Tennessee",
+                    county="Hamilton County", county_fips="065", latitude=35.2, longitude=-85.2)
+                selected["metrics"]["labor_force"]["value"] = 100000
+                selected["metrics"]["median_home_value"]["value"] = 240000
+                selected["metrics"]["home_value_to_income_ratio"]["value"] = 3
+            return selected
         fixture = build_regional_intelligence({
             "supported": True, "data_available": True, "state": "Tennessee", "county": "Rutherford County",
             "state_fips": "47", "county_fips": "149", "latitude": 35.85, "longitude": -86.4,
@@ -55,10 +65,8 @@ def check_site(url):
                 if api_mode["failed"]:
                     route.fulfill(status=503, json={"ok": False, "reason": "Synthetic unavailable fixture"})
                 else:
-                    selected = copy.deepcopy(fixture)
-                    if parse_qs(urlsplit(route.request.url).query).get("lat") == ["35.2"]:
-                        selected["region"].update(id="US:county:47065", label="Hamilton County, Tennessee",
-                            county="Hamilton County", county_fips="065", latitude=35.2, longitude=-85.2)
+                    identity = "US:county:47065" if parse_qs(urlsplit(route.request.url).query).get("lat") == ["35.2"] else "US:county:47149"
+                    selected = selected_fixture(identity)
                     route.fulfill(json={"ok": True, "intelligence": selected})
             elif "/api/chat" in route.request.url:
                 chat_contexts.append(route.request.post_data_json.get("region_context"))
@@ -66,9 +74,19 @@ def check_site(url):
                 if api_mode["hold_chat"]:
                     pending["chat"].append(route)
                     return
+                context = route.request.post_data_json.get("intelligence_session", {})
+                read = assess(context.get("investigation"), [selected_fixture(item["id"]) for item in context.get("regions", [])],
+                              context.get("comparison_ids", []))
                 route.fulfill(json={"ok": True, "reply": "Synthetic model interpretation: observed ACS evidence is distinct from derived signals. STEX is unavailable in this fixture.",
-                    "action_protocol": "gvai.ui-actions.v1", "actions": api_mode["actions"]})
+                    "action_protocol": "gvai.ui-actions.v1", "actions": api_mode["actions"], "decision_read": read})
             elif "/api/geocode" in route.request.url:
+                if parse_qs(urlsplit(route.request.url).query).get("q") == ["Springfield"]:
+                    route.fulfill(json={"ok": True, "requires_choice": True, "candidates": [
+                        {"label": "Springfield, Tennessee · synthetic choice", "latitude": 35.85, "longitude": -86.4,
+                         "country_code": "us", "state": "Tennessee", "county": "Rutherford County"},
+                        {"label": "Springfield, Missouri · synthetic choice", "latitude": 37.2, "longitude": -93.3,
+                         "country_code": "us", "state": "Missouri", "county": "Greene County"}]})
+                    return
                 if parse_qs(urlsplit(route.request.url).query).get("q") == ["Hamilton County, Tennessee"]:
                     route.fulfill(json={"ok": True, "label": "Hamilton County, Tennessee", "latitude": 35.2,
                         "longitude": -85.2, "country": "United States", "country_code": "us",
@@ -193,6 +211,84 @@ def check_site(url):
             page.wait_for_function("document.getElementById('intelligence-context').textContent.includes('Rutherford')")
             page.wait_for_function("Math.abs(window.gvaiViewer.camera.positionCartographic.longitude - (-86.4 * Math.PI / 180)) < .01")
         print("Desktop/mobile AI audience, real camera movement, shortlist, follow-up context, Why Here and executable-action rejection verified")
+        def submit_question(message):
+            page.wait_for_function("!document.querySelector('#regional-ask-form button').disabled")
+            page.locator("#regional-question").fill(message)
+            page.locator("#regional-ask-form button").click()
+            page.wait_for_function("!document.querySelector('#regional-ask-form button').disabled")
+
+        for width, height in [(1440, 900), (390, 844)]:
+            print("Starting decision journey", width, flush=True)
+            page.set_viewport_size({"width": width, "height": height})
+            page.locator("#intelligence-guide").evaluate("element => element.open = true")
+            page.wait_for_function("!document.querySelector('#regional-ask-form button').disabled")
+            page.locator("#intelligence-clear").click()
+            api_mode["actions"] = [
+                {"type": "set_audience", "audience": "business"},
+                {"type": "start_investigation", "investigation_type": "business_expansion", "question": "Open a pest control office between Nashville and Chattanooga?"},
+                {"type": "set_criteria", "criteria": [
+                    {"key": "geography", "value": "Nashville to Chattanooga", "priority": "constraint", "direction": "inspect"},
+                    {"key": "distance_radius", "value": {"miles": 100, "center": "Nashville"}, "priority": "constraint", "direction": "inspect"},
+                    {"key": "occupations", "value": [{"code": "37-2021.00", "workers": 30}, {"code": "41-3091.00", "workers": 5},
+                                                    {"code": "11-1021.00", "workers": 3}], "priority": "constraint", "direction": "inspect"},
+                    {"key": "labor_force", "value": "Deeper labor pool", "priority": "primary", "direction": "higher"},
+                    {"key": "housing_pressure", "value": "Less housing pressure", "priority": "secondary", "direction": "lower"},
+                    {"key": "workforce_availability", "value": "Occupation workforce availability", "priority": "secondary", "direction": "higher"}]},
+                {"type": "add_candidate", "query": "Hamilton County, Tennessee"},
+                {"type": "compare_candidates"},
+                {"type": "focus_candidate", "region_id": "US:county:47065"}]
+            before = len(investigations)
+            submit_question("Open a pest control branch: 30 workers in 37-2021.00, 5 in 41-3091.00 and 3 in 11-1021.00 within 100 miles of Nashville. Prioritize the deeper labor pool over lower housing pressure; compare Rutherford and Hamilton.")
+            assert len(investigations) == before + 2, "Exactly one automatic continuation is allowed"
+            current = investigations[-1]["investigation"]
+            assert current["type"] == "business_expansion"
+            assert len(current["candidates"]) == 2
+            assert current["criteria"][2]["value"][0]["workers"] == 30
+            assert "PRIVATE_PROFILE_SENTINEL" not in json.dumps(investigations[-1])
+            page.wait_for_function("Math.abs(window.gvaiViewer.camera.positionCartographic.longitude - (-85.2 * Math.PI / 180)) < .01")
+            panel = page.locator("#intelligence-investigation-content")
+            assert "Rutherford County, Tennessee leads" in panel.inner_text()
+            assert "occupation" in panel.inner_text()
+            assert "unverified" in panel.inner_text()
+            assert "Could change if" in panel.inner_text()
+            api_mode["actions"] = []
+            panel.locator('[data-candidate-action="remove_candidate"][data-region-id="US:county:47065"]').click()
+            assert panel.locator('[data-candidate-action="focus_candidate"]').count() == 1
+            assert "Reassess before relying" in panel.inner_text()
+            api_mode["actions"] = [{"type": "add_candidate", "query": "Hamilton County, Tennessee"}, {"type": "compare_candidates"}]
+            submit_question("Add Hamilton back to the shortlist.")
+            assert panel.locator('[data-candidate-action="focus_candidate"]').count() == 2
+            api_mode["actions"] = []
+            submit_question("Why is Rutherford ahead, and what would change that recommendation?")
+            assert "Rutherford County, Tennessee leads" in panel.inner_text()
+            panel.locator("[data-criteria-editor]").evaluate("element => element.open = true")
+            panel.locator('[data-criterion-key="labor_force"][data-criterion-field="priority"]').select_option("secondary")
+            panel.locator('[data-criterion-key="housing_pressure"][data-criterion-field="priority"]').select_option("primary")
+            assert "Reassess before relying" in panel.inner_text()
+            submit_question("Use my updated visible priorities: housing is now primary, labor-force size secondary. Reassess.")
+            assert "Hamilton County, Tennessee leads" in panel.inner_text()
+            assert "GVAI Score" not in panel.inner_text()
+            api_mode["actions"] = [{"type": "add_candidate", "query": "Springfield"}]
+            page.locator("#regional-question").fill("What about Springfield?")
+            page.locator("#regional-ask-form button").click()
+            choice = page.locator("#intelligence-place-choice")
+            page.wait_for_selector("#intelligence-place-choice:not([hidden])")
+            assert choice.locator("[data-place-choice]").count() == 2
+            assert page.locator("#regional-ask-form button").is_disabled()
+            choice.locator('[data-place-choice="0"]').click()
+            page.wait_for_function("!document.querySelector('#regional-ask-form button').disabled")
+            assert investigations[-1]["investigation"]["criteria"][4]["priority"] == "primary"
+            assert not choice.is_visible()
+            panel.locator("[data-criteria-editor]").evaluate("element => element.open = false")
+            panel.locator("p").first.scroll_into_view_if_needed()
+            assert panel.evaluate("element => element.scrollWidth <= element.clientWidth + 1")
+            assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            page.screenshot(path=str(output / f"decision-{width}.png"))
+            api_mode["actions"] = []
+            page.locator("#intelligence-clear").click()
+            page.locator("#intelligence-guide").evaluate("element => element.open = false")
+            page.locator("#close-business-workspace-btn").click()
+        print("Desktop/mobile criteria, priority-sensitive evidence read, candidate removal, disambiguation and bounded continuation verified", flush=True)
         page.set_viewport_size({"width": 1440, "height": 900})
         page.locator("#intelligence-guide").evaluate("element => element.open = true")
         page.locator("#regional-ask-pane").evaluate("element => element.open = true")

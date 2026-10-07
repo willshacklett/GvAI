@@ -10,7 +10,7 @@ from urllib.parse import unquote, urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 WEB_FILES = (
     "index.html", "api_config.js", "fetch.js", "regional-intelligence.js",
-    "intelligence-session.js", "intelligence-guide.js", "intelligence-session.css", "gv-carl-logo.svg", "gv-logo.png",
+    "investigation.js", "intelligence-session.js", "intelligence-guide.js", "intelligence-session.css", "gv-carl-logo.svg", "gv-logo.png",
     "favicon.ico", "favicon.png", "style.css", "dashboard.js", "gvai-voice.js",
     "manifest.json", "service-worker.js", "CNAME", "robots.txt", "sitemap.xml",
     "data/geography/ne_110m_admin_0_countries.geojson",

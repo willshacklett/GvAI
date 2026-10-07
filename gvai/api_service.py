@@ -31,6 +31,7 @@ from gvai.postlabor.region_labor_intelligence import (
 )
 from gvai.postlabor.regional_intelligence import sanitize_regional_context, synthesize_regional_intelligence
 from gvai.intelligence_session import SYSTEM as INTELLIGENCE_SYSTEM, sanitize_session, retrieve_evidence, parse_response
+from gvai.decision_intelligence import assess
 from gvai.postlabor.worker_region_outlook import (
     synthesize_worker_related_occupations,
     synthesize_worker_region_outlook,
@@ -216,6 +217,7 @@ def api_geocode():
     if len(raw_query.encode("utf-8")) > app.config["GEOCODE_MAX_QUERY_BYTES"]:
         return jsonify({"ok": False, "reason": "Location query is too large."}), 413
     query = raw_query.strip()
+    multiple = request.args.get("candidates") == "1"
 
     if not query:
         return jsonify({
@@ -233,9 +235,9 @@ def api_geocode():
             params={
                 "q": geocode_query,
                 "format": "jsonv2",
-                "limit": 1,
+                "limit": 5 if multiple else 1,
                 "addressdetails": 1,
-                "polygon_geojson": 1,
+                "polygon_geojson": 0 if multiple else 1,
                 "polygon_threshold": 0.01,
             },
             headers={
@@ -255,31 +257,38 @@ def api_geocode():
                 "reason": "Location not found."
             }), 404
 
-        result = results[0]
-        address = result.get("address") or {}
+        def place(result):
+            address = result.get("address") or {}
+            latitude, longitude = float(result["lat"]), float(result["lon"])
+            if not math.isfinite(latitude) or not math.isfinite(longitude) or abs(latitude) > 90 or abs(longitude) > 180:
+                raise ValueError("Invalid geocoder coordinates")
+            return {
+                "ok": True,
+                "query": query,
+                "label": result.get("display_name") or query,
+                "latitude": latitude,
+                "longitude": longitude,
+                "place_type": result.get("type"),
+                "geojson": result.get("geojson"),
+                "country": address.get("country"),
+                "country_code": address.get("country_code"),
+                "state": address.get("state"),
+                "county": address.get("county"),
+                "city": (
+                    address.get("city")
+                    or address.get("town")
+                    or address.get("village")
+                    or address.get("municipality")
+                ),
+                "postcode": address.get("postcode"),
+            }
+        candidates = [place(result) for result in results[:5 if multiple else 1]]
+        if multiple:
+            return jsonify({"ok": True, "query": query, "candidates": candidates,
+                            "requires_choice": len(candidates) > 1})
+        return jsonify(candidates[0])
 
-        return jsonify({
-            "ok": True,
-            "query": query,
-            "label": result.get("display_name") or query,
-            "latitude": float(result["lat"]),
-            "longitude": float(result["lon"]),
-            "place_type": result.get("type"),
-            "geojson": result.get("geojson"),
-            "country": address.get("country"),
-            "country_code": address.get("country_code"),
-            "state": address.get("state"),
-            "county": address.get("county"),
-            "city": (
-                address.get("city")
-                or address.get("town")
-                or address.get("village")
-                or address.get("municipality")
-            ),
-            "postcode": address.get("postcode"),
-        })
-
-    except requests.RequestException as exc:
+    except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
         app.logger.exception("Geocode provider failed")
         return jsonify({
             "ok": False,
@@ -1704,6 +1713,10 @@ def chat():
 
     investigation = None
     evidence = []
+    decision_read = None
+    continuation = data.get("continuation", False)
+    if not isinstance(continuation, bool):
+        return jsonify({"ok": False, "reason": "Invalid continuation flag."}), 400
     if "intelligence_session" in data:
         try:
             investigation = sanitize_session(data["intelligence_session"])
@@ -1711,14 +1724,23 @@ def chat():
             return jsonify({"ok": False, "reason": "Invalid or oversized intelligence session."}), 400
         try:
             evidence = retrieve_evidence(investigation, synthesize_regional_intelligence)
+            occupation_codes = []
             if investigation["occupation_code"]:
+                occupation_codes.append(investigation["occupation_code"])
+            for criterion in (investigation["investigation"] or {}).get("criteria", []):
+                if criterion["key"] == "occupations":
+                    occupation_codes.extend(item["code"] for item in criterion["value"])
+            occupation_codes = list(dict.fromkeys(occupation_codes))
+            if occupation_codes:
                 for model in evidence:
-                    model["occupation_evidence"] = {
-                        "occupation_code": investigation["occupation_code"],
+                    model["occupation_evidence_by_code"] = {code: {
+                        "occupation_code": code,
                         "geography": {"type": "oews_labor_market_area", "id": model["region"].get("oews_area_code")},
-                        **public_occupation_evidence(occupation_code=investigation["occupation_code"],
+                        **public_occupation_evidence(occupation_code=code,
                             area_code=model["region"].get("oews_area_code")),
-                    }
+                    } for code in occupation_codes}
+                    model["occupation_evidence"] = model["occupation_evidence_by_code"][occupation_codes[0]]
+            decision_read = assess(investigation["investigation"], evidence, investigation["comparison_ids"])
         except ValueError:
             return jsonify({"ok": False, "reason": "Region identity could not be verified. Reselect the region."}), 400
         except Exception:
@@ -1781,6 +1803,7 @@ BEHAVIOR
         user_content += "\n\nINVESTIGATION_JSON:\n" + json.dumps({
             **investigation, "evidence": evidence,
             "client_jobs_search": region_context.get("jobs") if region_context else None,
+            "DECISION_READ": decision_read, "continuation": continuation,
         }, ensure_ascii=False, allow_nan=False)
     elif region_context is not None:
         user_content += "\n\nCLIENT_REGION_CONTEXT_JSON:\n" + json.dumps(region_context, ensure_ascii=False, allow_nan=False)
@@ -1812,6 +1835,9 @@ BEHAVIOR
     if investigation is not None:
         if gv_precheck.get("mode") == "BLOCK" or governed.get("gv", {}).get("mode") == "BLOCK":
             actions = []
+            decision_read = None
+        if continuation:
+            actions = []
         if rejected_actions:
             app.logger.warning("Rejected %s malformed intelligence UI actions", rejected_actions)
         return jsonify({
@@ -1821,6 +1847,7 @@ BEHAVIOR
             "audience": investigation["audience"], "region_id": investigation["selected_region_id"],
             "occupation_evidence": {model["region"]["id"]: model["occupation_evidence"]
                                     for model in evidence if "occupation_evidence" in model},
+            "decision_read": decision_read,
         })
     if region_context is not None:
         return jsonify({"ok": governed["ok"], "reply": governed["reply"], "response": governed["response"],
