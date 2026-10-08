@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GVAI — Post-Labor Capitalism Intelligence</title>
+  <title>GVAI — Intelligence for work, workforce, and place</title>
   <meta name="description" content="Geographic labor intelligence for laborers, businesses, and government. Explore regional workforce evidence on GVAI's interactive globe." />
   <meta property="og:title" content="GVAI | Geographic Labor Intelligence" />
   <meta property="og:description" content="Explore regional labor and workforce evidence for laborers, businesses, and government." />
@@ -2579,31 +2579,30 @@
 <body>
 <main id="app" aria-label="GVAI geographic labor intelligence">
   <details id="intelligence-guide" class="intelligence-guide" open>
-    <summary>Ask GVAI · your intelligence guide</summary>
+    <summary>What are you trying to understand?</summary>
     <div class="intelligence-guide-body regional-tools">
-      <p id="intelligence-context"></p>
-      <div id="intelligence-starters" class="intelligence-starters">
-        <h2>What are you trying to understand?</h2>
-        <button type="button" data-intelligence-prompt data-audience="laborers">Where could my skills be worth more?</button>
-        <button type="button" data-intelligence-prompt data-audience="business">Where is labor getting harder to hire?</button>
-        <button type="button" data-intelligence-prompt data-audience="business">Compare two places for expansion.</button>
-        <button type="button" data-intelligence-prompt data-audience="government">Show me what is changing in my region.</button>
-      </div>
+      <p id="intelligence-context" hidden></p>
       <div id="intelligence-conversation" aria-live="polite" aria-label="Investigation conversation"></div>
       <div id="intelligence-composer-slot"></div>
+      <div id="intelligence-starters" class="intelligence-starters">
+        <button type="button" data-intelligence-prompt="Help me find better work. Where could my skills be worth more?" data-audience="laborers">Find better work</button>
+        <button type="button" data-intelligence-prompt="Help me find where to hire. Where is labor getting harder to hire?" data-audience="business">Find where to hire</button>
+        <button type="button" data-intelligence-prompt="Help me compare two places for expansion." data-audience="business" data-start-comparison>Compare places</button>
+        <button type="button" data-intelligence-prompt="Help me understand what is changing in my region." data-audience="government">Understand my region</button>
+      </div>
       <p id="intelligence-action-status" role="status"></p>
-      <button type="button" id="intelligence-clear">New conversation</button>
-      <details id="intelligence-why">
+      <button type="button" id="intelligence-clear" hidden>New conversation</button>
+      <details id="intelligence-why" hidden>
         <summary>Why GVAI is showing this place</summary>
         <div id="intelligence-why-content"></div>
         <button type="button" id="intelligence-why-ask">Ask GVAI why</button>
       </details>
       <section id="intelligence-place-choice" hidden aria-live="polite"></section>
-      <details id="intelligence-investigation">
+      <details id="intelligence-investigation" hidden>
         <summary>Investigation · question, criteria and candidates</summary>
         <div id="intelligence-investigation-content"></div>
       </details>
-      <details id="intelligence-comparison">
+      <details id="intelligence-comparison" hidden>
         <summary>Compare places · evidence shortlist</summary>
         <button type="button" id="intelligence-add-region">Add selected place</button>
         <div id="intelligence-comparison-content"></div>
@@ -2625,19 +2624,26 @@
       />
       <div class="brand-copy">
         <h1 class="brand-title">GVAI</h1>
-        <div class="brand-sub">Post-Labor Capitalism Intelligence</div>
+        <div class="brand-sub">Intelligence for work, workforce, and place</div>
         <div class="brand-status">GLOBAL OUTLOOK</div>
       </div>
     </div>
 
-    <div class="search-wrap">
+    <details id="exploration-tools" class="exploration-tools">
+      <summary>Explore places</summary>
+      <div class="search-wrap">
       <input
         id="location-search"
         placeholder="Search country, state, city, or county..."
         aria-label="Search location"
       />
       <button id="search-btn" class="primary">Explore</button>
-    </div>
+      </div>
+      <details class="exploration-map-tools">
+        <summary>Map layers and controls</summary>
+        <div id="exploration-map-slot"></div>
+      </details>
+    </details>
   </header>
 
   <nav class="globe-controls" aria-label="Globe controls">
@@ -2671,7 +2677,7 @@
     </div>
   </div>
 
-  <div class="info-panel" id="regional-outlook-panel">
+  <div class="info-panel" id="regional-outlook-panel" hidden>
     <button
       id="regional-outlook-toggle"
       class="regional-outlook-toggle"
@@ -2897,11 +2903,11 @@
     <details id="regional-ask-pane">
       <summary>Continue your investigation</summary>
       <form id="regional-ask-form">
-        <label>Audience<select id="regional-ask-audience"><option value="laborers">Laborers</option><option value="business">Business</option><option value="government">Government</option></select></label>
-        <label>Question<textarea id="regional-question" maxlength="8192" placeholder="Ask a question or tell GVAI where to take you..." required>Explain the observed conditions, derived signals, and data gaps in this region.</textarea></label>
+        <label id="intelligence-audience-control" hidden>Audience<select id="regional-ask-audience"><option value="laborers">Laborers</option><option value="business">Business</option><option value="government">Government</option></select></label>
+        <label class="intelligence-question"><span class="intelligence-input-label">Ask GVAI</span><textarea id="regional-question" maxlength="8192" placeholder="Ask GVAI about work, hiring, regions, careers, or expansion..." required></textarea></label>
         <button type="submit" class="primary">Ask GVAI</button>
       </form>
-      <p>Model interpretation, not source data. Verify claims against the cited evidence.</p>
+      <p id="intelligence-disclaimer" hidden>Model interpretation, not source data. Verify claims against the cited evidence.</p>
       <p id="regional-ask-status" role="status"></p>
       <div id="regional-ask-reply" class="regional-ask-reply"></div>
     </details>
@@ -3951,6 +3957,9 @@ const regionalStore = window.GVAIRegional.createStore();
 window.GVAIRegional.mount(regionalStore);
 const intelligenceSession = window.GVAIIntelligence.createStore(regionalStore);
 document.getElementById("intelligence-composer-slot").append(document.getElementById("regional-ask-pane"));
+document.getElementById("exploration-map-slot").append(
+  document.querySelector(".globe-controls"), document.querySelector(".layer-bar"), document.querySelector(".legend")
+);
 let renderedRegionalModel = null;
 let renderedRegionalAudience = "laborers";
 let renderedRegionalSelection = null;
@@ -8211,8 +8220,13 @@ const intelligenceGuide = window.GVAIIntelligenceGuide.mount(intelligenceSession
     intelligenceSession.compare(shortlist.length >= 2 ? shortlist : ids);
     document.getElementById("intelligence-comparison").open = true;
   }),
-  open_region_evidence: () => { document.getElementById("intelligence-why").open = true; },
+  open_region_evidence: () => {
+    const pane = document.getElementById("intelligence-why");
+    pane.hidden = false;
+    pane.open = true;
+  },
   show_sources: () => {
+    document.getElementById("intelligence-why").hidden = false;
     document.getElementById("intelligence-why").open = true;
     document.querySelectorAll("#intelligence-why-content .regional-source-note").forEach(note => { note.open = true; });
   },
@@ -10962,8 +10976,6 @@ regionalOutlookToggle.addEventListener(
   }
 );
 
-// Show the default regional panel without moving the camera.
-// The globe should open at the whole-Earth view.
 renderProfile(
   globalProfile
 );

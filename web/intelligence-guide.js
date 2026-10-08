@@ -16,13 +16,26 @@
     const status = document.getElementById("regional-ask-status");
     const button = form.querySelector("button");
     let busy = false;
+    let comparisonRequested = false;
     const open = () => { guide.open = true; pane.open = true; question.focus(); };
     const ask = (message, audience) => {
       if (busy) { status.textContent = "Wait for the current answer before sending another question."; open(); return; }
-      if (audience) adapters.set_audience({ audience });
+      if (audience) regional.selectAudience(audience);
       question.value = message; open(); return send(message);
     };
     session.subscribe(state => {
+      const active = state.messages.length > 0 || !!state.investigation;
+      const selected = state.selectedRegion || regional.get().selection;
+      document.getElementById("intelligence-context").hidden = !active && !state.selectedRegion;
+      document.getElementById("intelligence-clear").hidden = !state.messages.length;
+      document.getElementById("intelligence-why").hidden = !state.evidence && !state.scenario;
+      document.getElementById("intelligence-investigation").hidden = !state.investigation;
+      document.getElementById("intelligence-comparison").hidden = !state.selectedRegion && !state.comparisons.length && !state.investigation && !comparisonRequested;
+      document.getElementById("intelligence-audience-control").hidden = !active;
+      document.getElementById("intelligence-disclaimer").hidden = !state.messages.length;
+      document.getElementById("regional-outlook-panel").hidden = !selected;
+      document.getElementById("app").classList.toggle("intelligence-active", active);
+      document.getElementById("app").classList.toggle("intelligence-contextual", active || !!selected);
       document.getElementById("intelligence-context").textContent =
         `${{ laborers: "Laborer", business: "Business", government: "Government" }[state.audience]} · ${state.selectedRegion?.label || "No place selected"}`;
       const conversation = document.getElementById("intelligence-conversation");
@@ -54,12 +67,17 @@
     document.getElementById("ask-btn").addEventListener("click", open);
     document.getElementById("intelligence-clear").addEventListener("click", () => {
       if (busy) { status.textContent = "Wait for the current answer before starting a new conversation."; return; }
+      comparisonRequested = false;
       session.clearConversation(); document.getElementById("regional-ask-reply").textContent = "";
       status.textContent = "New conversation. Your regional selection and shortlist remain.";
     });
     document.getElementById("intelligence-starters").addEventListener("click", event => {
       const prompt = event.target.closest("[data-intelligence-prompt]");
-      if (prompt) ask(prompt.textContent, prompt.dataset.audience);
+      if (prompt) {
+        if (busy) { open(); return; }
+        comparisonRequested = prompt.hasAttribute("data-start-comparison");
+        ask(prompt.dataset.intelligencePrompt || prompt.textContent, prompt.dataset.audience);
+      }
     });
     document.getElementById("intelligence-why-ask").addEventListener("click", () =>
       ask("Why does this place matter for my investigation? Explain the evidence, tradeoffs, and what is missing."));
