@@ -2570,10 +2570,47 @@
   <script src="/api_config.js?v=railway1"></script>
   <script src="/fetch.js"></script>
   <script src="/regional-intelligence.js"></script>
+  <script src="/investigation.js"></script>
+  <script src="/intelligence-session.js"></script>
+  <script src="/intelligence-guide.js"></script>
+  <link rel="stylesheet" href="/intelligence-session.css" />
 </head>
 
 <body>
 <main id="app" aria-label="GVAI geographic labor intelligence">
+  <details id="intelligence-guide" class="intelligence-guide" open>
+    <summary>Ask GVAI · your intelligence guide</summary>
+    <div class="intelligence-guide-body regional-tools">
+      <p id="intelligence-context"></p>
+      <div id="intelligence-starters" class="intelligence-starters">
+        <h2>What are you trying to understand?</h2>
+        <button type="button" data-intelligence-prompt data-audience="laborers">Where could my skills be worth more?</button>
+        <button type="button" data-intelligence-prompt data-audience="business">Where is labor getting harder to hire?</button>
+        <button type="button" data-intelligence-prompt data-audience="business">Compare two places for expansion.</button>
+        <button type="button" data-intelligence-prompt data-audience="government">Show me what is changing in my region.</button>
+      </div>
+      <div id="intelligence-conversation" aria-live="polite" aria-label="Investigation conversation"></div>
+      <div id="intelligence-composer-slot"></div>
+      <p id="intelligence-action-status" role="status"></p>
+      <button type="button" id="intelligence-clear">New conversation</button>
+      <details id="intelligence-why">
+        <summary>Why GVAI is showing this place</summary>
+        <div id="intelligence-why-content"></div>
+        <button type="button" id="intelligence-why-ask">Ask GVAI why</button>
+      </details>
+      <section id="intelligence-place-choice" hidden aria-live="polite"></section>
+      <details id="intelligence-investigation">
+        <summary>Investigation · question, criteria and candidates</summary>
+        <div id="intelligence-investigation-content"></div>
+      </details>
+      <details id="intelligence-comparison">
+        <summary>Compare places · evidence shortlist</summary>
+        <button type="button" id="intelligence-add-region">Add selected place</button>
+        <div id="intelligence-comparison-content"></div>
+        <button type="button" id="intelligence-compare-ask">Compare these places</button>
+      </details>
+    </div>
+  </details>
 
   <div id="globe-shell">
     <canvas id="globe"></canvas>
@@ -2858,10 +2895,10 @@
       </button>
     </div>
     <details id="regional-ask-pane">
-      <summary>Ask about regional evidence</summary>
+      <summary>Continue your investigation</summary>
       <form id="regional-ask-form">
         <label>Audience<select id="regional-ask-audience"><option value="laborers">Laborers</option><option value="business">Business</option><option value="government">Government</option></select></label>
-        <label>Question<textarea id="regional-question" maxlength="8192" required>Explain the observed conditions, derived signals, and data gaps in this region.</textarea></label>
+        <label>Question<textarea id="regional-question" maxlength="8192" placeholder="Ask a question or tell GVAI where to take you..." required>Explain the observed conditions, derived signals, and data gaps in this region.</textarea></label>
         <button type="submit" class="primary">Ask GVAI</button>
       </form>
       <p>Model interpretation, not source data. Verify claims against the cited evidence.</p>
@@ -3912,20 +3949,20 @@ let activeRegionRequestId = 0;
 let lastRegionalSelection = null;
 const regionalStore = window.GVAIRegional.createStore();
 window.GVAIRegional.mount(regionalStore);
-let regionalAskRequestId = 0;
+const intelligenceSession = window.GVAIIntelligence.createStore(regionalStore);
+document.getElementById("intelligence-composer-slot").append(document.getElementById("regional-ask-pane"));
 let renderedRegionalModel = null;
 let renderedRegionalAudience = "laborers";
+let renderedRegionalSelection = null;
 
 regionalStore.subscribe(state => {
-  if (state.model !== renderedRegionalModel || state.audience !== renderedRegionalAudience) {
-    regionalAskRequestId += 1;
-    document.getElementById("regional-ask-status").textContent = "";
-    document.getElementById("regional-ask-reply").textContent = "";
-    document.querySelector("#regional-ask-form button").disabled = false;
+  if (state.model?.region.id !== renderedRegionalModel?.region.id ||
+      state.selection !== renderedRegionalSelection || state.audience !== renderedRegionalAudience) {
     document.getElementById("regional-scenario-result").innerHTML = "<p>No scenario calculated for this selection.</p>";
   }
   renderedRegionalModel = state.model;
   renderedRegionalAudience = state.audience;
+  renderedRegionalSelection = state.selection;
   if (state.model) renderSharedRegionalMetrics(state.model);
 });
 
@@ -4068,6 +4105,7 @@ function publicRegionContext() {
 }
 
 function setActiveInvestigation(occupationCode, occupationTitle) {
+  intelligenceSession.selectOccupation(occupationCode);
   activeInvestigationContext = {
     schema_version: ACTIVE_INVESTIGATION_VERSION,
     investigated_occupation: {
@@ -7312,7 +7350,8 @@ async function loadCountryBoundaryFromGeocoder(
 async function loadRegionalData(
   latitude,
   longitude,
-  options = {}
+  options = {},
+  updateSession = mutation => mutation()
 ) {
   const requestId =
     ++activeRegionRequestId;
@@ -7322,7 +7361,7 @@ async function loadRegionalData(
 
   const scope =
     options.scope || "county";
-  regionalStore.begin({ scope, latitude, longitude, label: options.label || options.stateName || (scope === "country" ? "United States" : scope === "state" ? `US state ${options.stateFips}` : `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`) });
+  updateSession(() => regionalStore.begin({ scope, latitude, longitude, label: options.label || options.stateName || (scope === "country" ? "United States" : scope === "state" ? `US state ${options.stateFips}` : `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`) }));
 
   const title =
     document.getElementById("location-title");
@@ -7410,7 +7449,7 @@ async function loadRegionalData(
 
     if (!data.supported) {
       clearRegionalMetrics();
-      regionalStore.set(model);
+      updateSession(() => regionalStore.set(model));
 
       currentRegionLatitude = null;
       currentRegionLongitude = null;
@@ -7422,7 +7461,7 @@ async function loadRegionalData(
       return;
     }
 
-    regionalStore.set(model);
+    updateSession(() => regionalStore.set(model));
     title.textContent =
       data.county ||
       data.state ||
@@ -7601,7 +7640,7 @@ async function loadRegionalData(
     );
     if (requestId !== activeRegionRequestId) return;
     showRegionalFailure(requestId);
-    regionalStore.fail();
+    updateSession(() => regionalStore.fail());
     sub.textContent =
       "Regional data temporarily unavailable.";
   }
@@ -7658,6 +7697,8 @@ document
         rawQuery.toLowerCase();
 
       if (!query) return;
+      const searchSelectionToken = ++activeRegionRequestId;
+      intelligenceSession.invalidateNavigation();
 
       // Explicit national aliases must take precedence over
       // fuzzy local profile matching.
@@ -7771,6 +7812,7 @@ document
 
         const data =
           await response.json();
+        if (searchSelectionToken !== activeRegionRequestId) return;
 
         if (
           !response.ok ||
@@ -7934,6 +7976,7 @@ document
         );
 
       } catch (error) {
+        if (searchSelectionToken !== activeRegionRequestId) return;
         console.error(
           "Place search failed",
           error
@@ -8039,43 +8082,176 @@ handler.setInputAction(
   Cesium.ScreenSpaceEventType.LEFT_CLICK
 );
 
-document
-  .getElementById("ask-btn")
-  .addEventListener(
-    "click",
-    () => {
-      document.getElementById("regional-ask-pane").open = true;
-      document.getElementById("regional-question").focus();
-    }
-  );
+function selectIntelligenceAudience({ audience }) {
+  if (audience === "laborers") openLaborersWorkspace();
+  else if (audience === "business") openBusinessWorkspace();
+  else if (audience === "government") openGovernmentWorkspace();
+  else throw new Error("Unsupported audience");
+}
 
-document.getElementById("regional-ask-audience").addEventListener("change", event => regionalStore.selectAudience(event.target.value));
-document.getElementById("regional-ask-form").addEventListener("submit", async event => {
-  event.preventDefault();
-  const { model, audience } = regionalStore.get();
-  const status = document.getElementById("regional-ask-status");
-  const button = event.currentTarget.querySelector("button");
-  const message = document.getElementById("regional-question").value.trim();
-  if (!model) { status.textContent = "Select a region before asking about its evidence."; return; }
-  if (!message || new TextEncoder().encode(message).length > 8192) { status.textContent = "Enter a shorter question."; return; }
-  const requestId = ++regionalAskRequestId;
-  button.disabled = true;
-  status.textContent = "Reviewing the selected regional evidence...";
-  try {
-    const response = await fetch((window.GVAI_API_BASE || "") + "/api/chat", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, region_context: window.GVAIRegional.contextForChat(model, audience) })
-    });
+async function resolveIntelligenceRegion(action, token, isCurrent) {
+  let region = action.region_id
+    ? intelligenceSession.get().knownRegions.find(item => item.id === action.region_id)
+    : null;
+  if (!region || !Number.isFinite(region.latitude) || !Number.isFinite(region.longitude)) {
+    const known = region;
+    const query = action.query || region.label;
+    const response = await fetch((window.GVAI_API_BASE || "") + `/api/geocode?candidates=1&q=${encodeURIComponent(query)}`);
     const data = await response.json();
-    if (requestId !== regionalAskRequestId || regionalStore.get().model !== model || regionalStore.get().audience !== audience) return;
-    if (!data.ok) throw new Error("Regional interpretation unavailable");
-    document.getElementById("regional-ask-reply").textContent = data.reply || data.response || "No interpretation returned.";
-    status.textContent = "Model interpretation based on the supplied regional evidence; verify against sources.";
-  } catch (error) {
-    if (requestId === regionalAskRequestId) status.textContent = "GVAI regional interpretation is temporarily unavailable. Your evidence remains visible.";
-  } finally {
-    if (requestId === regionalAskRequestId) button.disabled = false;
+    if (token !== activeRegionRequestId || !isCurrent()) return null;
+    if (!response.ok || !data.ok) throw new Error(data.reason || "Place could not be resolved.");
+    let location = data;
+    if (data.candidates) {
+      if (!Array.isArray(data.candidates) || !data.candidates.length || data.candidates.length > 5 ||
+          data.candidates.some(place => typeof place.label !== "string" || place.label.length > 1000 ||
+            !Number.isFinite(place.latitude) || Math.abs(place.latitude) > 90 ||
+            !Number.isFinite(place.longitude) || Math.abs(place.longitude) > 180 ||
+            typeof place.country_code !== "string")) throw new Error("Place search returned invalid candidates.");
+      location = data.candidates.length === 1 ? data.candidates[0] : await intelligenceSession.choosePlace(query, data.candidates);
+      if (!location) {
+        if (!isCurrent() || token !== activeRegionRequestId) return null;
+        throw new Error("Place choice cancelled. Name a more specific place to continue.");
+      }
+      if (token !== activeRegionRequestId || !isCurrent()) return null;
+    }
+    const stateFips = usStateFipsByName[location.state];
+    const country = location.country_code?.toUpperCase();
+    const aggregate = !location.county && !location.city && !location.postcode;
+    region = { label: location.label, latitude: location.latitude, longitude: location.longitude,
+      country_code: country, type: aggregate ? (location.state ? "state" : "country") : "county",
+      state_fips: stateFips, state: location.state, country: location.country };
+    if (known) {
+      if (country !== known.country_code || (known.type === "state" && stateFips !== known.state_fips)) {
+        throw new Error("Location lookup did not match the known region.");
+      }
+      region = { ...known, latitude: location.latitude, longitude: location.longitude };
+    }
   }
+  return region;
+}
+
+async function navigateIntelligenceRegion(action, isCurrent, updateSession) {
+  const token = ++activeRegionRequestId;
+  const audience = regionalStore.get().audience;
+  const region = await resolveIntelligenceRegion(action, token, isCurrent);
+  if (!region) return false;
+  if (token !== activeRegionRequestId || !isCurrent()) return false;
+  if (Number.isFinite(region.latitude) && Number.isFinite(region.longitude)) {
+    viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(region.longitude, region.latitude,
+      region.type === "country" ? 10000000 : region.type === "state" ? 1500000 : 180000), duration: 2 });
+  } else if (action.type === "focus_region") {
+    throw new Error("This region has no supported camera coordinates. Select it to open its boundary instead.");
+  }
+  if (action.type === "focus_region") return;
+  if (region.country_code !== "US") throw new Error("AI region selection currently supports US evidence only. Use the location search to explore other countries.");
+  let options;
+  if (region.type === "state") {
+    if (!region.state_fips) throw new Error("State identity could not be resolved.");
+    options = { scope: "state", stateFips: region.state_fips, stateName: region.state, label: region.label };
+  } else options = { scope: region.type === "country" ? "country" : "county", label: region.label };
+  const loading = loadRegionalData(region.latitude, region.longitude, options, updateSession);
+  const selectionToken = activeRegionRequestId;
+  await loading;
+  if (selectionToken !== activeRegionRequestId || regionalStore.get().audience !== audience || !isCurrent()) return false;
+  if (!regionalStore.get().model) throw new Error("Selected place has no retrievable regional evidence.");
+  const model = regionalStore.get().model;
+  if (action.region_id && model.region.id !== action.region_id) throw new Error("Selected evidence did not match the requested identity.");
+  if (intelligenceSession.get().investigation) updateSession(() => intelligenceSession.setCandidate(model));
+}
+
+async function retrieveIntelligenceCandidate(action, token, isCurrent) {
+  const region = await resolveIntelligenceRegion(action, token, isCurrent);
+  if (!region) return null;
+  if (region.country_code !== "US") throw new Error("Candidate retrieval currently supports US regional evidence only.");
+  const params = new URLSearchParams();
+  if (region.type === "state") {
+    if (!region.state_fips) throw new Error("State identity could not be resolved.");
+    params.set("scope", "state"); params.set("state", region.state_fips);
+  } else if (region.type === "country") params.set("scope", "country");
+  else {
+    if (!Number.isFinite(region.latitude) || !Number.isFinite(region.longitude)) throw new Error("Place coordinates are unavailable.");
+    params.set("lat", region.latitude); params.set("lon", region.longitude);
+  }
+  const response = await fetch((window.GVAI_API_BASE || "") + `/api/region/intelligence?${params}`);
+  const data = await response.json();
+  if (token !== activeRegionRequestId || !isCurrent()) return null;
+  if (!response.ok || !data.ok || !data.intelligence) throw new Error(data.reason || "Candidate evidence is temporarily unavailable.");
+  if (action.region_id && data.intelligence.region?.id !== action.region_id) throw new Error("Candidate evidence did not match the requested identity.");
+  return data.intelligence;
+}
+
+const intelligenceGuide = window.GVAIIntelligenceGuide.mount(intelligenceSession, regionalStore, {
+  set_audience: (action, isCurrent, updateSession = mutation => mutation()) => updateSession(() => selectIntelligenceAudience(action)),
+  focus_region: navigateIntelligenceRegion,
+  select_region: navigateIntelligenceRegion,
+  start_investigation: (action, isCurrent, updateSession) => updateSession(() => {
+    intelligenceSession.startInvestigation(action.investigation_type, action.question);
+    document.getElementById("intelligence-investigation").open = true;
+  }),
+  set_criteria: (action, isCurrent, updateSession) => updateSession(() => intelligenceSession.setCriteria(action.criteria)),
+  add_candidate: async (action, isCurrent, updateSession) => {
+    if (!intelligenceSession.get().investigation) throw new Error("Start an investigation before adding candidates.");
+    const token = activeRegionRequestId;
+    const model = await retrieveIntelligenceCandidate(action, token, isCurrent);
+    if (!model || !isCurrent() || token !== activeRegionRequestId) return false;
+    updateSession(() => intelligenceSession.setCandidate(model));
+    const { latitude, longitude } = model.region;
+    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+      viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(longitude, latitude, 180000), duration: 2 });
+    }
+  },
+  remove_candidate: (action, isCurrent, updateSession) => updateSession(() => intelligenceSession.candidateDecision(action.region_id, "removed")),
+  shortlist_candidate: (action, isCurrent, updateSession) => updateSession(() => intelligenceSession.candidateDecision(action.region_id, "shortlisted")),
+  reject_candidate: (action, isCurrent, updateSession) => updateSession(() => intelligenceSession.candidateDecision(action.region_id, "rejected", action.reason)),
+  focus_candidate: (action, isCurrent, updateSession) => navigateIntelligenceRegion({ type: "focus_region", region_id: action.region_id }, isCurrent, updateSession),
+  compare_candidates: (action, isCurrent, updateSession) => updateSession(() => {
+    const state = intelligenceSession.get();
+    const ids = state.investigation?.candidates.filter(item => item.status !== "rejected").map(item => item.region_id) || [];
+    const shortlist = state.investigation?.candidates.filter(item => item.status === "shortlisted").map(item => item.region_id) || [];
+    intelligenceSession.compare(shortlist.length >= 2 ? shortlist : ids);
+    document.getElementById("intelligence-comparison").open = true;
+  }),
+  open_region_evidence: () => { document.getElementById("intelligence-why").open = true; },
+  show_sources: () => {
+    document.getElementById("intelligence-why").open = true;
+    document.querySelectorAll("#intelligence-why-content .regional-source-note").forEach(note => { note.open = true; });
+  },
+  compare_regions: async (action, isCurrent, updateSession) => {
+    if (action.region_ids) updateSession(() => intelligenceSession.compare(action.region_ids));
+    else {
+      const token = activeRegionRequestId;
+      const models = [];
+      for (const query of action.queries) {
+        const model = await retrieveIntelligenceCandidate({ query }, token, isCurrent);
+        if (!model) return false;
+        models.push(model);
+      }
+      if (token !== activeRegionRequestId || !isCurrent()) return false;
+      if (models.some(model => !model)) return false;
+      updateSession(() => intelligenceSession.setComparisons(models));
+    }
+    document.getElementById("intelligence-comparison").open = true;
+  },
+  open_occupation: async (action, isCurrent, updateSession) => {
+    const regionToken = activeRegionRequestId;
+    const audience = regionalStore.get().audience;
+    const selector = document.getElementById("stex-occupation-select");
+    if (![...selector.options].some(option => option.value === action.occupation_code)) throw new Error("This occupation is not in the available audited catalog.");
+    updateSession(() => intelligenceSession.selectOccupation(action.occupation_code));
+    await loadOccupationSTEX(action.occupation_code, false);
+    if (!isCurrent() || regionToken !== activeRegionRequestId || regionalStore.get().audience !== audience ||
+        intelligenceSession.get().occupation !== action.occupation_code) return false;
+    document.getElementById("stex-task-audit").open = true;
+  },
+  open_jobs: (action, isCurrent, updateSession) => { updateSession(() => openLaborersWorkspace("live-jobs")); },
+  open_scenario: () => {
+    document.getElementById("regional-scenario-pane").open = true;
+    document.getElementById("regional-scenario-pane").scrollIntoView({ block: "nearest" });
+  }
+});
+document.getElementById("business-occupation-select").addEventListener("change", () => {
+  const { occupation_code } = businessSelectedOccupation();
+  if (occupation_code) intelligenceSession.selectOccupation(occupation_code);
 });
 
 document.getElementById("regional-scenario-form").addEventListener("submit", event => {
@@ -8084,9 +8260,13 @@ document.getElementById("regional-scenario-form").addEventListener("submit", eve
   const { model, audience } = regionalStore.get();
   if (!model) { result.textContent = "Select a region before building a scenario."; return; }
   try {
+    const assumptions = { workers: Number(document.getElementById("scenario-workers").value),
+      weeklyHours: Number(document.getElementById("scenario-hours").value), taskShare: Number(document.getElementById("scenario-share").value),
+      timeSaving: Number(document.getElementById("scenario-saving").value) };
     const estimate = window.GVAIRegional.scenario({ workers: document.getElementById("scenario-workers").value,
       weeklyHours: document.getElementById("scenario-hours").value, taskShare: document.getElementById("scenario-share").value,
       timeSaving: document.getElementById("scenario-saving").value });
+    intelligenceSession.setScenario(assumptions, estimate);
     const format = number => new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(number);
     result.innerHTML = `<h3>Scenario change</h3><p>Assumed cohort baseline: ${format(estimate.baselineHours)} task hours/week. Assumed affected tasks: ${format(estimate.affectedHours)} hours/week.</p><h3>Potential effect (directional scenario)</h3><p>If these assumptions held, ${format(estimate.potentialHours)} task hours/week could be released for other work.</p><p>Scenario output for ${escapeHtml(model.region.label)} · ${escapeHtml(audience)}. Not observed regional hours or predicted jobs removed.</p><p>${escapeHtml(estimate.method)}</p>`;
   } catch (error) { result.textContent = error.message; }
@@ -8595,7 +8775,8 @@ async function loadOccupationSTEXTasks(code, requestId = activeOccupationSTEXReq
 }
 
 async function loadOccupationSTEX(
-  code = "37-2021.00"
+  code = "37-2021.00",
+  updateCurrentOccupation = true
 ) {
   const requestId = ++activeOccupationSTEXRequestId;
   document.getElementById("regional-task-patterns").innerHTML = "";
@@ -8622,8 +8803,10 @@ async function loadOccupationSTEX(
     if (requestId !== activeOccupationSTEXRequestId) return;
     const profile = data.profile || {};
 
-    currentOccupationTitle = profile.occupation_title || null;
-    renderWorkerJourneyState(storedWorkerProfile());
+    if (updateCurrentOccupation) {
+      currentOccupationTitle = profile.occupation_title || null;
+      renderWorkerJourneyState(storedWorkerProfile());
+    }
 
     document.getElementById(
       "stex-occupation-name"
@@ -8811,6 +8994,7 @@ document
       }
 
       currentOccupationCode = code || null;
+      if (code) intelligenceSession.selectOccupation(code);
       clearWorkerOutlook();
       renderWorkerOutlookAvailability();
 
@@ -9481,6 +9665,8 @@ async function loadLiveJobs() {
   openLaborersWorkspace("live-jobs");
   setWorkerJourneyStep(5);
   status.textContent = "Loading live jobs...";
+  regionalStore.updateJobs({ status: "loading", result_count: null, source_names: [],
+    occupation_code: occupationCode, occupation_title: occupationTitle, retrieved_at: null }, regionId);
   content.innerHTML = "";
   const activeRegion = activeInvestigationContext?.region;
   document.getElementById("live-jobs-context").textContent =
