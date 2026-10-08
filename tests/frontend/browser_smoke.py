@@ -140,6 +140,49 @@ def check_site(url):
             window.gvaiViewer.scene.requestRenderMode = true;
             window.gvaiViewer.scene.maximumRenderTimeChange = Infinity;
         }""")
+        output = Path("test-results")
+        output.mkdir(exist_ok=True)
+        for width, height in [(1440, 900), (390, 844)]:
+            page.set_viewport_size({"width": width, "height": height})
+            assert page.locator("#intelligence-guide > summary").inner_text() == "What are you trying to understand?"
+            assert page.locator("#regional-question").get_attribute("placeholder") == "Ask GVAI about work, hiring, regions, careers, or expansion..."
+            assert page.locator("#regional-question").input_value() == ""
+            assert page.locator(".brand-sub").inner_text() == "Intelligence for work, workforce, and place"
+            assert page.locator("#intelligence-starters button").all_text_contents() == [
+                "Find better work", "Find where to hire", "Compare places", "Understand my region"]
+            for selector in ["#regional-outlook-panel", "#intelligence-investigation", "#intelligence-comparison",
+                             "#intelligence-why", "#intelligence-audience-control", ".layer-bar", ".legend", "#location-search"]:
+                assert not page.locator(selector).is_visible(), selector
+            assert page.locator("#laborers-workspace:visible, #business-workspace:visible, #government-workspace:visible").count() == 0
+            assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            assert page.locator("#regional-question").evaluate("element => element.contains(document.elementFromPoint(element.getBoundingClientRect().x + 10, element.getBoundingClientRect().y + 10))")
+            assert page.evaluate("document.querySelector('.cesium-widget-credits').getBoundingClientRect().bottom <= document.getElementById('intelligence-guide').getBoundingClientRect().top")
+            pixels = page.evaluate("""() => {
+                window.gvaiViewer.scene.requestRender();
+                window.gvaiViewer.render();
+                const canvas = document.querySelector('.cesium-widget canvas');
+                const context = canvas.getContext('webgl2') || canvas.getContext('webgl');
+                const data = new Uint8Array(canvas.width * canvas.height * 4);
+                context.readPixels(0, 0, canvas.width, canvas.height, context.RGBA, context.UNSIGNED_BYTE, data);
+                let colored = 0;
+                for (let offset = 0; offset < data.length; offset += 4) {
+                    if (data[offset] + data[offset + 1] + data[offset + 2] > 30) colored++;
+                }
+                return colored;
+            }""")
+            assert pixels > 1000, f"Blank initial globe at {width}: {pixels}"
+            page.screenshot(path=str(output / f"homepage-{width}.png"))
+        page.set_viewport_size({"width": 1366, "height": 768})
+        for index, audience in enumerate(["laborers", "business", "business", "government"]):
+            page.locator("#intelligence-starters button").nth(index).click()
+            page.wait_for_function("!document.querySelector('#regional-ask-form button').disabled")
+            assert investigations[-1]["audience"] == audience
+            assert investigations[-1]["selected_region_id"] is None
+            assert page.locator("#laborers-workspace:visible, #business-workspace:visible, #government-workspace:visible").count() == 0
+            if index == 2:
+                assert page.locator("#intelligence-comparison").is_visible()
+            page.locator("#intelligence-clear").click()
+        print("Uncluttered desktop/mobile homepage and four starter audience routes verified", flush=True)
         assert page.locator("#intelligence-starters").is_visible()
         api_mode["actions"] = [{"type": "set_audience", "audience": "business"}]
         page.locator('[data-intelligence-prompt][data-audience="business"]').first.click()
@@ -150,6 +193,7 @@ def check_site(url):
         api_mode["actions"] = []
         page.locator("#intelligence-guide").evaluate("element => element.open = false")
         page.locator("#close-business-workspace-btn").click()
+        page.locator("#exploration-tools > summary").click()
         page.locator("#location-search").fill("Rutherford County")
         page.locator("#search-btn").click()
         page.wait_for_selector("#regional-error:not([hidden])", timeout=60000)
@@ -222,7 +266,8 @@ def check_site(url):
             page.set_viewport_size({"width": width, "height": height})
             page.locator("#intelligence-guide").evaluate("element => element.open = true")
             page.wait_for_function("!document.querySelector('#regional-ask-form button').disabled")
-            page.locator("#intelligence-clear").click()
+            if page.locator("#intelligence-clear").is_visible():
+                page.locator("#intelligence-clear").click()
             api_mode["actions"] = [
                 {"type": "set_audience", "audience": "business"},
                 {"type": "start_investigation", "investigation_type": "business_expansion", "question": "Open a pest control office between Nashville and Chattanooga?"},
@@ -405,8 +450,10 @@ def check_site(url):
                 });
             })""")
             assert pixels > 1000, f"Blank globe canvas at {width}: {pixels} colored pixels"
+            page.locator(".exploration-map-tools > summary").click()
             page.locator("#globe-zoom-in").click()
             page.locator("#globe-zoom-out").click()
+            page.locator(".exploration-map-tools > summary").click()
             print(width, "globe colored pixels", pixels)
         page.set_viewport_size({"width": 1440, "height": 900})
         page.locator("#audience-laborers-btn").click()

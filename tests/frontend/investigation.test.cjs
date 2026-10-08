@@ -159,12 +159,14 @@ test("investigation panel shows question, rejected rationale, gaps, classified e
   assert.doesNotMatch(markup, /<script>|<img|GVAI Score/);
 });
 
-function mounted(fetcher) {
-  const { session, store } = setup();
+function mounted(fetcher, selected = true) {
+  const store = regional.createStore(), session = intelligence.createStore(store);
+  if (selected) store.set(model());
   const elements = new Map();
   const document = { getElementById(id) {
     if (!elements.has(id)) elements.set(id, {
       value: "", textContent: "", innerHTML: "", listeners: {}, focus() {},
+      classList: { toggle() {} },
       addEventListener(type, callback) { this.listeners[type] = callback; },
       querySelector() { return document.getElementById("submit"); }
     });
@@ -182,6 +184,40 @@ function mounted(fetcher) {
   return { session, store, guide, elements, requestBody: root.GVAIIntelligenceGuide.requestBody };
 }
 const reply = data => ({ ok: true, async json() { return { ok: true, reply: "Evidence-backed explanation", ...data }; } });
+
+test("homepage discloses region, investigation and comparison controls only in context", () => {
+  const app = mounted(async () => reply({}), false);
+  for (const id of ["regional-outlook-panel", "intelligence-context", "intelligence-clear", "intelligence-why",
+    "intelligence-investigation", "intelligence-comparison", "intelligence-audience-control", "intelligence-disclaimer"]) {
+    assert.equal(app.elements.get(id).hidden, true, id);
+  }
+  app.store.begin({ label: "A requested region", latitude: 35.85, longitude: -86.4 });
+  assert.equal(app.elements.get("regional-outlook-panel").hidden, false);
+  app.store.fail();
+  assert.equal(app.elements.get("regional-outlook-panel").hidden, false);
+  app.store.set(model());
+  assert.equal(app.elements.get("regional-outlook-panel").hidden, false);
+  assert.equal(app.elements.get("intelligence-why").hidden, false);
+  assert.equal(app.elements.get("intelligence-investigation").hidden, true);
+  app.session.startInvestigation("business_expansion", "Where should I hire?");
+  assert.equal(app.elements.get("intelligence-investigation").hidden, false);
+  assert.equal(app.elements.get("intelligence-audience-control").hidden, false);
+});
+
+test("starters retain intent and audience without opening a full workspace", async () => {
+  const calls = [];
+  const app = mounted(async (url, options) => {
+    calls.push(JSON.parse(options.body));
+    return reply({});
+  }, false);
+  await app.guide.ask("Help me find better work", "laborers");
+  await app.guide.ask("Help me find where to hire", "business");
+  await app.guide.ask("Help me compare places", "business");
+  await app.guide.ask("Help me understand my region", "government");
+  assert.deepEqual(calls.map(call => call.intelligence_session.audience), ["laborers", "business", "business", "government"]);
+  assert.ok(calls.every(call => call.intelligence_session.selected_region_id === null));
+  assert.equal(calls[3].message, "Help me understand my region");
+});
 
 test("voice-ready send performs exactly one fresh-evidence continuation and ignores its action requests", async () => {
   const calls = [];
