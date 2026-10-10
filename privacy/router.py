@@ -87,10 +87,26 @@ class PrivacyRouter:
     through this layer before data leaves GVAI.
     """
 
-    def __init__(self, audit_log=None):
+    def __init__(
+        self, audit_log=None, *,
+        require_external_model_authority=False,
+        external_model_authority=None,
+    ):
         self.audit_log = audit_log or AuditLog()
+        # Parent configuration only, never resolved from request/environment data.
+        self.external_model_authority = external_model_authority
+        self.require_external_model_authority = (
+            require_external_model_authority or external_model_authority is not None
+        )
 
     def decide(self, context, destination):
+
+        # A preview cannot consume a single-use grant or authorize transmission.
+        if (
+            self.require_external_model_authority
+            and destination == DestinationClass.EXTERNAL_MODEL
+        ):
+            return RouteDecision(False, "trusted_authority_required", destination)
 
         # Local GVAI processing is always available.
         if destination == DestinationClass.LOCAL:
@@ -166,7 +182,35 @@ class PrivacyRouter:
             destination
         )
 
-    def authorize(self, context, destination, payload=""):
+    def authorize(
+        self, context, destination, payload="", *,
+        approval=None, model_destination=None, purpose=None,
+    ):
+
+        if (
+            self.require_external_model_authority
+            and destination == DestinationClass.EXTERNAL_MODEL
+        ):
+            if self.external_model_authority is not None:
+                # This path has its own descriptor-anchored sanitized audit.
+                return self.external_model_authority.authorize(
+                    operator_id=context.user_id,
+                    project_id=context.project_id,
+                    payload=payload.encode("utf-8") if isinstance(payload, str) else payload,
+                    destination=model_destination,
+                    purpose=purpose,
+                    approval=approval,
+                )
+            decision = self.decide(context, destination)
+            # There is no verified identity to audit in this path. Omit even
+            # identity hashes: low-entropy requester IDs are guessable.
+            sanitized = PrivacyContext(
+                "unverified",
+                "unverified",
+                DataClass.PRIVATE, True,
+            )
+            self.audit_log.write(sanitized, decision, "")
+            return decision
 
         decision = self.decide(context, destination)
 
@@ -179,7 +223,10 @@ class PrivacyRouter:
         return decision
 
 
-def enforce(router, context, destination, payload=""):
+def enforce(
+    router, context, destination, payload="", *,
+    approval=None, model_destination=None, purpose=None,
+):
     """
     Hard enforcement helper.
 
@@ -189,7 +236,10 @@ def enforce(router, context, destination, payload=""):
     decision = router.authorize(
         context,
         destination,
-        payload
+        payload,
+        approval=approval,
+        model_destination=model_destination,
+        purpose=purpose,
     )
 
     if not decision.allowed:
