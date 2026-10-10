@@ -129,16 +129,19 @@ hashed operator/project references, fixed operation/reason codes, and a digest
 of the complete approval scope, never payload text, endpoint text, purpose
 text, credentials, approval evidence or receipts. Audit failures deny admission
 and irreversibly revoke grants. Stop state is latched before its audit write.
-Missing-authority router denials hash identities and omit payloads in the
-legacy audit log; they can never result in admission.
+Missing-authority router denials omit requester identities entirely (recording
+only `unverified` placeholders) and omit payloads in the legacy audit log;
+they can never result in admission.
 
 The local descriptor-anchored audit sink fsyncs writes and rejects unsafe file
 permissions, symlinks and directory replacement. It does **not** detect all
 same-owner edits/truncation or provide independent immutable storage; scope
 digests also are not a reconstruction of the human approval record. Production
 integration needs an independently protected audit sink and authenticated
-approval record retention. Grants and shutdown state are single-process, not
-a durable or multi-parent revocation service.
+approval record retention. Hash references are pseudonymous, not anonymization:
+guessable identity or scope values may be inferred by an audit reader. Grants
+and shutdown state are single-process, not a durable or multi-parent revocation
+service.
 
 Focused tests: `python -m pytest -q tests/test_external_model_authority.py`.
 Broker regression tests require the Python 3.14 environment used by the private

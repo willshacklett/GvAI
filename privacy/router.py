@@ -202,11 +202,11 @@ class PrivacyRouter:
                     approval=approval,
                 )
             decision = self.decide(context, destination)
-            # Even a missing integration must not put requester identities or
-            # consent tokens into the legacy audit log in raw form.
+            # There is no verified identity to audit in this path. Omit even
+            # identity hashes: low-entropy requester IDs are guessable.
             sanitized = PrivacyContext(
-                hashlib.sha256(str(context.user_id).encode()).hexdigest(),
-                hashlib.sha256(str(context.project_id).encode()).hexdigest(),
+                "unverified",
+                "unverified",
                 DataClass.PRIVATE, True,
             )
             self.audit_log.write(sanitized, decision, "")

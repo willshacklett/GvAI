@@ -420,6 +420,10 @@ def test_opt_in_router_denies_missing_authority_even_public_or_token(tmp_path):
     raw = (tmp_path / "strict.jsonl").read_text()
     assert "sensitive" not in raw
     assert "forged" not in raw
+    events = [json.loads(line) for line in raw.splitlines()]
+    assert all(event["user_id"] == "unverified" for event in events)
+    assert all(event["project_id"] == "unverified" for event in events)
+    assert all(event["payload_sha256"] is None for event in events)
     assert strict.authorize(public, DestinationClass.LOCAL).allowed
     assert strict.authorize(public, DestinationClass.WORLD_READ).allowed
 
