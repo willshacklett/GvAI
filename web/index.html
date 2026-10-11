@@ -2578,6 +2578,7 @@
 
 <body>
 <main id="app" aria-label="GVAI geographic labor intelligence">
+  <div id="map-attribution" aria-label="Map attribution"></div>
   <details id="intelligence-guide" class="intelligence-guide" open>
     <summary>What are you trying to understand?</summary>
     <div class="intelligence-guide-body regional-tools">
@@ -3595,6 +3596,8 @@ globeShell.innerHTML = `
 const viewer = new Cesium.Viewer(
   "cesiumContainer",
   {
+    creditContainer: document.getElementById("map-attribution"),
+    creditViewport: document.getElementById("app"),
     baseLayer:
       Cesium.ImageryLayer.fromProviderAsync(
         Cesium.ArcGisMapServerImageryProvider.fromUrl(
@@ -3617,6 +3620,14 @@ const viewer = new Cesium.Viewer(
 
 window.gvaiViewer = viewer;
 window.gvaiCesium = Cesium;
+
+const mapAttribution = document.getElementById("map-attribution");
+const attributionObserver = new ResizeObserver(() => {
+  document.getElementById("app").style.setProperty(
+    "--map-attribution-height", `${mapAttribution.getBoundingClientRect().height}px`
+  );
+});
+attributionObserver.observe(mapAttribution);
 
 viewer.scene.globe.enableLighting = true;
 viewer.scene.skyAtmosphere.show = true;

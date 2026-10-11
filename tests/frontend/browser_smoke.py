@@ -156,7 +156,17 @@ def check_site(url):
             assert page.locator("#laborers-workspace:visible, #business-workspace:visible, #government-workspace:visible").count() == 0
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
             assert page.locator("#regional-question").evaluate("element => element.contains(document.elementFromPoint(element.getBoundingClientRect().x + 10, element.getBoundingClientRect().y + 10))")
-            assert page.evaluate("document.querySelector('.cesium-widget-credits').getBoundingClientRect().bottom <= document.getElementById('intelligence-guide').getBoundingClientRect().top")
+            credits = page.locator("#map-attribution .cesium-widget-credits")
+            assert credits.is_visible()
+            assert credits.locator('a[href*="cesium.com"] img').is_visible()
+            assert credits.locator('a[href*="cesium.com"] img').evaluate("image => image.complete && image.naturalWidth > 0")
+            assert page.evaluate("""() => {
+                const credits = document.querySelector('#map-attribution .cesium-widget-credits').getBoundingClientRect();
+                const guide = document.getElementById('intelligence-guide').getBoundingClientRect();
+                return credits.left >= 0 && credits.left <= 20 && credits.right <= innerWidth &&
+                    credits.bottom <= innerHeight && credits.top >= innerHeight - 100 &&
+                    credits.top >= guide.bottom + 12;
+            }""")
             pixels = page.evaluate("""() => {
                 window.gvaiViewer.scene.requestRender();
                 window.gvaiViewer.render();
@@ -172,6 +182,10 @@ def check_site(url):
             }""")
             assert pixels > 1000, f"Blank initial globe at {width}: {pixels}"
             page.screenshot(path=str(output / f"homepage-{width}.png"))
+            credits.locator(".cesium-credit-expand-link").click()
+            assert page.locator(".cesium-credit-lightbox").is_visible()
+            assert "Esri" in page.locator(".cesium-credit-lightbox").inner_text()
+            page.locator(".cesium-credit-lightbox-close").click()
         page.set_viewport_size({"width": 1366, "height": 768})
         for index, audience in enumerate(["laborers", "business", "business", "government"]):
             page.locator("#intelligence-starters button").nth(index).click()

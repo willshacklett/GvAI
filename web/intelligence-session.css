@@ -1,5 +1,5 @@
 .intelligence-guide {
-  position: absolute; left: 50%; bottom: 24px; z-index: 12;
+  position: absolute; left: 50%; bottom: calc(var(--map-attribution-height, 28px) + 28px); z-index: 12;
   transform: translateX(-50%); width: min(660px, calc(100vw - 40px)); border: 1px solid var(--border);
   border-radius: 8px; background: var(--panel); backdrop-filter: blur(18px);
   box-shadow: 0 18px 50px rgba(0,0,0,.28); overflow: hidden;
@@ -28,8 +28,11 @@
 .intelligence-guide [hidden], #regional-outlook-panel[hidden] { display: none !important; }
 #intelligence-context:empty, #intelligence-action-status:empty, #regional-ask-status:empty, #intelligence-conversation:empty { display: none; }
 #app.intelligence-contextual .intelligence-guide { left: 20px; transform: none; width: 340px; }
-#app:not(.intelligence-contextual) #globe-shell { top: -14dvh; bottom: 14dvh; }
-#app:not(.intelligence-contextual) .cesium-viewer-bottom { bottom: calc(280px - 14dvh) !important; }
+#app { height: 100dvh; }
+#app:not(.intelligence-contextual) #globe-shell { top: -10dvh; bottom: 10dvh; }
+#map-attribution { position: absolute; left: 20px; right: 20px; bottom: 12px; z-index: 14; color: var(--text); }
+#map-attribution .cesium-widget-credits { position: static; display: block; font-size: 12px; line-height: 1.5; color: var(--text); }
+#map-attribution a, #map-attribution .cesium-credit-expand-link { color: var(--text); }
 .intelligence-guide :focus-visible, .exploration-tools :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .brand { min-width: 0; background: transparent; border: 0; box-shadow: none; backdrop-filter: none; }
 .brand-title, .brand-sub { letter-spacing: 0; }
@@ -60,7 +63,8 @@
 #intelligence-investigation-content label { display: block; font-size: 12px; margin-top: 8px; }
 #intelligence-place-choice button { display: block; width: 100%; text-align: left; margin-top: 6px; white-space: normal; }
 @media (max-width: 1100px) {
-  .intelligence-guide { width: min(660px, calc(100vw - 28px)); bottom: 12px; }
+  .intelligence-guide { width: min(660px, calc(100vw - 28px)); }
+  #map-attribution { left: 14px; right: 14px; }
   #app.intelligence-contextual .intelligence-guide { left: 14px; width: min(340px, calc(100vw - 28px)); }
   .intelligence-guide-body { max-height: 38dvh; }
 }
