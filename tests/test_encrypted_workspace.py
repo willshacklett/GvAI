@@ -1,3 +1,4 @@
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -203,6 +204,36 @@ assert json.loads(sys.stdin.readline()) == {"error": "workspace request denied",
     ]
 
 
+def test_worker_does_not_inherit_high_numbered_descriptor(tmp_path):
+    source_descriptor = os.open(
+        tmp_path / "inherited.txt",
+        os.O_CREAT | os.O_RDWR,
+        0o600,
+    )
+    descriptor = -1
+    try:
+        descriptor = fcntl.fcntl(source_descriptor, fcntl.F_DUPFD, 512)
+        os.set_inheritable(descriptor, True)
+        broker = build_broker(tmp_path)
+        run_worker(
+            tmp_path,
+            broker,
+            f"""
+import os
+try:
+    os.fstat({descriptor})
+except OSError:
+    pass
+else:
+    raise AssertionError("worker inherited a high-numbered descriptor")
+""",
+        )
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        os.close(source_descriptor)
+
+
 def test_worker_that_closes_protocol_pipe_cannot_hold_broker_open(tmp_path):
     broker = build_broker(tmp_path)
     with pytest.raises(WorkspaceWorkerError, match="workspace worker failed"):
@@ -370,6 +401,42 @@ def test_extra_env_cannot_override_broker_owned_variables(tmp_path):
             [sys.executable, "-c", "pass"],
             extra_env={"PATH": "/attacker-controlled"},
         )
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "GVAI_PRIVATE_WORKSPACE_KEY",
+        "GVAI_TEST_SECRET",
+        "PYTHONPATH",
+        "LD_PRELOAD",
+        "UNCLASSIFIED_CONFIG",
+    ],
+)
+def test_extra_env_rejects_unclassified_variables(tmp_path, name):
+    broker = build_broker(tmp_path)
+    with pytest.raises(WorkspaceWorkerError, match="workspace worker failed"):
+        broker.run_worker(
+            [sys.executable, "-c", "pass"],
+            extra_env={name: "must-not-enter-worker"},
+        )
+
+
+def test_extra_env_accepts_only_classified_local_model_configuration(
+    tmp_path,
+):
+    broker = build_broker(tmp_path)
+    broker.run_worker(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import os; "
+                "assert os.environ['GVAI_LOCAL_MODEL_NAME'] == 'test-model'"
+            ),
+        ],
+        extra_env={"GVAI_LOCAL_MODEL_NAME": "test-model"},
+    )
 
 
 

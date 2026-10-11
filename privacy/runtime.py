@@ -50,6 +50,7 @@ import uuid
 from typing import Dict, Any, Optional
 
 from privacy.encrypted_workspace import (
+    LOCAL_MODEL_CONFIG_ENV_ALLOWLIST,
     AESGCMControlPlane,
     EncryptedProjectWorkspace,
     WorkspaceAuditError,
@@ -112,11 +113,7 @@ EXTERNAL_SECRET_ENV = {
 # list may ever hold a credential or the workspace key. This is a fixed
 # allowlist, not a denylist: only these exact names can ever reach the
 # worker through extra_env.
-_LOCAL_MODEL_CONFIG_ENV = (
-    "GVAI_LOCAL_MODEL_COMMAND",
-    "GVAI_LOCAL_MODEL_NAME",
-    "GVAI_LOCAL_MODEL_TIMEOUT",
-)
+_LOCAL_MODEL_CONFIG_ENV = tuple(sorted(LOCAL_MODEL_CONFIG_ENV_ALLOWLIST))
 
 ENCRYPTED_WORKSPACE_KEY_ENV = "GVAI_PRIVATE_WORKSPACE_KEY"
 ENCRYPTED_WORKSPACE_AUDIT_DIR_ENV = "GVAI_PRIVATE_WORKSPACE_AUDIT_DIR"

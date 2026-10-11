@@ -31,6 +31,14 @@ from privacy.resource_containment import (
     build_staged_worker_command,
 )
 
+LOCAL_MODEL_CONFIG_ENV_ALLOWLIST = frozenset(
+    {
+        "GVAI_LOCAL_MODEL_COMMAND",
+        "GVAI_LOCAL_MODEL_NAME",
+        "GVAI_LOCAL_MODEL_TIMEOUT",
+    }
+)
+
 
 class WorkspaceAccessDenied(PermissionError):
     pass
@@ -700,6 +708,7 @@ class WorkspaceBroker:
     _MAX_REQUEST_BYTES = 16 * 1024 * 1024
     _MAX_RESPONSE_BYTES = 16 * 1024 * 1024
     _ENV_ALLOWLIST = frozenset({"LANG", "LC_ALL", "PATH", "TZ"})
+    _EXTRA_ENV_ALLOWLIST = LOCAL_MODEL_CONFIG_ENV_ALLOWLIST
 
     def __init__(
         self,
@@ -736,12 +745,12 @@ class WorkspaceBroker:
                     "workspace worker failed"
                 ) from None
 
-        # extra_env may only add names the broker does not itself manage.
-        # A caller (bug or otherwise) attempting to override a broker-owned
-        # variable (e.g. PATH) through this channel fails closed instead of
-        # silently winning the collision.
-        if extra_env and any(
-            str(name) in self._ENV_ALLOWLIST for name in extra_env
+        if extra_env is not None and any(
+            not isinstance(name, str)
+            or name not in self._EXTRA_ENV_ALLOWLIST
+            or not isinstance(value, str)
+            or "\x00" in value
+            for name, value in extra_env.items()
         ):
             raise WorkspaceWorkerError("workspace worker failed")
 
@@ -751,12 +760,11 @@ class WorkspaceBroker:
             if name in self._ENV_ALLOWLIST
         }
         # Callers may add a narrow set of non-secret config values (e.g. an
-        # inference command name). This never widens beyond what the caller
-        # explicitly hands in; the full parent environment is still filtered
-        # through the allowlist above.
+        # inference command name). The fixed allowlist prevents this channel
+        # from forwarding credentials, loader overrides, or broker policy.
         if extra_env:
             for name, value in extra_env.items():
-                environment[str(name)] = str(value)
+                environment[name] = value
         environment.setdefault("PATH", os.defpath)
         environment["PYTHONUNBUFFERED"] = "1"
 
