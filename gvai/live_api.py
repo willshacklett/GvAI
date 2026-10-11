@@ -114,7 +114,7 @@ def chat():
             provider="openai",
             data_class=(
                 os.getenv("GVAI_DATA_CLASS")
-                or ("private" if private_mode else "public")
+                or "private"
             ),
             private_build_mode=private_mode,
         )

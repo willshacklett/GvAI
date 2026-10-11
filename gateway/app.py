@@ -112,7 +112,7 @@ def call_openai_compatible(
             provider="openai-compatible",
             data_class=(
                 os.getenv("GVAI_DATA_CLASS")
-                or ("private" if private_mode else "public")
+                or "private"
             ),
             private_build_mode=private_mode,
         )
@@ -146,7 +146,7 @@ def gateway_privacy_context():
         project_id=os.getenv("GVAI_PROJECT_ID") or "default",
         data_class=(
             os.getenv("GVAI_DATA_CLASS")
-            or ("private" if private_mode else "public")
+            or "private"
         ),
         private_build_mode=private_mode,
     )

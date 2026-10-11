@@ -43,17 +43,19 @@ def test_private_build_mode_blocks_before_network(
         )
 
 
-def test_normal_mode_reaches_network_layer(monkeypatch):
-    """
-    We don't actually contact OpenAI.
-
-    This proves that when Private Build Mode is OFF, the privacy
-    guard allows GVAI to proceed to its normal network layer.
-    """
-
+def test_normal_mode_defaults_to_private_and_blocks_before_network(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "fake-key")
     monkeypatch.setenv("GVAI_PRIVATE_BUILD_MODE", "0")
     monkeypatch.delenv("GVAI_DATA_CLASS", raising=False)
+    monkeypatch.setattr(bridge.requests, "post", _must_not_transmit)
+    with pytest.raises(PermissionError):
+        bridge.chat_openai("ordinary GVAI request")
+
+
+def test_explicit_public_classification_can_reach_network(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "fake-key")
+    monkeypatch.setenv("GVAI_PRIVATE_BUILD_MODE", "0")
+    monkeypatch.setenv("GVAI_DATA_CLASS", "public")
 
     reached_network = {"value": False}
 
@@ -61,17 +63,9 @@ def test_normal_mode_reaches_network_layer(monkeypatch):
         reached_network["value"] = True
         raise RuntimeError("fake-network-stop")
 
-    monkeypatch.setattr(
-        bridge.requests,
-        "post",
-        fake_post,
-    )
-
-    with pytest.raises(
-        RuntimeError,
-        match="fake-network-stop",
-    ):
-        bridge.chat_openai("ordinary GVAI request")
+    monkeypatch.setattr(bridge.requests, "post", fake_post)
+    with pytest.raises(RuntimeError, match="fake-network-stop"):
+        bridge.chat_openai("explicitly public information")
 
     assert reached_network["value"] is True
 

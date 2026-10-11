@@ -27,6 +27,11 @@ def private_env(monkeypatch):
     )
 
 
+def default_egress_env(monkeypatch):
+    monkeypatch.setenv("GVAI_PRIVATE_BUILD_MODE", "0")
+    monkeypatch.delenv("GVAI_DATA_CLASS", raising=False)
+
+
 def test_model_router_blocked(monkeypatch):
     private_env(monkeypatch)
 
@@ -66,10 +71,19 @@ def test_model_router_blocked(monkeypatch):
         )
 
 
+def test_model_router_defaults_to_private(monkeypatch):
+    default_egress_env(monkeypatch)
+    import gvai.model_router as mod
+
+    with pytest.raises(PermissionError):
+        mod.call_model("system", "unclassified request")
+
+
 def test_llm_blocked(monkeypatch):
-    private_env(monkeypatch)
+    default_egress_env(monkeypatch)
 
     import gvai.llm as mod
+    monkeypatch.setattr(mod, "llm_available", lambda: True)
 
     class FakeCompletions:
         create = staticmethod(block_sdk_call)
@@ -112,9 +126,12 @@ def test_ai_gate_blocked(monkeypatch):
     )
 
     assert guard < external_call
+    assert 'or "private"' in source
+    assert 'or ("private" if private_mode else "public")' not in source
+
 
 def test_live_api_blocked(monkeypatch):
-    private_env(monkeypatch)
+    default_egress_env(monkeypatch)
 
     import openai
 
@@ -166,8 +183,14 @@ def test_live_api_blocked(monkeypatch):
     assert data["blocked"] is True
     assert data["reason"] == "privacy_policy"
 
+
 def test_gateway_blocked(monkeypatch):
-    private_env(monkeypatch)
+    default_egress_env(monkeypatch)
+    monkeypatch.setenv(
+        "OPENAI_COMPAT_BASE_URL",
+        "https://example.invalid/v1",
+    )
+    monkeypatch.setenv("OPENAI_COMPAT_API_KEY", "fake-key")
 
     import gateway.app as mod
 
@@ -183,3 +206,24 @@ def test_gateway_blocked(monkeypatch):
             None,
             None,
         )
+
+def test_gateway_context_defaults_to_private(monkeypatch):
+    default_egress_env(monkeypatch)
+    import gateway.app as mod
+
+    assert mod.gateway_privacy_context().data_class.value == "private"
+
+
+def test_gateway_defaults_to_private_before_http(monkeypatch):
+    default_egress_env(monkeypatch)
+    monkeypatch.setenv(
+        "OPENAI_COMPAT_BASE_URL",
+        "https://example.invalid/v1",
+    )
+    monkeypatch.setenv("OPENAI_COMPAT_API_KEY", "fake-key")
+
+    import gateway.app as mod
+
+    monkeypatch.setattr(mod.requests, "post", block_http_call)
+    with pytest.raises(PermissionError):
+        mod.call_openai_compatible("unclassified request", None, None)

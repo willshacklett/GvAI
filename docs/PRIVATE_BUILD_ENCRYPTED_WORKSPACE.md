@@ -8,6 +8,11 @@ file descriptors, and only JSON-lines stdin/stdout pipes. This avoids copying
 the key-owning Python process with `fork`. Python attribute hiding or
 name-mangling is not part of the security boundary.
 
+Caller-supplied worker environment entries are restricted to the fixed
+non-secret local-model configuration allowlist. Credentials, broker policy,
+Python import paths, dynamic-loader overrides, and unclassified variables are
+rejected rather than forwarded.
+
 Worker requests contain only an operation, relative path, and base64-encoded
 content for writes. The broker rejects extra identity or authority fields and
 attaches those values from trusted session state. Raw keys are never returned,

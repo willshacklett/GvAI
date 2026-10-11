@@ -49,12 +49,7 @@ def call_model(system_prompt: str, user_content: str):
             provider="openai",
             data_class=(
                 os.getenv("GVAI_DATA_CLASS")
-                or (
-                    "private"
-                    if os.getenv("GVAI_PRIVATE_BUILD_MODE", "0").lower()
-                    in {"1", "true", "yes", "on"}
-                    else "public"
-                )
+                or "private"
             ),
         )
 

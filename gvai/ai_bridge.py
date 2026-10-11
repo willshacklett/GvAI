@@ -35,7 +35,7 @@ def _authorize_ai_egress(payload: Dict[str, Any], provider: str) -> None:
     # shares it with consent.
     data_class = os.getenv(
         "GVAI_DATA_CLASS",
-        "private" if private_mode else "public"
+        "private"
     )
 
     authorize_external_model(
