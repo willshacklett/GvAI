@@ -220,12 +220,12 @@ def test_worker_does_not_inherit_high_numbered_descriptor(tmp_path):
             broker,
             f"""
 import os
-try:
-    os.fstat({descriptor})
-except OSError:
-    pass
-else:
-    raise AssertionError("worker inherited a high-numbered descriptor")
+for inherited in range(3, 1024):
+    try:
+        os.fstat(inherited)
+    except OSError:
+        continue
+    raise AssertionError(f"worker inherited descriptor {{inherited}}")
 """,
         )
     finally:
@@ -366,6 +366,41 @@ def test_failed_worker_group_is_signaled_before_leader_is_reaped(tmp_path, monke
         run_worker(tmp_path, broker, "import os; os._exit(7)")
 
     assert observed == [(os.CLD_EXITED, 7)]
+
+
+def test_group_signal_permission_failure_still_reaps_leader(
+    tmp_path,
+    monkeypatch,
+):
+    broker = build_broker(tmp_path)
+    pid_path = tmp_path / "failed-worker.pid"
+    import privacy.encrypted_workspace as ews
+
+    def deny_group_signal(pgid, sig):
+        raise PermissionError("synthetic process-group denial")
+
+    monkeypatch.setattr(ews.os, "killpg", deny_group_signal)
+
+    with pytest.raises(
+        WorkspaceWorkerError,
+        match="workspace worker failed",
+    ):
+        run_worker(
+            tmp_path,
+            broker,
+            f"""
+import os
+with open({str(pid_path)!r}, "w", encoding="utf-8") as handle:
+    handle.write(str(os.getpid()))
+os._exit(7)
+""",
+        )
+
+    process_id = int(pid_path.read_text())
+    with pytest.raises(ChildProcessError):
+        os.waitpid(process_id, os.WNOHANG)
+    with pytest.raises(ProcessLookupError):
+        os.kill(process_id, 0)
 
 
 def test_successful_worker_run_does_not_kill_anything(tmp_path):
@@ -943,18 +978,44 @@ def base64_key_fragment():
 def test_broker_stages_worker_inside_resource_boundary(tmp_path):
     broker = build_broker(tmp_path)
     script = tmp_path / "contained-workspace-worker.py"
+    escaped_pid_path = tmp_path / "escaped-descendant.pid"
+    escaped_ready_path = tmp_path / "escaped-descendant.ready"
     script.write_text(
-        r"""
+        f"""
 import json
+import os
+import subprocess
 import sys
+import time
 
-request = {
+descendant = subprocess.Popen(
+    [
+        sys.executable,
+        "-c",
+        (
+            "import os,time; os.setsid(); "
+            f"open({str(escaped_ready_path)!r}, 'w').close(); "
+            "time.sleep(30)"
+        ),
+    ],
+    stdin=subprocess.DEVNULL,
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
+with open({str(escaped_pid_path)!r}, "w", encoding="utf-8") as handle:
+    handle.write(str(descendant.pid))
+deadline = time.monotonic() + 5
+while not os.path.exists({str(escaped_ready_path)!r}) and time.monotonic() < deadline:
+    time.sleep(0.01)
+if time.monotonic() >= deadline:
+    raise RuntimeError("escaped descendant did not start")
+request = {{
     "operation": "write",
     "path": "contained.txt",
     "content_b64": "Y29udGFpbmVk",
-}
+}}
 print(json.dumps(request), flush=True)
-assert json.loads(sys.stdin.readline()) == {"ok": True}
+assert json.loads(sys.stdin.readline()) == {{"ok": True}}
 """,
         encoding="utf-8",
     )
@@ -987,8 +1048,26 @@ assert json.loads(sys.stdin.readline()) == {"ok": True}
         )
 
         assert request_count == 1
+        deadline = time.monotonic() + 5
+        while (
+            boundary.current_process_count() != 0
+            and time.monotonic() < deadline
+        ):
+            time.sleep(0.01)
         assert boundary.current_process_count() == 0
         assert group_path.exists()
+        escaped_pid = int(escaped_pid_path.read_text())
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            try:
+                stat = Path(f"/proc/{escaped_pid}/stat").read_text()
+            except FileNotFoundError:
+                break
+            if stat.rsplit(")", 1)[1].split()[0] == "Z":
+                break
+            time.sleep(0.01)
+        else:
+            raise AssertionError("cgroup left a live escaped descendant")
     finally:
         boundary.close()
 

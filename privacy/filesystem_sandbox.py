@@ -178,6 +178,23 @@ def build_filesystem_sandbox_command(
         read_only_paths,
         denied_paths,
     )
+    protected_runtime_paths = (
+        Path.home().resolve(strict=False),
+        root.resolve(strict=True),
+        *(
+            Path(path).resolve(strict=False)
+            for path in denied_paths
+        ),
+    )
+    host_runtime_mounts = (Path("/usr"), python_prefix)
+    if python_prefix == Path("/") or any(
+        _paths_overlap(mount, protected)
+        for mount in host_runtime_mounts
+        for protected in protected_runtime_paths
+    ):
+        raise FilesystemSandboxError(
+            "sandbox runtime mount crosses a protected boundary"
+        )
 
     sandbox = [
         str(bubblewrap),

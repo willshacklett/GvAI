@@ -115,6 +115,9 @@ The encrypted runtime places the worker inside a Bubblewrap namespace with:
 list of canonical absolute regular files. Directories, symlinks, hard links,
 special files, missing files, relative paths, non-canonical paths, root-wide
 paths, and protected-boundary paths fail closed.
+The host Python runtime prefix and the system `/usr` mount are also rejected
+if either overlaps the home, repository, or any protected workspace path,
+rather than mounting those paths to make an unusual host layout work.
 
 `GVAI_PRIVATE_MODEL_ASSET_MANIFEST` names a canonical JSON manifest signed with
 Ed25519. Its signature covers the schema and the complete ordered asset list,

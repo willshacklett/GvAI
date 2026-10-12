@@ -800,11 +800,13 @@ class WorkspaceBroker:
             ):
                 os.close(descriptor)
             if process_id is not None:
-                self.__terminate_contained_worker(
-                    process_id,
-                    resource_boundary,
-                )
-                self.__reap(process_id)
+                try:
+                    self.__terminate_contained_worker(
+                        process_id,
+                        resource_boundary,
+                    )
+                finally:
+                    self.__reap(process_id)
             raise WorkspaceWorkerError("workspace worker failed") from None
 
         response_stream = None
@@ -834,11 +836,13 @@ class WorkspaceBroker:
                 response_stream.close()
             if request_stream is not None:
                 request_stream.close()
-            self.__terminate_contained_worker(
-                process_id,
-                resource_boundary,
-            )
-            self.__reap(process_id)
+            try:
+                self.__terminate_contained_worker(
+                    process_id,
+                    resource_boundary,
+                )
+            finally:
+                self.__reap(process_id)
             raise WorkspaceWorkerError("workspace worker failed") from None
 
         selector = selectors.DefaultSelector()
@@ -906,11 +910,13 @@ class WorkspaceBroker:
                 resource_boundary.terminate()
         except Exception:
             if not process_reaped:
-                self.__terminate_contained_worker(
-                    process_id,
-                    resource_boundary,
-                )
-                self.__reap(process_id)
+                try:
+                    self.__terminate_contained_worker(
+                        process_id,
+                        resource_boundary,
+                    )
+                finally:
+                    self.__reap(process_id)
                 process_reaped = True
             elif resource_boundary is not None:
                 try:
@@ -977,14 +983,23 @@ class WorkspaceBroker:
         resource_boundary: CgroupV2Boundary | None,
     ) -> None:
         # The cgroup is the authoritative whole-tree kill switch.
+        termination_failed = False
         if resource_boundary is not None:
             try:
                 resource_boundary.terminate()
             except ResourceContainmentError:
-                pass
+                termination_failed = True
 
         # Retain process-group termination as a fallback.
-        cls.__terminate_worker_group(process_id)
+        try:
+            cls.__terminate_worker_group(process_id)
+        except WorkspaceWorkerError:
+            termination_failed = True
+
+        if termination_failed:
+            raise WorkspaceWorkerError(
+                "workspace worker failed"
+            ) from None
 
     @staticmethod
     def __terminate_worker_group(process_id: int) -> None:
@@ -1003,10 +1018,13 @@ class WorkspaceBroker:
         existing fail-secure timeout/error handling in this method.
         """
 
+        signal_failed = False
         try:
             os.killpg(process_id, signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
+        except ProcessLookupError:
             pass
+        except PermissionError:
+            signal_failed = True
 
         # Defensive fallback in case the leader was somehow not its own
         # process group (should not happen with setsid=True).
@@ -1014,6 +1032,13 @@ class WorkspaceBroker:
             os.kill(process_id, signal.SIGKILL)
         except ProcessLookupError:
             pass
+        except PermissionError:
+            signal_failed = True
+
+        if signal_failed:
+            raise WorkspaceWorkerError(
+                "workspace worker failed"
+            ) from None
 
     @staticmethod
     def __reap(process_id: int) -> None:
