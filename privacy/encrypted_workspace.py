@@ -707,6 +707,7 @@ class WorkspaceBroker:
 
     _MAX_REQUEST_BYTES = 16 * 1024 * 1024
     _MAX_RESPONSE_BYTES = 16 * 1024 * 1024
+    _REAP_TIMEOUT = 5.0
     _ENV_ALLOWLIST = frozenset({"LANG", "LC_ALL", "PATH", "TZ"})
     _EXTRA_ENV_ALLOWLIST = LOCAL_MODEL_CONFIG_ENV_ALLOWLIST
 
@@ -853,14 +854,15 @@ class WorkspaceBroker:
                 ) from None
             raise
 
-        selector = selectors.DefaultSelector()
-        selector.register(request_stream, selectors.EVENT_READ)
+        selector = None
         pending = b""
         request_count = 0
         deadline = time.monotonic() + timeout
         process_reaped = False
 
         try:
+            selector = selectors.DefaultSelector()
+            selector.register(request_stream, selectors.EVENT_READ)
             while True:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
@@ -937,7 +939,8 @@ class WorkspaceBroker:
                 ) from None
             raise
         finally:
-            selector.close()
+            if selector is not None:
+                selector.close()
             os.close(process_descriptor)
             request_stream.close()
             if not response_stream.closed:
@@ -1054,10 +1057,25 @@ class WorkspaceBroker:
 
     @staticmethod
     def __reap(process_id: int) -> None:
-        try:
-            os.waitpid(process_id, 0)
-        except ChildProcessError:
-            pass
+        """Reap an exited worker, but never wait indefinitely for a live one."""
+
+        deadline = time.monotonic() + WorkspaceBroker._REAP_TIMEOUT
+        while True:
+            try:
+                reaped_pid, _ = os.waitpid(process_id, os.WNOHANG)
+            except ChildProcessError:
+                return
+
+            if reaped_pid == process_id:
+                return
+
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise WorkspaceWorkerError(
+                    "workspace worker failed"
+                ) from None
+
+            time.sleep(min(0.01, remaining))
 
     def __write_response(
         self,

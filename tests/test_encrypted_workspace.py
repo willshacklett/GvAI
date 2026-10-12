@@ -317,6 +317,165 @@ def test_resource_activation_failure_kills_and_reaps_started_worker(
         os.kill(process_ids[0], 0)
 
 
+@pytest.mark.parametrize("failure_stage", ["create", "register"])
+def test_selector_failure_terminates_closes_and_reaps_worker(
+    tmp_path,
+    monkeypatch,
+    failure_stage,
+):
+    broker = build_broker(tmp_path)
+    pid_path = tmp_path / "selector-failure-worker.pid"
+    worker_descriptors = []
+    allocated_descriptors = []
+    real_pipe = os.pipe
+    real_pidfd_open = os.pidfd_open
+    selectors_created = []
+
+    def tracking_pipe():
+        descriptors = real_pipe()
+        allocated_descriptors.extend(descriptors)
+        return descriptors
+
+    def tracking_pidfd_open(process_id):
+        descriptor = real_pidfd_open(process_id)
+        worker_descriptors.append(descriptor)
+        return descriptor
+
+    def wait_for_worker():
+        deadline = time.monotonic() + 5
+        while not pid_path.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert pid_path.exists(), "worker did not start before selector failure"
+
+    class FailingSelector:
+        def __init__(self):
+            self.closed = False
+
+        def register(self, *_args):
+            wait_for_worker()
+            raise OSError("synthetic selector registration failure")
+
+        def close(self):
+            self.closed = True
+
+    def create_selector():
+        if failure_stage == "create":
+            wait_for_worker()
+            raise OSError("synthetic selector creation failure")
+        selector = FailingSelector()
+        selectors_created.append(selector)
+        return selector
+
+    monkeypatch.setattr(os, "pipe", tracking_pipe)
+    monkeypatch.setattr(os, "pidfd_open", tracking_pidfd_open)
+    monkeypatch.setattr(selectors, "DefaultSelector", create_selector)
+
+    with pytest.raises(
+        WorkspaceWorkerError,
+        match="workspace worker failed",
+    ):
+        run_worker(
+            tmp_path,
+            broker,
+            f"""
+import os
+import time
+with open({str(pid_path)!r}, "w", encoding="utf-8") as handle:
+    handle.write(str(os.getpid()))
+time.sleep(30)
+""",
+        )
+
+    process_id = int(pid_path.read_text())
+    with pytest.raises(ChildProcessError):
+        os.waitpid(process_id, os.WNOHANG)
+    with pytest.raises(ProcessLookupError):
+        os.kill(process_id, 0)
+    assert len(allocated_descriptors) == 4
+    for descriptor in allocated_descriptors + worker_descriptors:
+        with pytest.raises(OSError):
+            os.fstat(descriptor)
+    if failure_stage == "register":
+        assert selectors_created[0].closed
+
+
+def test_failed_termination_uses_bounded_reap_and_preserves_external_shutdown(
+    tmp_path,
+    monkeypatch,
+):
+    broker = build_broker(tmp_path)
+    pid_path = tmp_path / "termination-failure-worker.pid"
+    import privacy.encrypted_workspace as ews
+
+    real_kill = os.kill
+
+    class RetryableBoundary:
+        def __init__(self):
+            self.calls = 0
+
+        def terminate(self):
+            self.calls += 1
+            if self.calls == 1:
+                raise ews.ResourceContainmentError(
+                    "synthetic cgroup termination failure"
+                )
+            real_kill(int(pid_path.read_text()), signal.SIGKILL)
+
+    boundary = RetryableBoundary()
+
+    def denied_signal(*_args):
+        raise PermissionError("synthetic signal permission failure")
+
+    def no_op_activation(*_args):
+        return None
+
+    monkeypatch.setattr(
+        WorkspaceBroker,
+        "_WorkspaceBroker__activate_resource_boundary",
+        staticmethod(no_op_activation),
+    )
+    monkeypatch.setattr(
+        "privacy.encrypted_workspace.build_staged_worker_command",
+        lambda command: list(command),
+    )
+    monkeypatch.setattr(WorkspaceBroker, "_REAP_TIMEOUT", 0.15)
+
+    started = time.monotonic()
+    with monkeypatch.context() as signals:
+        signals.setattr(ews.os, "killpg", denied_signal)
+        signals.setattr(ews.os, "kill", denied_signal)
+        with pytest.raises(
+            WorkspaceWorkerError,
+            match="workspace worker failed",
+        ) as excinfo:
+            broker.run_worker(
+                [
+                    sys.executable,
+                    "-c",
+                    (
+                        "import os,time; "
+                        f"open({str(pid_path)!r}, 'w').write(str(os.getpid())); "
+                        "time.sleep(30)"
+                    ),
+                ],
+                timeout=0.05,
+                resource_boundary=boundary,
+            )
+
+    elapsed = time.monotonic() - started
+    assert elapsed < 1.0
+    assert str(excinfo.value) == "workspace worker failed"
+    assert boundary.calls == 1
+
+    process_id = int(pid_path.read_text())
+    real_kill(process_id, 0)
+    boundary.terminate()
+    assert boundary.calls == 2
+    assert os.waitpid(process_id, 0)[0] == process_id
+    with pytest.raises(ProcessLookupError):
+        real_kill(process_id, 0)
+
+
 def test_worker_cancellation_terminates_and_reaps_child(
     tmp_path,
     monkeypatch,
