@@ -2,6 +2,7 @@ import fcntl
 import json
 import os
 from pathlib import Path
+import signal
 import stat
 import sys
 import time
@@ -234,6 +235,87 @@ for inherited in range(3, 1024):
         os.close(source_descriptor)
 
 
+def test_worker_launch_failure_closes_all_protocol_descriptors(
+    tmp_path,
+    monkeypatch,
+):
+    broker = build_broker(tmp_path)
+    allocated_descriptors = []
+    real_pipe = os.pipe
+
+    def tracking_pipe():
+        descriptors = real_pipe()
+        allocated_descriptors.extend(descriptors)
+        return descriptors
+
+    def failed_spawn(*args, **kwargs):
+        raise FileNotFoundError("synthetic launch failure")
+
+    monkeypatch.setattr(os, "pipe", tracking_pipe)
+    monkeypatch.setattr(os, "posix_spawnp", failed_spawn)
+
+    with pytest.raises(
+        WorkspaceWorkerError,
+        match="workspace worker failed",
+    ) as excinfo:
+        broker.run_worker(["missing-private-worker"])
+
+    assert str(excinfo.value) == "workspace worker failed"
+    assert len(allocated_descriptors) == 4
+    for descriptor in allocated_descriptors:
+        with pytest.raises(OSError):
+            os.fstat(descriptor)
+
+
+def test_resource_activation_failure_kills_and_reaps_started_worker(
+    tmp_path,
+    monkeypatch,
+):
+    broker = build_broker(tmp_path)
+    process_ids = []
+    real_spawn = os.posix_spawnp
+
+    def tracking_spawn(*args, **kwargs):
+        process_id = real_spawn(*args, **kwargs)
+        process_ids.append(process_id)
+        return process_id
+
+    class Boundary:
+        @staticmethod
+        def terminate():
+            return None
+
+    def fail_activation(*args):
+        raise RuntimeError("synthetic activation failure")
+
+    monkeypatch.setattr(os, "posix_spawnp", tracking_spawn)
+    monkeypatch.setattr(
+        WorkspaceBroker,
+        "_WorkspaceBroker__activate_resource_boundary",
+        staticmethod(fail_activation),
+    )
+    monkeypatch.setattr(
+        "privacy.encrypted_workspace.build_staged_worker_command",
+        lambda command: list(command),
+    )
+
+    with pytest.raises(
+        WorkspaceWorkerError,
+        match="workspace worker failed",
+    ) as excinfo:
+        broker.run_worker(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            resource_boundary=Boundary(),
+        )
+
+    assert str(excinfo.value) == "workspace worker failed"
+    assert len(process_ids) == 1
+    with pytest.raises(ChildProcessError):
+        os.waitpid(process_ids[0], os.WNOHANG)
+    with pytest.raises(ProcessLookupError):
+        os.kill(process_ids[0], 0)
+
+
 def test_worker_that_closes_protocol_pipe_cannot_hold_broker_open(tmp_path):
     broker = build_broker(tmp_path)
     with pytest.raises(WorkspaceWorkerError, match="workspace worker failed"):
@@ -376,10 +458,18 @@ def test_group_signal_permission_failure_still_reaps_leader(
     pid_path = tmp_path / "failed-worker.pid"
     import privacy.encrypted_workspace as ews
 
+    attempted_fallback_signals = []
+    real_kill = os.kill
+
     def deny_group_signal(pgid, sig):
         raise PermissionError("synthetic process-group denial")
 
+    def track_fallback_signal(pid, sig):
+        attempted_fallback_signals.append((pid, sig))
+        return real_kill(pid, sig)
+
     monkeypatch.setattr(ews.os, "killpg", deny_group_signal)
+    monkeypatch.setattr(ews.os, "kill", track_fallback_signal)
 
     with pytest.raises(
         WorkspaceWorkerError,
@@ -397,10 +487,48 @@ os._exit(7)
         )
 
     process_id = int(pid_path.read_text())
+    assert attempted_fallback_signals == [(process_id, signal.SIGKILL)]
     with pytest.raises(ChildProcessError):
         os.waitpid(process_id, os.WNOHANG)
     with pytest.raises(ProcessLookupError):
         os.kill(process_id, 0)
+
+
+def test_all_signal_permission_failures_are_sanitized_and_reaped(
+    tmp_path,
+    monkeypatch,
+):
+    broker = build_broker(tmp_path)
+    pid_path = tmp_path / "signal-denied-worker.pid"
+    import privacy.encrypted_workspace as ews
+
+    def deny_signal(*args):
+        raise PermissionError("synthetic signal denial")
+
+    real_kill = os.kill
+    monkeypatch.setattr(ews.os, "killpg", deny_signal)
+    monkeypatch.setattr(ews.os, "kill", deny_signal)
+
+    source = f"""
+import os
+import time
+with open({str(pid_path)!r}, "w", encoding="utf-8") as handle:
+    handle.write(str(os.getpid()))
+os.close(1)
+time.sleep(0.2)
+"""
+    with pytest.raises(
+        WorkspaceWorkerError,
+        match="workspace worker failed",
+    ) as excinfo:
+        run_worker(tmp_path, broker, source, timeout=0.05)
+
+    assert str(excinfo.value) == "workspace worker failed"
+    process_id = int(pid_path.read_text())
+    with pytest.raises(ChildProcessError):
+        os.waitpid(process_id, os.WNOHANG)
+    with pytest.raises(ProcessLookupError):
+        real_kill(process_id, 0)
 
 
 def test_successful_worker_run_does_not_kill_anything(tmp_path):
