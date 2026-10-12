@@ -791,7 +791,7 @@ class WorkspaceBroker:
                     process_id,
                     timeout,
                 )
-        except Exception:
+        except BaseException as exc:
             for descriptor in (
                 response_read,
                 response_write,
@@ -807,7 +807,11 @@ class WorkspaceBroker:
                     )
                 finally:
                     self.__reap(process_id)
-            raise WorkspaceWorkerError("workspace worker failed") from None
+            if isinstance(exc, Exception):
+                raise WorkspaceWorkerError(
+                    "workspace worker failed"
+                ) from None
+            raise
 
         response_stream = None
         request_stream = None
@@ -823,7 +827,7 @@ class WorkspaceBroker:
             request_stream = os.fdopen(request_read, "rb", buffering=0)
             request_read = -1
             process_descriptor = os.pidfd_open(process_id)
-        except Exception:
+        except BaseException as exc:
             for descriptor in (
                 response_read,
                 response_write,
@@ -843,7 +847,11 @@ class WorkspaceBroker:
                 )
             finally:
                 self.__reap(process_id)
-            raise WorkspaceWorkerError("workspace worker failed") from None
+            if isinstance(exc, Exception):
+                raise WorkspaceWorkerError(
+                    "workspace worker failed"
+                ) from None
+            raise
 
         selector = selectors.DefaultSelector()
         selector.register(request_stream, selectors.EVENT_READ)
@@ -908,7 +916,7 @@ class WorkspaceBroker:
                 # Successful leader exit is not enough: independently
                 # verify that no descendant remains in the cgroup.
                 resource_boundary.terminate()
-        except Exception:
+        except BaseException as exc:
             if not process_reaped:
                 try:
                     self.__terminate_contained_worker(
@@ -923,7 +931,11 @@ class WorkspaceBroker:
                     resource_boundary.terminate()
                 except ResourceContainmentError:
                     pass
-            raise WorkspaceWorkerError("workspace worker failed") from None
+            if isinstance(exc, Exception):
+                raise WorkspaceWorkerError(
+                    "workspace worker failed"
+                ) from None
+            raise
         finally:
             selector.close()
             os.close(process_descriptor)

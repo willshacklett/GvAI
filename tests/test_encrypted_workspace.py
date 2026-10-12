@@ -2,6 +2,7 @@ import fcntl
 import json
 import os
 from pathlib import Path
+import selectors
 import signal
 import stat
 import sys
@@ -314,6 +315,43 @@ def test_resource_activation_failure_kills_and_reaps_started_worker(
         os.waitpid(process_ids[0], os.WNOHANG)
     with pytest.raises(ProcessLookupError):
         os.kill(process_ids[0], 0)
+
+
+def test_worker_cancellation_terminates_and_reaps_child(
+    tmp_path,
+    monkeypatch,
+):
+    broker = build_broker(tmp_path)
+    pid_path = tmp_path / "cancelled-worker.pid"
+    source = f"""
+import os
+import time
+with open({str(pid_path)!r}, "w", encoding="utf-8") as handle:
+    handle.write(str(os.getpid()))
+time.sleep(30)
+"""
+
+    def cancel_after_worker_starts(_selector, timeout=None):
+        deadline = time.monotonic() + 5
+        while not pid_path.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert pid_path.exists(), "worker did not start before cancellation"
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(
+        selectors.DefaultSelector,
+        "select",
+        cancel_after_worker_starts,
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        run_worker(tmp_path, broker, source)
+
+    process_id = int(pid_path.read_text())
+    with pytest.raises(ChildProcessError):
+        os.waitpid(process_id, os.WNOHANG)
+    with pytest.raises(ProcessLookupError):
+        os.kill(process_id, 0)
 
 
 def test_worker_that_closes_protocol_pipe_cannot_hold_broker_open(tmp_path):
