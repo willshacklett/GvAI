@@ -29,6 +29,7 @@ from privacy.encrypted_workspace import (
     WorkspaceBroker,
     WorkspaceRequest,
     WorkspaceWorkerError,
+    WorkspaceWorkerShutdownUnconfirmed,
 )
 
 
@@ -283,8 +284,12 @@ def test_resource_activation_failure_kills_and_reaps_started_worker(
 
     class Boundary:
         @staticmethod
-        def terminate():
+        def terminate(*, timeout=5.0):
             return None
+
+        @staticmethod
+        def current_process_count():
+            return 0
 
     def fail_activation(*args):
         raise RuntimeError("synthetic activation failure")
@@ -412,14 +417,34 @@ def test_failed_termination_uses_bounded_reap_and_preserves_external_shutdown(
     class RetryableBoundary:
         def __init__(self):
             self.calls = 0
+            self.stopped = False
+            self.closed = False
 
-        def terminate(self):
+        def terminate(self, *, timeout=5.0):
             self.calls += 1
             if self.calls == 1:
                 raise ews.ResourceContainmentError(
                     "synthetic cgroup termination failure"
                 )
             real_kill(int(pid_path.read_text()), signal.SIGKILL)
+            self.stopped = True
+
+        def current_process_count(self):
+            if not self.stopped:
+                return 1
+            try:
+                status = os.waitid(
+                    os.P_PID,
+                    int(pid_path.read_text()),
+                    os.WEXITED | os.WNOHANG | os.WNOWAIT,
+                )
+            except ChildProcessError:
+                return 0
+            return int(status is not None and status.si_pid != 0)
+
+        def close(self):
+            assert self.current_process_count() == 0
+            self.closed = True
 
     boundary = RetryableBoundary()
 
@@ -445,8 +470,8 @@ def test_failed_termination_uses_bounded_reap_and_preserves_external_shutdown(
         signals.setattr(ews.os, "killpg", denied_signal)
         signals.setattr(ews.os, "kill", denied_signal)
         with pytest.raises(
-            WorkspaceWorkerError,
-            match="workspace worker failed",
+            WorkspaceWorkerShutdownUnconfirmed,
+            match="shutdown is unconfirmed",
         ) as excinfo:
             broker.run_worker(
                 [
@@ -464,16 +489,104 @@ def test_failed_termination_uses_bounded_reap_and_preserves_external_shutdown(
 
     elapsed = time.monotonic() - started
     assert elapsed < 1.0
-    assert str(excinfo.value) == "workspace worker failed"
+    shutdown = excinfo.value
+    assert str(shutdown) == (
+        "workspace worker shutdown is unconfirmed; "
+        "external recovery is required"
+    )
+    assert shutdown.resource_boundary is boundary
+    assert not shutdown.verify_stopped()
+    cleanup_calls = []
+    shutdown.defer_cleanup(lambda: cleanup_calls.append("cleaned"))
+    assert cleanup_calls == []
     assert boundary.calls == 1
 
     process_id = int(pid_path.read_text())
     real_kill(process_id, 0)
-    boundary.terminate()
-    assert boundary.calls == 2
-    assert os.waitpid(process_id, 0)[0] == process_id
+    assert shutdown.stop_and_verify(timeout=1.0)
+    assert boundary.calls >= 2
+    assert shutdown.process_reaped
+    assert boundary.closed
+    assert cleanup_calls == ["cleaned"]
     with pytest.raises(ProcessLookupError):
         real_kill(process_id, 0)
+
+
+def test_shutdown_race_reaps_worker_before_reporting_timeout(
+    tmp_path,
+    monkeypatch,
+):
+    broker = build_broker(tmp_path)
+    pid_path = tmp_path / "shutdown-race-worker.pid"
+    import privacy.encrypted_workspace as ews
+
+    class ExitingBoundary:
+        def __init__(self):
+            self.process_id = None
+
+        def terminate(self, *, timeout=5.0):
+            self.process_id = int(pid_path.read_text())
+            deadline = time.monotonic() + 2
+            while time.monotonic() < deadline:
+                try:
+                    status = os.waitid(
+                        os.P_PID,
+                        self.process_id,
+                        os.WEXITED | os.WNOHANG | os.WNOWAIT,
+                    )
+                except ChildProcessError:
+                    return
+                if status is not None and status.si_pid == self.process_id:
+                    raise ews.ResourceContainmentError(
+                        "synthetic race with natural worker exit"
+                    )
+                time.sleep(0.005)
+            raise AssertionError("worker did not exit during shutdown race")
+
+        def current_process_count(self):
+            assert self.process_id is not None
+            try:
+                status = os.waitid(
+                    os.P_PID,
+                    self.process_id,
+                    os.WEXITED | os.WNOHANG | os.WNOWAIT,
+                )
+            except ChildProcessError:
+                return 0
+            return int(status is None or status.si_pid == 0)
+
+    boundary = ExitingBoundary()
+    monkeypatch.setattr(
+        WorkspaceBroker,
+        "_WorkspaceBroker__activate_resource_boundary",
+        staticmethod(lambda *_args: None),
+    )
+    monkeypatch.setattr(
+        "privacy.encrypted_workspace.build_staged_worker_command",
+        lambda command: list(command),
+    )
+
+    with pytest.raises(WorkspaceWorkerError) as excinfo:
+        broker.run_worker(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "import os,time; "
+                    f"open({str(pid_path)!r}, 'w').write(str(os.getpid())); "
+                    "time.sleep(0.2)"
+                ),
+            ],
+            timeout=0.05,
+            resource_boundary=boundary,
+        )
+
+    assert str(excinfo.value) == "workspace worker failed"
+    process_id = int(pid_path.read_text())
+    with pytest.raises(ChildProcessError):
+        os.waitpid(process_id, os.WNOHANG)
+    with pytest.raises(ProcessLookupError):
+        os.kill(process_id, 0)
 
 
 def test_worker_cancellation_terminates_and_reaps_child(
@@ -669,9 +782,9 @@ def test_group_signal_permission_failure_still_reaps_leader(
     monkeypatch.setattr(ews.os, "kill", track_fallback_signal)
 
     with pytest.raises(
-        WorkspaceWorkerError,
-        match="workspace worker failed",
-    ):
+        WorkspaceWorkerShutdownUnconfirmed,
+        match="shutdown is unconfirmed",
+    ) as excinfo:
         run_worker(
             tmp_path,
             broker,
@@ -685,13 +798,13 @@ os._exit(7)
 
     process_id = int(pid_path.read_text())
     assert attempted_fallback_signals == [(process_id, signal.SIGKILL)]
-    with pytest.raises(ChildProcessError):
-        os.waitpid(process_id, os.WNOHANG)
+    assert not excinfo.value.process_reaped
+    assert os.waitpid(process_id, 0)[0] == process_id
     with pytest.raises(ProcessLookupError):
         os.kill(process_id, 0)
 
 
-def test_all_signal_permission_failures_are_sanitized_and_reaped(
+def test_all_signal_permission_failures_preserve_recovery_authority(
     tmp_path,
     monkeypatch,
 ):
@@ -703,6 +816,7 @@ def test_all_signal_permission_failures_are_sanitized_and_reaped(
         raise PermissionError("synthetic signal denial")
 
     real_kill = os.kill
+    real_killpg = os.killpg
     monkeypatch.setattr(ews.os, "killpg", deny_signal)
     monkeypatch.setattr(ews.os, "kill", deny_signal)
 
@@ -715,15 +829,15 @@ os.close(1)
 time.sleep(0.2)
 """
     with pytest.raises(
-        WorkspaceWorkerError,
-        match="workspace worker failed",
+        WorkspaceWorkerShutdownUnconfirmed,
+        match="shutdown is unconfirmed",
     ) as excinfo:
         run_worker(tmp_path, broker, source, timeout=0.05)
 
-    assert str(excinfo.value) == "workspace worker failed"
+    assert "synthetic signal denial" not in str(excinfo.value)
     process_id = int(pid_path.read_text())
-    with pytest.raises(ChildProcessError):
-        os.waitpid(process_id, os.WNOHANG)
+    real_killpg(process_id, signal.SIGKILL)
+    assert os.waitpid(process_id, 0)[0] == process_id
     with pytest.raises(ProcessLookupError):
         real_kill(process_id, 0)
 

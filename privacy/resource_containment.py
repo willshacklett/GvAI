@@ -572,31 +572,30 @@ class CgroupV2Boundary:
         if self._closed:
             return
 
-        failed = False
         try:
             self.terminate()
         except ResourceContainmentError:
-            failed = True
-
-        if self._group_fd >= 0:
-            os.close(self._group_fd)
-            self._group_fd = -1
+            # Keep both directory descriptors open so a trusted caller can
+            # retry termination and independently verify the boundary.
+            raise ResourceContainmentError(
+                "private worker resource cleanup failed"
+            ) from None
 
         try:
             if self._root_fd >= 0:
                 os.rmdir(self._name, dir_fd=self._root_fd)
         except OSError:
-            failed = True
-        finally:
-            if self._root_fd >= 0:
-                os.close(self._root_fd)
-                self._root_fd = -1
-            self._closed = True
-
-        if failed:
             raise ResourceContainmentError(
                 "private worker resource cleanup failed"
-            )
+            ) from None
+
+        if self._group_fd >= 0:
+            os.close(self._group_fd)
+            self._group_fd = -1
+        if self._root_fd >= 0:
+            os.close(self._root_fd)
+            self._root_fd = -1
+        self._closed = True
 
     def _best_effort_cleanup(self) -> None:
         if self._group_fd >= 0:

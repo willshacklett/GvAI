@@ -176,11 +176,19 @@ forbidden from the worker environment. Invalid limits, unavailable controllers,
 unsafe roots, failed attachment, failed termination, or incomplete cleanup fail
 closed with sanitized errors.
 
-On every success or failure path, the broker uses the host-controlled
-`cgroup.kill` interface, waits for the cgroup to become unpopulated, and removes
-the exact per-worker cgroup. Process-group signaling remains fallback cleanup;
-it is not the authoritative containment boundary. A worker cannot expand its
-limits or own its kill switch.
+The broker uses the host-controlled `cgroup.kill` interface, waits for the
+cgroup to become unpopulated, and removes the exact per-worker cgroup after
+confirmed shutdown. Process-group signaling remains fallback cleanup; it is not
+the authoritative containment boundary. A worker cannot expand its limits or
+own its kill switch.
+
+If shutdown cannot be confirmed, the broker raises an explicit
+`WorkspaceWorkerShutdownUnconfirmed` error and does not return a worker result.
+The error retains the cgroup boundary for independent stop verification and
+retry through `stop_and_verify()`. The runtime keeps the encrypted workspace
+until shutdown is confirmed, then removes it. Operators must retain and act on
+this error; closing or abandoning the broker process discards its in-process
+recovery handle.
 
 ## Remaining deployment requirements
 

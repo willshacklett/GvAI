@@ -207,6 +207,44 @@ def test_non_cgroup_directory_is_rejected(tmp_path):
     assert list(tmp_path.iterdir()) == []
 
 
+def test_failed_close_retains_retryable_boundary_descriptors(
+    tmp_path,
+    monkeypatch,
+):
+    root = tmp_path / "delegated"
+    group = root / "worker"
+    group.mkdir(parents=True)
+    boundary = CgroupV2Boundary.__new__(CgroupV2Boundary)
+    boundary._name = group.name
+    boundary._root_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+    boundary._group_fd = os.open(group, os.O_RDONLY | os.O_DIRECTORY)
+    boundary._closed = False
+    boundary._attached_pid = None
+    attempts = 0
+
+    def fail_once(*, timeout=5.0):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise ResourceContainmentError("synthetic termination failure")
+
+    monkeypatch.setattr(boundary, "terminate", fail_once)
+
+    with pytest.raises(ResourceContainmentError):
+        boundary.close()
+
+    assert not boundary.closed
+    os.fstat(boundary._root_fd)
+    os.fstat(boundary._group_fd)
+    assert group.is_dir()
+
+    boundary.close()
+    assert boundary.closed
+    assert not group.exists()
+    assert boundary._root_fd == -1
+    assert boundary._group_fd == -1
+
+
 
 @pytest.mark.parametrize(
     "delegated",
