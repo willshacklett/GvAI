@@ -213,6 +213,79 @@ def test_unapproved_environment_name_fails_closed(monkeypatch):
             },
         )
 
+
+@pytest.mark.parametrize(
+    "runtime_prefix",
+    ["/", str(Path.home())],
+)
+def test_python_runtime_cannot_expose_host_home(
+    monkeypatch,
+    runtime_prefix,
+):
+    monkeypatch.setattr(
+        sandbox.shutil,
+        "which",
+        lambda name: "/usr/bin/bwrap",
+    )
+    monkeypatch.setattr(
+        sandbox.sys,
+        "base_prefix",
+        runtime_prefix,
+    )
+
+    with pytest.raises(
+        FilesystemSandboxError,
+        match="runtime mount crosses a protected boundary",
+    ):
+        build_filesystem_sandbox_command(
+            [sys.executable, "-c", "pass"],
+        )
+
+
+def test_python_runtime_cannot_overlap_a_denied_path(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setattr(
+        sandbox.shutil,
+        "which",
+        lambda name: "/usr/bin/bwrap",
+    )
+    monkeypatch.setattr(
+        sandbox.sys,
+        "base_prefix",
+        str(tmp_path),
+    )
+
+    with pytest.raises(
+        FilesystemSandboxError,
+        match="runtime mount crosses a protected boundary",
+    ):
+        build_filesystem_sandbox_command(
+            [sys.executable, "-c", "pass"],
+            denied_paths=(tmp_path,),
+        )
+
+
+def test_system_runtime_mount_cannot_expose_protected_path(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        sandbox.shutil,
+        "which",
+        lambda name: "/usr/bin/bwrap",
+    )
+
+    with pytest.raises(
+        FilesystemSandboxError,
+        match="runtime mount crosses a protected boundary",
+    ):
+        build_filesystem_sandbox_command(
+            [sys.executable, "-c", "pass"],
+            denied_paths=("/usr/local/share/host-home",),
+        )
+
+
 def test_untrusted_bubblewrap_executable_fails_closed(
     monkeypatch,
     tmp_path,

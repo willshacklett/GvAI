@@ -115,6 +115,9 @@ The encrypted runtime places the worker inside a Bubblewrap namespace with:
 list of canonical absolute regular files. Directories, symlinks, hard links,
 special files, missing files, relative paths, non-canonical paths, root-wide
 paths, and protected-boundary paths fail closed.
+The host Python runtime prefix and the system `/usr` mount are also rejected
+if either overlaps the home, repository, or any protected workspace path,
+rather than mounting those paths to make an unusual host layout work.
 
 `GVAI_PRIVATE_MODEL_ASSET_MANIFEST` names a canonical JSON manifest signed with
 Ed25519. Its signature covers the schema and the complete ordered asset list,
@@ -173,11 +176,19 @@ forbidden from the worker environment. Invalid limits, unavailable controllers,
 unsafe roots, failed attachment, failed termination, or incomplete cleanup fail
 closed with sanitized errors.
 
-On every success or failure path, the broker uses the host-controlled
-`cgroup.kill` interface, waits for the cgroup to become unpopulated, and removes
-the exact per-worker cgroup. Process-group signaling remains fallback cleanup;
-it is not the authoritative containment boundary. A worker cannot expand its
-limits or own its kill switch.
+The broker uses the host-controlled `cgroup.kill` interface, waits for the
+cgroup to become unpopulated, and removes the exact per-worker cgroup after
+confirmed shutdown. Process-group signaling remains fallback cleanup; it is not
+the authoritative containment boundary. A worker cannot expand its limits or
+own its kill switch.
+
+If shutdown cannot be confirmed, the broker raises an explicit
+`WorkspaceWorkerShutdownUnconfirmed` error and does not return a worker result.
+The error retains the cgroup boundary for independent stop verification and
+retry through `stop_and_verify()`. The runtime keeps the encrypted workspace
+until shutdown is confirmed, then removes it. Operators must retain and act on
+this error; closing or abandoning the broker process discards its in-process
+recovery handle.
 
 ## Remaining deployment requirements
 

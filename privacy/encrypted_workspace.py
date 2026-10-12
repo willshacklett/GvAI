@@ -52,6 +52,117 @@ class WorkspaceWorkerError(RuntimeError):
     pass
 
 
+class WorkspaceWorkerShutdownUnconfirmed(WorkspaceWorkerError):
+    """Worker shutdown failed; retain the cgroup for independent recovery."""
+
+    def __init__(
+        self,
+        process_id: int,
+        resource_boundary: CgroupV2Boundary | None,
+        *,
+        process_reaped: bool = False,
+        cleanup_after_stop: Callable[[], None] | None = None,
+    ):
+        super().__init__(
+            "workspace worker shutdown is unconfirmed; "
+            "external recovery is required"
+        )
+        self.process_id = process_id
+        self.resource_boundary = resource_boundary
+        self.process_reaped = process_reaped
+        self._verified_stopped = False
+        self._cleanup_after_stop = cleanup_after_stop
+
+    def verify_stopped(self) -> bool:
+        """Verify leader exit and, when available, whole-cgroup emptiness."""
+
+        if self._verified_stopped:
+            return True
+        try:
+            status = os.waitid(
+                os.P_PID,
+                self.process_id,
+                os.WEXITED | os.WNOHANG | os.WNOWAIT,
+            )
+            leader_exited = (
+                status is not None
+                and getattr(status, "si_pid", 0) == self.process_id
+            )
+        except ChildProcessError:
+            leader_exited = True
+        except OSError:
+            return False
+
+        if not leader_exited or self.resource_boundary is None:
+            return False
+
+        if not self.process_reaped:
+            try:
+                reaped_pid, _ = os.waitpid(
+                    self.process_id,
+                    os.WNOHANG,
+                )
+                self.process_reaped = reaped_pid == self.process_id
+                if not self.process_reaped:
+                    return False
+            except ChildProcessError:
+                self.process_reaped = True
+            except OSError:
+                return False
+
+        try:
+            return self.resource_boundary.current_process_count() == 0
+        except ResourceContainmentError:
+            return False
+
+    def defer_cleanup(self, callback: Callable[[], None]) -> None:
+        """Retain sensitive runtime artifacts until shutdown is verified."""
+
+        self._cleanup_after_stop = callback
+
+    def stop_and_verify(self, *, timeout: float = 5.0) -> bool:
+        """Retry the retained cgroup stop and independently verify emptiness."""
+
+        deadline = time.monotonic() + max(0.0, float(timeout))
+        while True:
+            if self.resource_boundary is not None:
+                remaining = deadline - time.monotonic()
+                if remaining > 0:
+                    try:
+                        self.resource_boundary.terminate(
+                            timeout=remaining
+                        )
+                    except ResourceContainmentError:
+                        pass
+
+            if not self.process_reaped:
+                try:
+                    os.killpg(self.process_id, signal.SIGKILL)
+                except OSError:
+                    pass
+                try:
+                    os.kill(self.process_id, signal.SIGKILL)
+                except OSError:
+                    pass
+
+            if self.verify_stopped():
+                if self.resource_boundary is not None:
+                    try:
+                        self.resource_boundary.close()
+                    except ResourceContainmentError:
+                        return False
+                if self._cleanup_after_stop is not None:
+                    self._cleanup_after_stop()
+                    self._cleanup_after_stop = None
+                self._verified_stopped = True
+                return True
+
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            time.sleep(min(0.01, remaining))
+
+
 class WorkspaceAuditError(WorkspaceIntegrityError):
     pass
 
@@ -707,6 +818,7 @@ class WorkspaceBroker:
 
     _MAX_REQUEST_BYTES = 16 * 1024 * 1024
     _MAX_RESPONSE_BYTES = 16 * 1024 * 1024
+    _REAP_TIMEOUT = 5.0
     _ENV_ALLOWLIST = frozenset({"LANG", "LC_ALL", "PATH", "TZ"})
     _EXTRA_ENV_ALLOWLIST = LOCAL_MODEL_CONFIG_ENV_ALLOWLIST
 
@@ -791,7 +903,7 @@ class WorkspaceBroker:
                     process_id,
                     timeout,
                 )
-        except Exception:
+        except BaseException as exc:
             for descriptor in (
                 response_read,
                 response_write,
@@ -800,12 +912,15 @@ class WorkspaceBroker:
             ):
                 os.close(descriptor)
             if process_id is not None:
-                self.__terminate_contained_worker(
+                self.__shutdown_and_reap_worker(
                     process_id,
                     resource_boundary,
                 )
-                self.__reap(process_id)
-            raise WorkspaceWorkerError("workspace worker failed") from None
+            if isinstance(exc, Exception):
+                raise WorkspaceWorkerError(
+                    "workspace worker failed"
+                ) from None
+            raise
 
         response_stream = None
         request_stream = None
@@ -821,7 +936,7 @@ class WorkspaceBroker:
             request_stream = os.fdopen(request_read, "rb", buffering=0)
             request_read = -1
             process_descriptor = os.pidfd_open(process_id)
-        except Exception:
+        except BaseException as exc:
             for descriptor in (
                 response_read,
                 response_write,
@@ -834,21 +949,25 @@ class WorkspaceBroker:
                 response_stream.close()
             if request_stream is not None:
                 request_stream.close()
-            self.__terminate_contained_worker(
+            self.__shutdown_and_reap_worker(
                 process_id,
                 resource_boundary,
             )
-            self.__reap(process_id)
-            raise WorkspaceWorkerError("workspace worker failed") from None
+            if isinstance(exc, Exception):
+                raise WorkspaceWorkerError(
+                    "workspace worker failed"
+                ) from None
+            raise
 
-        selector = selectors.DefaultSelector()
-        selector.register(request_stream, selectors.EVENT_READ)
+        selector = None
         pending = b""
         request_count = 0
         deadline = time.monotonic() + timeout
         process_reaped = False
 
         try:
+            selector = selectors.DefaultSelector()
+            selector.register(request_stream, selectors.EVENT_READ)
             while True:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
@@ -904,22 +1023,30 @@ class WorkspaceBroker:
                 # Successful leader exit is not enough: independently
                 # verify that no descendant remains in the cgroup.
                 resource_boundary.terminate()
-        except Exception:
+        except BaseException as exc:
             if not process_reaped:
-                self.__terminate_contained_worker(
+                self.__shutdown_and_reap_worker(
                     process_id,
                     resource_boundary,
                 )
-                self.__reap(process_id)
                 process_reaped = True
             elif resource_boundary is not None:
                 try:
                     resource_boundary.terminate()
                 except ResourceContainmentError:
-                    pass
-            raise WorkspaceWorkerError("workspace worker failed") from None
+                    raise WorkspaceWorkerShutdownUnconfirmed(
+                        process_id,
+                        resource_boundary,
+                        process_reaped=True,
+                    ) from None
+            if isinstance(exc, Exception):
+                raise WorkspaceWorkerError(
+                    "workspace worker failed"
+                ) from None
+            raise
         finally:
-            selector.close()
+            if selector is not None:
+                selector.close()
             os.close(process_descriptor)
             request_stream.close()
             if not response_stream.closed:
@@ -970,43 +1097,27 @@ class WorkspaceBroker:
 
             time.sleep(0.005)
 
-    @classmethod
-    def __terminate_contained_worker(
-        cls,
+    def __shutdown_and_reap_worker(
+        self,
         process_id: int,
         resource_boundary: CgroupV2Boundary | None,
     ) -> None:
-        # The cgroup is the authoritative whole-tree kill switch.
+        deadline = time.monotonic() + self._REAP_TIMEOUT
         if resource_boundary is not None:
             try:
-                resource_boundary.terminate()
+                resource_boundary.terminate(
+                    timeout=max(0.0, deadline - time.monotonic())
+                )
             except ResourceContainmentError:
                 pass
 
-        # Retain process-group termination as a fallback.
-        cls.__terminate_worker_group(process_id)
-
-    @staticmethod
-    def __terminate_worker_group(process_id: int) -> None:
-        """Kill the worker's original process group, not just its leader.
-
-        ``run_worker`` always spawns with ``setsid=True``, so the worker
-        becomes the leader of a brand-new session and process group whose
-        id equals its own pid -- distinct from the broker's own process
-        group. Signaling that group (rather than only the leader pid)
-        reaches descendants that remain in that process group.
-        Descendants that create or join another process group are not
-        contained by this mechanism. This is not complete process-tree
-        containment.
-
-        This fails directly to SIGKILL (no graceful phase) to match the
-        existing fail-secure timeout/error handling in this method.
-        """
-
+        signal_failed = False
         try:
             os.killpg(process_id, signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
+        except ProcessLookupError:
             pass
+        except OSError:
+            signal_failed = True
 
         # Defensive fallback in case the leader was somehow not its own
         # process group (should not happen with setsid=True).
@@ -1014,13 +1125,67 @@ class WorkspaceBroker:
             os.kill(process_id, signal.SIGKILL)
         except ProcessLookupError:
             pass
+        except OSError:
+            signal_failed = True
+
+        process_reaped = False
+        while True:
+            leader_exited = self.__worker_exited(process_id)
+            if (
+                leader_exited
+                and not process_reaped
+                and (resource_boundary is not None or not signal_failed)
+            ):
+                try:
+                    reaped_pid, _ = os.waitpid(process_id, os.WNOHANG)
+                    process_reaped = reaped_pid == process_id
+                except ChildProcessError:
+                    process_reaped = True
+                except OSError:
+                    raise WorkspaceWorkerShutdownUnconfirmed(
+                        process_id,
+                        resource_boundary,
+                    ) from None
+
+            if resource_boundary is None:
+                contained = not signal_failed
+            else:
+                try:
+                    contained = (
+                        resource_boundary.current_process_count() == 0
+                    )
+                except ResourceContainmentError:
+                    contained = False
+
+            if leader_exited and process_reaped and contained:
+                return
+
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise WorkspaceWorkerShutdownUnconfirmed(
+                    process_id,
+                    resource_boundary,
+                    process_reaped=process_reaped,
+                ) from None
+
+            time.sleep(min(0.01, remaining))
 
     @staticmethod
-    def __reap(process_id: int) -> None:
+    def __worker_exited(process_id: int) -> bool:
         try:
-            os.waitpid(process_id, 0)
+            status = os.waitid(
+                os.P_PID,
+                process_id,
+                os.WEXITED | os.WNOHANG | os.WNOWAIT,
+            )
         except ChildProcessError:
-            pass
+            return True
+        except OSError:
+            return False
+        return (
+            status is not None
+            and getattr(status, "si_pid", 0) == process_id
+        )
 
     def __write_response(
         self,

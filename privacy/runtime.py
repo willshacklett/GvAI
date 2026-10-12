@@ -59,6 +59,7 @@ from privacy.encrypted_workspace import (
     WorkspaceBroker,
     WorkspaceRequest,
     WorkspaceWorkerError,
+    WorkspaceWorkerShutdownUnconfirmed,
 )
 from privacy.filesystem_sandbox import (
     FilesystemSandboxError,
@@ -415,6 +416,7 @@ def run_private_model_encrypted_workspace(
         ) from None
 
     storage_dir = None
+    preserve_resource_boundary = False
     try:
         storage_dir = Path(
             tempfile.mkdtemp(prefix="gvai-private-ws-")
@@ -480,6 +482,18 @@ def run_private_model_encrypted_workspace(
                 resource_boundary=resource_boundary,
             )
             reverify_model_assets(verified_model_assets)
+        except WorkspaceWorkerShutdownUnconfirmed as exc:
+            preserve_resource_boundary = True
+            if storage_dir is not None:
+                deferred_storage_dir = storage_dir
+                exc.defer_cleanup(
+                    lambda: shutil.rmtree(
+                        deferred_storage_dir,
+                        ignore_errors=True,
+                    )
+                )
+                storage_dir = None
+            raise
         except (
             FilesystemSandboxError,
             ModelAssetProvenanceError,
@@ -506,12 +520,13 @@ def run_private_model_encrypted_workspace(
     finally:
         if storage_dir is not None:
             shutil.rmtree(storage_dir, ignore_errors=True)
-        try:
-            resource_boundary.close()
-        except ResourceContainmentError:
-            raise RuntimeError(
-                "GVAI private model worker failed."
-            ) from None
+        if not preserve_resource_boundary:
+            try:
+                resource_boundary.close()
+            except ResourceContainmentError:
+                raise RuntimeError(
+                    "GVAI private model worker failed."
+                ) from None
 
     try:
         response = json.loads((result_bytes or b"").decode("utf-8"))

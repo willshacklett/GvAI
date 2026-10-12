@@ -14,7 +14,10 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 )
 
 import privacy.runtime as runtime
-from privacy.encrypted_workspace import WorkspaceBroker
+from privacy.encrypted_workspace import (
+    WorkspaceBroker,
+    WorkspaceWorkerShutdownUnconfirmed,
+)
 from privacy.model_asset_provenance import MANIFEST_SCHEMA
 
 
@@ -166,6 +169,77 @@ def test_encrypted_round_trip_through_exec_worker(monkeypatch, tmp_path):
         "reply": "ENCRYPTED-REPLY:top-secret-project-plan",
         "network_isolated": True,
     }
+
+
+def test_unconfirmed_shutdown_retains_boundary_and_encrypted_workspace(
+    monkeypatch,
+    tmp_path,
+):
+    _base_env(monkeypatch, tmp_path)
+    storage = tmp_path / "unconfirmed-storage"
+    boundaries = []
+
+    class RetryableBoundary:
+        def __init__(self, _configuration):
+            self.stopped = False
+            self.closed = False
+            boundaries.append(self)
+
+        def terminate(self, *, timeout=5.0):
+            self.stopped = True
+
+        def current_process_count(self):
+            return 0 if self.stopped else 1
+
+        def close(self):
+            assert self.stopped
+            self.closed = True
+
+    monkeypatch.setattr(runtime, "load_trusted_workspace_key", lambda: bytes(range(32)))
+    monkeypatch.setattr(
+        runtime,
+        "load_verified_model_assets",
+        lambda **_kwargs: type("VerifiedAssets", (), {"paths": ()})(),
+    )
+    monkeypatch.setattr(runtime, "reverify_model_assets", lambda _assets: None)
+    monkeypatch.setattr(runtime, "CgroupV2Boundary", RetryableBoundary)
+    monkeypatch.setattr(
+        runtime.tempfile,
+        "mkdtemp",
+        lambda **_kwargs: (storage.mkdir() or str(storage)),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "build_filesystem_sandbox_command",
+        lambda command, **_kwargs: list(command),
+    )
+    monkeypatch.setattr(runtime, "_encrypted_worker_command", lambda: ["worker"])
+    monkeypatch.setattr(runtime, "_local_model_extra_env", lambda: {})
+
+    def fail_shutdown(self, *_args, resource_boundary=None, **_kwargs):
+        raise WorkspaceWorkerShutdownUnconfirmed(
+            2**30,
+            resource_boundary,
+            process_reaped=True,
+        )
+
+    monkeypatch.setattr(WorkspaceBroker, "run_worker", fail_shutdown)
+
+    with pytest.raises(WorkspaceWorkerShutdownUnconfirmed) as excinfo:
+        runtime.run_private_model_encrypted_workspace(
+            "synthetic",
+            "unconfirmed-shutdown",
+        )
+
+    shutdown = excinfo.value
+    boundary = boundaries[0]
+    assert shutdown.resource_boundary is boundary
+    assert not boundary.closed
+    assert storage.is_dir()
+
+    assert shutdown.stop_and_verify(timeout=1.0)
+    assert boundary.closed
+    assert not storage.exists()
 
 
 def test_encrypted_dispatch_does_not_require_legacy_network_sandbox(

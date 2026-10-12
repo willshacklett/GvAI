@@ -2,6 +2,8 @@ import fcntl
 import json
 import os
 from pathlib import Path
+import selectors
+import signal
 import stat
 import sys
 import time
@@ -27,6 +29,7 @@ from privacy.encrypted_workspace import (
     WorkspaceBroker,
     WorkspaceRequest,
     WorkspaceWorkerError,
+    WorkspaceWorkerShutdownUnconfirmed,
 )
 
 
@@ -220,18 +223,407 @@ def test_worker_does_not_inherit_high_numbered_descriptor(tmp_path):
             broker,
             f"""
 import os
-try:
-    os.fstat({descriptor})
-except OSError:
-    pass
-else:
-    raise AssertionError("worker inherited a high-numbered descriptor")
+for inherited in range(3, 1024):
+    try:
+        os.fstat(inherited)
+    except OSError:
+        continue
+    raise AssertionError(f"worker inherited descriptor {{inherited}}")
 """,
         )
     finally:
         if descriptor >= 0:
             os.close(descriptor)
         os.close(source_descriptor)
+
+
+def test_worker_launch_failure_closes_all_protocol_descriptors(
+    tmp_path,
+    monkeypatch,
+):
+    broker = build_broker(tmp_path)
+    allocated_descriptors = []
+    real_pipe = os.pipe
+
+    def tracking_pipe():
+        descriptors = real_pipe()
+        allocated_descriptors.extend(descriptors)
+        return descriptors
+
+    def failed_spawn(*args, **kwargs):
+        raise FileNotFoundError("synthetic launch failure")
+
+    monkeypatch.setattr(os, "pipe", tracking_pipe)
+    monkeypatch.setattr(os, "posix_spawnp", failed_spawn)
+
+    with pytest.raises(
+        WorkspaceWorkerError,
+        match="workspace worker failed",
+    ) as excinfo:
+        broker.run_worker(["missing-private-worker"])
+
+    assert str(excinfo.value) == "workspace worker failed"
+    assert len(allocated_descriptors) == 4
+    for descriptor in allocated_descriptors:
+        with pytest.raises(OSError):
+            os.fstat(descriptor)
+
+
+def test_resource_activation_failure_kills_and_reaps_started_worker(
+    tmp_path,
+    monkeypatch,
+):
+    broker = build_broker(tmp_path)
+    process_ids = []
+    real_spawn = os.posix_spawnp
+
+    def tracking_spawn(*args, **kwargs):
+        process_id = real_spawn(*args, **kwargs)
+        process_ids.append(process_id)
+        return process_id
+
+    class Boundary:
+        @staticmethod
+        def terminate(*, timeout=5.0):
+            return None
+
+        @staticmethod
+        def current_process_count():
+            return 0
+
+    def fail_activation(*args):
+        raise RuntimeError("synthetic activation failure")
+
+    monkeypatch.setattr(os, "posix_spawnp", tracking_spawn)
+    monkeypatch.setattr(
+        WorkspaceBroker,
+        "_WorkspaceBroker__activate_resource_boundary",
+        staticmethod(fail_activation),
+    )
+    monkeypatch.setattr(
+        "privacy.encrypted_workspace.build_staged_worker_command",
+        lambda command: list(command),
+    )
+
+    with pytest.raises(
+        WorkspaceWorkerError,
+        match="workspace worker failed",
+    ) as excinfo:
+        broker.run_worker(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            resource_boundary=Boundary(),
+        )
+
+    assert str(excinfo.value) == "workspace worker failed"
+    assert len(process_ids) == 1
+    with pytest.raises(ChildProcessError):
+        os.waitpid(process_ids[0], os.WNOHANG)
+    with pytest.raises(ProcessLookupError):
+        os.kill(process_ids[0], 0)
+
+
+@pytest.mark.parametrize("failure_stage", ["create", "register"])
+def test_selector_failure_terminates_closes_and_reaps_worker(
+    tmp_path,
+    monkeypatch,
+    failure_stage,
+):
+    broker = build_broker(tmp_path)
+    pid_path = tmp_path / "selector-failure-worker.pid"
+    worker_descriptors = []
+    allocated_descriptors = []
+    real_pipe = os.pipe
+    real_pidfd_open = os.pidfd_open
+    selectors_created = []
+
+    def tracking_pipe():
+        descriptors = real_pipe()
+        allocated_descriptors.extend(descriptors)
+        return descriptors
+
+    def tracking_pidfd_open(process_id):
+        descriptor = real_pidfd_open(process_id)
+        worker_descriptors.append(descriptor)
+        return descriptor
+
+    def wait_for_worker():
+        deadline = time.monotonic() + 5
+        while not pid_path.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert pid_path.exists(), "worker did not start before selector failure"
+
+    class FailingSelector:
+        def __init__(self):
+            self.closed = False
+
+        def register(self, *_args):
+            wait_for_worker()
+            raise OSError("synthetic selector registration failure")
+
+        def close(self):
+            self.closed = True
+
+    def create_selector():
+        if failure_stage == "create":
+            wait_for_worker()
+            raise OSError("synthetic selector creation failure")
+        selector = FailingSelector()
+        selectors_created.append(selector)
+        return selector
+
+    monkeypatch.setattr(os, "pipe", tracking_pipe)
+    monkeypatch.setattr(os, "pidfd_open", tracking_pidfd_open)
+    monkeypatch.setattr(selectors, "DefaultSelector", create_selector)
+
+    with pytest.raises(
+        WorkspaceWorkerError,
+        match="workspace worker failed",
+    ):
+        run_worker(
+            tmp_path,
+            broker,
+            f"""
+import os
+import time
+with open({str(pid_path)!r}, "w", encoding="utf-8") as handle:
+    handle.write(str(os.getpid()))
+time.sleep(30)
+""",
+        )
+
+    process_id = int(pid_path.read_text())
+    with pytest.raises(ChildProcessError):
+        os.waitpid(process_id, os.WNOHANG)
+    with pytest.raises(ProcessLookupError):
+        os.kill(process_id, 0)
+    assert len(allocated_descriptors) == 4
+    for descriptor in allocated_descriptors + worker_descriptors:
+        with pytest.raises(OSError):
+            os.fstat(descriptor)
+    if failure_stage == "register":
+        assert selectors_created[0].closed
+
+
+def test_failed_termination_uses_bounded_reap_and_preserves_external_shutdown(
+    tmp_path,
+    monkeypatch,
+):
+    broker = build_broker(tmp_path)
+    pid_path = tmp_path / "termination-failure-worker.pid"
+    import privacy.encrypted_workspace as ews
+
+    real_kill = os.kill
+
+    class RetryableBoundary:
+        def __init__(self):
+            self.calls = 0
+            self.stopped = False
+            self.closed = False
+
+        def terminate(self, *, timeout=5.0):
+            self.calls += 1
+            if self.calls == 1:
+                raise ews.ResourceContainmentError(
+                    "synthetic cgroup termination failure"
+                )
+            real_kill(int(pid_path.read_text()), signal.SIGKILL)
+            self.stopped = True
+
+        def current_process_count(self):
+            if not self.stopped:
+                return 1
+            try:
+                status = os.waitid(
+                    os.P_PID,
+                    int(pid_path.read_text()),
+                    os.WEXITED | os.WNOHANG | os.WNOWAIT,
+                )
+            except ChildProcessError:
+                return 0
+            return int(status is not None and status.si_pid != 0)
+
+        def close(self):
+            assert self.current_process_count() == 0
+            self.closed = True
+
+    boundary = RetryableBoundary()
+
+    def denied_signal(*_args):
+        raise PermissionError("synthetic signal permission failure")
+
+    def no_op_activation(*_args):
+        return None
+
+    monkeypatch.setattr(
+        WorkspaceBroker,
+        "_WorkspaceBroker__activate_resource_boundary",
+        staticmethod(no_op_activation),
+    )
+    monkeypatch.setattr(
+        "privacy.encrypted_workspace.build_staged_worker_command",
+        lambda command: list(command),
+    )
+    monkeypatch.setattr(WorkspaceBroker, "_REAP_TIMEOUT", 0.15)
+
+    started = time.monotonic()
+    with monkeypatch.context() as signals:
+        signals.setattr(ews.os, "killpg", denied_signal)
+        signals.setattr(ews.os, "kill", denied_signal)
+        with pytest.raises(
+            WorkspaceWorkerShutdownUnconfirmed,
+            match="shutdown is unconfirmed",
+        ) as excinfo:
+            broker.run_worker(
+                [
+                    sys.executable,
+                    "-c",
+                    (
+                        "import os,time; "
+                        f"open({str(pid_path)!r}, 'w').write(str(os.getpid())); "
+                        "time.sleep(30)"
+                    ),
+                ],
+                timeout=0.05,
+                resource_boundary=boundary,
+            )
+
+    elapsed = time.monotonic() - started
+    assert elapsed < 1.0
+    shutdown = excinfo.value
+    assert str(shutdown) == (
+        "workspace worker shutdown is unconfirmed; "
+        "external recovery is required"
+    )
+    assert shutdown.resource_boundary is boundary
+    assert not shutdown.verify_stopped()
+    cleanup_calls = []
+    shutdown.defer_cleanup(lambda: cleanup_calls.append("cleaned"))
+    assert cleanup_calls == []
+    assert boundary.calls == 1
+
+    process_id = int(pid_path.read_text())
+    real_kill(process_id, 0)
+    assert shutdown.stop_and_verify(timeout=1.0)
+    assert boundary.calls >= 2
+    assert shutdown.process_reaped
+    assert boundary.closed
+    assert cleanup_calls == ["cleaned"]
+    with pytest.raises(ProcessLookupError):
+        real_kill(process_id, 0)
+
+
+def test_shutdown_race_reaps_worker_before_reporting_timeout(
+    tmp_path,
+    monkeypatch,
+):
+    broker = build_broker(tmp_path)
+    pid_path = tmp_path / "shutdown-race-worker.pid"
+    import privacy.encrypted_workspace as ews
+
+    class ExitingBoundary:
+        def __init__(self):
+            self.process_id = None
+
+        def terminate(self, *, timeout=5.0):
+            self.process_id = int(pid_path.read_text())
+            deadline = time.monotonic() + 2
+            while time.monotonic() < deadline:
+                try:
+                    status = os.waitid(
+                        os.P_PID,
+                        self.process_id,
+                        os.WEXITED | os.WNOHANG | os.WNOWAIT,
+                    )
+                except ChildProcessError:
+                    return
+                if status is not None and status.si_pid == self.process_id:
+                    raise ews.ResourceContainmentError(
+                        "synthetic race with natural worker exit"
+                    )
+                time.sleep(0.005)
+            raise AssertionError("worker did not exit during shutdown race")
+
+        def current_process_count(self):
+            assert self.process_id is not None
+            try:
+                status = os.waitid(
+                    os.P_PID,
+                    self.process_id,
+                    os.WEXITED | os.WNOHANG | os.WNOWAIT,
+                )
+            except ChildProcessError:
+                return 0
+            return int(status is None or status.si_pid == 0)
+
+    boundary = ExitingBoundary()
+    monkeypatch.setattr(
+        WorkspaceBroker,
+        "_WorkspaceBroker__activate_resource_boundary",
+        staticmethod(lambda *_args: None),
+    )
+    monkeypatch.setattr(
+        "privacy.encrypted_workspace.build_staged_worker_command",
+        lambda command: list(command),
+    )
+
+    with pytest.raises(WorkspaceWorkerError) as excinfo:
+        broker.run_worker(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "import os,time; "
+                    f"open({str(pid_path)!r}, 'w').write(str(os.getpid())); "
+                    "time.sleep(0.2)"
+                ),
+            ],
+            timeout=0.05,
+            resource_boundary=boundary,
+        )
+
+    assert str(excinfo.value) == "workspace worker failed"
+    process_id = int(pid_path.read_text())
+    with pytest.raises(ChildProcessError):
+        os.waitpid(process_id, os.WNOHANG)
+    with pytest.raises(ProcessLookupError):
+        os.kill(process_id, 0)
+
+
+def test_worker_cancellation_terminates_and_reaps_child(
+    tmp_path,
+    monkeypatch,
+):
+    broker = build_broker(tmp_path)
+    pid_path = tmp_path / "cancelled-worker.pid"
+    source = f"""
+import os
+import time
+with open({str(pid_path)!r}, "w", encoding="utf-8") as handle:
+    handle.write(str(os.getpid()))
+time.sleep(30)
+"""
+
+    def cancel_after_worker_starts(_selector, timeout=None):
+        deadline = time.monotonic() + 5
+        while not pid_path.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert pid_path.exists(), "worker did not start before cancellation"
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(
+        selectors.DefaultSelector,
+        "select",
+        cancel_after_worker_starts,
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        run_worker(tmp_path, broker, source)
+
+    process_id = int(pid_path.read_text())
+    with pytest.raises(ChildProcessError):
+        os.waitpid(process_id, os.WNOHANG)
+    with pytest.raises(ProcessLookupError):
+        os.kill(process_id, 0)
 
 
 def test_worker_that_closes_protocol_pipe_cannot_hold_broker_open(tmp_path):
@@ -366,6 +758,88 @@ def test_failed_worker_group_is_signaled_before_leader_is_reaped(tmp_path, monke
         run_worker(tmp_path, broker, "import os; os._exit(7)")
 
     assert observed == [(os.CLD_EXITED, 7)]
+
+
+def test_group_signal_permission_failure_still_reaps_leader(
+    tmp_path,
+    monkeypatch,
+):
+    broker = build_broker(tmp_path)
+    pid_path = tmp_path / "failed-worker.pid"
+    import privacy.encrypted_workspace as ews
+
+    attempted_fallback_signals = []
+    real_kill = os.kill
+
+    def deny_group_signal(pgid, sig):
+        raise PermissionError("synthetic process-group denial")
+
+    def track_fallback_signal(pid, sig):
+        attempted_fallback_signals.append((pid, sig))
+        return real_kill(pid, sig)
+
+    monkeypatch.setattr(ews.os, "killpg", deny_group_signal)
+    monkeypatch.setattr(ews.os, "kill", track_fallback_signal)
+
+    with pytest.raises(
+        WorkspaceWorkerShutdownUnconfirmed,
+        match="shutdown is unconfirmed",
+    ) as excinfo:
+        run_worker(
+            tmp_path,
+            broker,
+            f"""
+import os
+with open({str(pid_path)!r}, "w", encoding="utf-8") as handle:
+    handle.write(str(os.getpid()))
+os._exit(7)
+""",
+        )
+
+    process_id = int(pid_path.read_text())
+    assert attempted_fallback_signals == [(process_id, signal.SIGKILL)]
+    assert not excinfo.value.process_reaped
+    assert os.waitpid(process_id, 0)[0] == process_id
+    with pytest.raises(ProcessLookupError):
+        os.kill(process_id, 0)
+
+
+def test_all_signal_permission_failures_preserve_recovery_authority(
+    tmp_path,
+    monkeypatch,
+):
+    broker = build_broker(tmp_path)
+    pid_path = tmp_path / "signal-denied-worker.pid"
+    import privacy.encrypted_workspace as ews
+
+    def deny_signal(*args):
+        raise PermissionError("synthetic signal denial")
+
+    real_kill = os.kill
+    real_killpg = os.killpg
+    monkeypatch.setattr(ews.os, "killpg", deny_signal)
+    monkeypatch.setattr(ews.os, "kill", deny_signal)
+
+    source = f"""
+import os
+import time
+with open({str(pid_path)!r}, "w", encoding="utf-8") as handle:
+    handle.write(str(os.getpid()))
+os.close(1)
+time.sleep(0.2)
+"""
+    with pytest.raises(
+        WorkspaceWorkerShutdownUnconfirmed,
+        match="shutdown is unconfirmed",
+    ) as excinfo:
+        run_worker(tmp_path, broker, source, timeout=0.05)
+
+    assert "synthetic signal denial" not in str(excinfo.value)
+    process_id = int(pid_path.read_text())
+    real_killpg(process_id, signal.SIGKILL)
+    assert os.waitpid(process_id, 0)[0] == process_id
+    with pytest.raises(ProcessLookupError):
+        real_kill(process_id, 0)
 
 
 def test_successful_worker_run_does_not_kill_anything(tmp_path):
@@ -943,18 +1417,44 @@ def base64_key_fragment():
 def test_broker_stages_worker_inside_resource_boundary(tmp_path):
     broker = build_broker(tmp_path)
     script = tmp_path / "contained-workspace-worker.py"
+    escaped_pid_path = tmp_path / "escaped-descendant.pid"
+    escaped_ready_path = tmp_path / "escaped-descendant.ready"
     script.write_text(
-        r"""
+        f"""
 import json
+import os
+import subprocess
 import sys
+import time
 
-request = {
+descendant = subprocess.Popen(
+    [
+        sys.executable,
+        "-c",
+        (
+            "import os,time; os.setsid(); "
+            f"open({str(escaped_ready_path)!r}, 'w').close(); "
+            "time.sleep(30)"
+        ),
+    ],
+    stdin=subprocess.DEVNULL,
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
+with open({str(escaped_pid_path)!r}, "w", encoding="utf-8") as handle:
+    handle.write(str(descendant.pid))
+deadline = time.monotonic() + 5
+while not os.path.exists({str(escaped_ready_path)!r}) and time.monotonic() < deadline:
+    time.sleep(0.01)
+if time.monotonic() >= deadline:
+    raise RuntimeError("escaped descendant did not start")
+request = {{
     "operation": "write",
     "path": "contained.txt",
     "content_b64": "Y29udGFpbmVk",
-}
+}}
 print(json.dumps(request), flush=True)
-assert json.loads(sys.stdin.readline()) == {"ok": True}
+assert json.loads(sys.stdin.readline()) == {{"ok": True}}
 """,
         encoding="utf-8",
     )
@@ -987,8 +1487,26 @@ assert json.loads(sys.stdin.readline()) == {"ok": True}
         )
 
         assert request_count == 1
+        deadline = time.monotonic() + 5
+        while (
+            boundary.current_process_count() != 0
+            and time.monotonic() < deadline
+        ):
+            time.sleep(0.01)
         assert boundary.current_process_count() == 0
         assert group_path.exists()
+        escaped_pid = int(escaped_pid_path.read_text())
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            try:
+                stat = Path(f"/proc/{escaped_pid}/stat").read_text()
+            except FileNotFoundError:
+                break
+            if stat.rsplit(")", 1)[1].split()[0] == "Z":
+                break
+            time.sleep(0.01)
+        else:
+            raise AssertionError("cgroup left a live escaped descendant")
     finally:
         boundary.close()
 
